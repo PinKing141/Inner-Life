@@ -41,12 +41,21 @@ class Stats:
 
 @dataclass
 class Character:
-    name: str
+    first_name: str
+    last_name: str
     gender: str
     country: str
     talent: str
+    city: str = ""
     age: int = 0
     alive: bool = True
+
+    @property
+    def name(self) -> str:
+        """Legacy accessor — most UI surfaces want the full name."""
+        if self.last_name:
+            return f"{self.first_name} {self.last_name}".strip()
+        return self.first_name
 
 
 @dataclass
@@ -99,6 +108,7 @@ class GameState:
     stats: Stats = field(default_factory=Stats)
     money: int = 0
     relationships: list[Relationship] = field(default_factory=list)
+    agents: list = field(default_factory=list)  # list[Agent]; typed via core.agents
     career: Job | None = None
     education: Education = field(default_factory=Education)
     feed: list[FeedEntry] = field(default_factory=list)
@@ -117,8 +127,11 @@ class GameState:
                 if self.character is None
                 else {
                     "name": self.character.name,
+                    "first_name": self.character.first_name,
+                    "last_name": self.character.last_name,
                     "gender": self.character.gender,
                     "country": self.character.country,
+                    "city": self.character.city,
                     "talent": self.character.talent,
                     "age": self.character.age,
                     "alive": self.character.alive,
@@ -136,6 +149,8 @@ class GameState:
                 }
                 for r in self.relationships
             ],
+            "agents": [a.to_dict() for a in self.agents],
+            "causal_chain": list(self.causal_chain),
             "career": (
                 None
                 if self.career is None
@@ -162,6 +177,95 @@ class GameState:
             "pending_event_id": self.pending_event_id,
             "tick": self.tick,
         }
+
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "GameState":
+        """Inverse of to_dict. Tolerant to missing fields from older snapshots."""
+        from core.agents import Agent  # local import to avoid cycle at module-load
+
+        char_d = data.get("character")
+        character: Character | None = None
+        if char_d is not None:
+            first = char_d.get("first_name")
+            last = char_d.get("last_name")
+            if first is None and last is None:
+                # Legacy snapshot: split a single "name" field.
+                full = (char_d.get("name") or "").strip()
+                parts = full.split(maxsplit=1)
+                first = parts[0] if parts else ""
+                last = parts[1] if len(parts) > 1 else ""
+            character = Character(
+                first_name=first or "",
+                last_name=last or "",
+                gender=char_d.get("gender", "NonBinary"),
+                country=char_d.get("country", ""),
+                city=char_d.get("city", ""),
+                talent=char_d.get("talent", ""),
+                age=char_d.get("age", 0),
+                alive=char_d.get("alive", True),
+            )
+
+        stats_d = data.get("stats") or {}
+        stats = Stats(
+            happiness=stats_d.get("happiness", 100),
+            health=stats_d.get("health", 100),
+            smarts=stats_d.get("smarts", 50),
+            looks=stats_d.get("looks", 50),
+        )
+
+        relationships = [
+            Relationship(
+                npc_id=r["npc_id"],
+                name=r["name"],
+                kind=r["kind"],
+                relationship=r.get("relationship", 50),
+                alive=r.get("alive", True),
+            )
+            for r in data.get("relationships", [])
+        ]
+
+        agents = [Agent.from_dict(a) for a in data.get("agents", [])]
+
+        career_d = data.get("career")
+        career = (
+            None
+            if career_d is None
+            else Job(job_id=career_d["job_id"], title=career_d["title"], salary=career_d["salary"])
+        )
+
+        edu_d = data.get("education") or {}
+        education = Education(
+            level=edu_d.get("level", "None"),
+            in_school=edu_d.get("in_school", False),
+        )
+
+        feed = [
+            FeedEntry(
+                age=f.get("age", 0),
+                text=f.get("text", ""),
+                kind=f.get("kind", "neutral"),
+                cause_id=f.get("cause_id"),
+                entry_id=f.get("entry_id", ""),
+            )
+            for f in data.get("feed", [])
+        ]
+
+        return cls(
+            seed=data.get("seed", 0),
+            mode=data.get("mode", "CREATION"),
+            character=character,
+            stats=stats,
+            money=data.get("money", 0),
+            relationships=relationships,
+            agents=agents,
+            career=career,
+            education=education,
+            feed=feed,
+            pending_event_id=data.get("pending_event_id"),
+            causal_chain=list(data.get("causal_chain", [])),
+            tick=data.get("tick", 0),
+        )
 
 
 def stage_for_age(age: int) -> Stage:

@@ -14,3 +14,8 @@ saves/
 .DS_Store
 .vscode/
 .idea/
+
+# Bulk name data — baked into core/content/_names_data.py at build time.
+# Re-generate with `python scripts/build_name_data.py` if you replace these.
+forenames.csv
+surnames.csv

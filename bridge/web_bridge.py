@@ -46,6 +46,28 @@ class WebBridge(QObject):
     def newGame(self, name: str, gender: str, country: str, talent: str) -> str:
         return json.dumps(self._controller.new_game(name, gender, country, talent))
 
+    @Slot(str, str, str, str, str, str, result=str)
+    def newGameFull(
+        self,
+        first_name: str,
+        last_name: str,
+        gender: str,
+        country: str,
+        city: str,
+        talent: str,
+    ) -> str:
+        """Phase: name split into first/last + city. Preferred call from JS."""
+        full = f"{first_name} {last_name}".strip()
+        return json.dumps(self._controller.new_game(
+            name=full,
+            gender=gender,
+            country=country,
+            talent=talent,
+            first_name=first_name,
+            last_name=last_name,
+            city=city,
+        ))
+
     @Slot(result=str)
     def ageUp(self) -> str:
         return json.dumps(self._controller.age_up())

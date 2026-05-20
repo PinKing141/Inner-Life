@@ -14,16 +14,26 @@ from __future__ import annotations
 from typing import Optional
 
 from core.content.events import EVENTS
+from core.predicates import evaluate as evaluate_predicates
 from core.rng import Rng
 from core.state import FeedEntry, GameState, Stats
 
 
 def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
-    """Try to fire one event this tick. Returns the chosen event dict, or None."""
+    """Try to fire one event this tick. Returns the chosen event dict, or None.
+
+    Filters by age window first, then by the optional ``predicates`` field on
+    each event (see core.predicates) — this is what makes careers, wealth,
+    and stats actually gate which beats can fire.
+    """
     if state.character is None:
         return None
     age = state.character.age
-    candidates = [e for e in EVENTS if e["min_age"] <= age <= e["max_age"]]
+    candidates = [
+        e for e in EVENTS
+        if e["min_age"] <= age <= e["max_age"]
+        and evaluate_predicates(e.get("predicates"), state)
+    ]
     if not candidates:
         return None
     # Single-roll model: shuffle candidates and pick the first whose prob hits.
@@ -58,6 +68,14 @@ def apply_effects(state: GameState, effects: dict) -> None:
         state.money += effects["money"]
 
 
+def _apply_side_effect(state: GameState, name: str) -> None:
+    """Side-effects are non-numeric mutations (e.g. clearing a job)."""
+    if name == "lose_job":
+        state.career = None
+    elif name == "leave_school":
+        state.education.in_school = False
+
+
 def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
     """Apply a chosen branch and log it. Records causal edges."""
     event = get_event(event_id)
@@ -77,6 +95,9 @@ def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
     })
 
     apply_effects(state, choice.get("effects", {}))
+    side = choice.get("side_effect")
+    if side:
+        _apply_side_effect(state, side)
 
     # Classify the feed entry by the net direction of the effects.
     eff = choice.get("effects", {})

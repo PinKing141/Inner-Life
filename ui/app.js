@@ -24,22 +24,23 @@ const ACTIVITIES = [
   { kind: "spend_time", name: "Visit kin",   cost: "Free", icon: "people" },
 ];
 
-const NAMES = {
+const FALLBACK_NAMES = {
   Male: ["Oliver","George","Arthur","Noah","Muhammad","Leo","Oscar","Harry","Jack","Henry"],
   Female: ["Olivia","Amelia","Isla","Ava","Ivy","Freya","Lily","Florence","Mia","Willow"],
   NonBinary: ["Alex","Jordan","Charlie","Sam","Taylor","Morgan","Casey","Riley","Quinn","Rowan"],
 };
-const COUNTRIES = ["United Kingdom","United States","Australia","Canada","Japan"];
+const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
 const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
 
-// --------------------------------------------------------------------------
-// Bridge layer. Real Qt bridge OR a minimal in-browser fallback.
-// --------------------------------------------------------------------------
+// How many recent feed entries to render. 100 years of play used to be one
+// unbounded list — the UI would lag in late game. 30 is plenty for context.
+const FEED_VISIBLE = 30;
 
 const App = {
   bridge: null,
   state: null,
   activeTab: "feed",
+  countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
 
   async connect() {
     if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined") {
@@ -48,6 +49,7 @@ const App = {
           this.bridge = channel.objects.bridge;
           this.bridge.stateChanged.connect((json) => {
             this.state = JSON.parse(json);
+            this.onSnapshot();
             this.render();
           });
           resolve();
@@ -56,18 +58,32 @@ const App = {
       const initial = await this.bridge.snapshot();
       this.state = JSON.parse(initial);
     } else {
-      // Browser fallback — useful for design iteration without Qt.
       console.warn("QWebChannel not present; using mock bridge.");
-      this.bridge = MockBridge.make((s) => { this.state = s; this.render(); });
+      this.bridge = MockBridge.make((s) => { this.state = s; this.onSnapshot(); this.render(); });
       this.state = MockBridge.initial();
+    }
+    this.onSnapshot();
+  },
+
+  onSnapshot() {
+    if (this.state && Array.isArray(this.state.countries) && this.state.countries.length) {
+      this.countries = this.state.countries;
+      populateCreation(this.countries);
     }
   },
 
   // ---- Verb wrappers ----
 
-  async newGame(name, gender, country, talent) {
-    const result = await this.bridge.newGame(name, gender, country, talent);
+  async newGame(firstName, lastName, gender, country, city, talent) {
+    let result;
+    if (this.bridge.newGameFull) {
+      result = await this.bridge.newGameFull(firstName, lastName, gender, country, city, talent);
+    } else {
+      const fullName = `${firstName} ${lastName}`.trim();
+      result = await this.bridge.newGame(fullName, gender, country, talent);
+    }
     if (typeof result === "string") this.state = JSON.parse(result);
+    this.onSnapshot();
     this.render();
   },
   async ageUp() {
@@ -111,8 +127,14 @@ const App = {
     const ch = s.character;
     const stage = stageForAge(ch.age);
 
-    document.getElementById("hud-name").textContent = ch.name;
+    const flag = s.country_flag || "";
+    document.getElementById("hud-name").textContent = `${flag} ${ch.name}`.trim();
     document.getElementById("hud-meta").textContent = `${stage} · Age ${ch.age}`;
+    const placeEl = document.getElementById("hud-place");
+    if (placeEl) {
+      const place = [ch.city, ch.country].filter(Boolean).join(", ");
+      placeEl.textContent = place;
+    }
     const moneyEl = document.getElementById("hud-money");
     moneyEl.textContent = formatMoney(s.money);
     moneyEl.classList.toggle("negative", s.money < 0);
@@ -141,15 +163,12 @@ const App = {
     Icons.hydrate(panel);
     this.bindPanel(panel);
 
-    // Tabs
     document.querySelectorAll(".tab").forEach((el) => {
       el.classList.toggle("active", el.dataset.tab === this.activeTab);
     });
 
-    // Disable age up while an event is pending
     document.getElementById("btn-age-up").disabled = !!s.pending_event;
 
-    // Auto-scroll feed
     if (this.activeTab === "feed") {
       const lastEntry = panel.querySelector(".feed-entry:last-child");
       if (lastEntry) lastEntry.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -157,7 +176,11 @@ const App = {
   },
 
   renderFeed() {
-    const entries = (this.state.feed || []).slice().reverse();
+    // Only the last FEED_VISIBLE years to keep late-game responsive.
+    const all = this.state.feed || [];
+    const trimmed = all.slice(-FEED_VISIBLE);
+    const omitted = all.length - trimmed.length;
+    const entries = trimmed.slice().reverse();
     return `
       <p class="panel-heading">The record</p>
       ${entries.map(e => `
@@ -166,6 +189,7 @@ const App = {
           <div class="feed-text">${escapeHtml(e.text)}</div>
         </div>
       `).join("")}
+      ${omitted > 0 ? `<p class="feed-truncated">${omitted} earlier entries kept in the record</p>` : ""}
     `;
   },
 
@@ -198,7 +222,7 @@ const App = {
       ${jobs.map(j => `
         <button class="job-row" data-action="apply" data-job="${j.job_id}">
           <div>
-            <div class="job-row-title">${escapeHtml(j.title)}</div>
+            <div class="job-row-title">${escapeHtml(j.title)}${j.track && j.track !== "general" ? ` <span class="job-track">(${j.track})</span>` : ""}</div>
             <div class="job-row-req">Req age ${j.min_age} · smarts ${j.min_smarts}</div>
           </div>
           <div class="job-row-salary">£${(j.salary / 1000).toFixed(0)}k</div>
@@ -216,11 +240,12 @@ const App = {
         const c = r.relationship > 70 ? "var(--good)"
                 : r.relationship > 30 ? "var(--warn)"
                 : "var(--bad)";
+        const kindLabel = r.alive ? r.kind : `${r.kind} (deceased)`;
         return `
-          <div class="rel-row">
+          <div class="rel-row${r.alive ? "" : " deceased"}">
             <div>
               <div class="rel-name">${escapeHtml(r.name)}</div>
-              <div class="rel-kind">${escapeHtml(r.kind)}</div>
+              <div class="rel-kind">${escapeHtml(kindLabel)}</div>
             </div>
             <div class="rel-bar">
               <div class="rel-bar-fill" style="width:${r.relationship}%;background:${c}"></div>
@@ -284,6 +309,69 @@ const App = {
 };
 
 // --------------------------------------------------------------------------
+// Creation form (populated dynamically once the snapshot arrives)
+// --------------------------------------------------------------------------
+
+let _creationPopulated = false;
+
+function populateCreation(countries) {
+  const countrySel = document.getElementById("cre-country");
+  if (!countrySel) return;
+
+  // Wipe and rebuild once. Subsequent snapshots reuse the populated form.
+  if (!_creationPopulated) {
+    countrySel.innerHTML = "";
+    countries.forEach((c) => {
+      const opt = new Option(`${c.flag}  ${c.name}`, c.code);
+      countrySel.add(opt);
+    });
+    // Default to the United Kingdom if available; otherwise first entry.
+    const defaultIx = countries.findIndex((c) => c.code === "GB");
+    countrySel.selectedIndex = defaultIx >= 0 ? defaultIx : 0;
+
+    const talentSel = document.getElementById("cre-talent");
+    talentSel.innerHTML = "";
+    TALENTS.forEach((t) => talentSel.add(new Option(t, t)));
+
+    refreshCityOptions();
+    refreshFlag();
+    _creationPopulated = true;
+  }
+}
+
+function selectedCountry() {
+  const code = document.getElementById("cre-country").value;
+  return (App.countries || []).find((c) => c.code === code);
+}
+
+function refreshFlag() {
+  const flagEl = document.getElementById("cre-country-flag");
+  const c = selectedCountry();
+  flagEl.textContent = c ? c.flag : "";
+}
+
+function refreshCityOptions() {
+  const citySel = document.getElementById("cre-city");
+  if (!citySel) return;
+  const c = selectedCountry();
+  citySel.innerHTML = "";
+  if (c && c.cities) {
+    c.cities.forEach((city) => citySel.add(new Option(city, city)));
+  }
+}
+
+function pickRandom(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function fillRandomName() {
+  const gender = document.getElementById("cre-gender").value;
+  const list = FALLBACK_NAMES[gender] || FALLBACK_NAMES.NonBinary;
+  document.getElementById("cre-first-name").value = pickRandom(list);
+  document.getElementById("cre-last-name").value = pickRandom(FALLBACK_SURNAMES);
+}
+
+// --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
 
@@ -311,7 +399,16 @@ function escapeHtml(str) {
 // --------------------------------------------------------------------------
 
 const MockBridge = (() => {
-  let state = { mode: "CREATION" };
+  const MOCK_COUNTRIES = [
+    { code: "GB", name: "United Kingdom", flag: "🇬🇧", currency: "GBP",
+      cities: ["London","Manchester","Birmingham","Edinburgh","Glasgow","Liverpool","Bristol"] },
+    { code: "US", name: "United States", flag: "🇺🇸", currency: "USD",
+      cities: ["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Francisco"] },
+    { code: "JP", name: "Japan", flag: "🇯🇵", currency: "JPY",
+      cities: ["Tokyo","Osaka","Yokohama","Nagoya","Sapporo","Kyoto","Fukuoka"] },
+  ];
+
+  let state = { mode: "CREATION", countries: MOCK_COUNTRIES };
   let pushTo = null;
 
   function broadcast() {
@@ -319,29 +416,48 @@ const MockBridge = (() => {
   }
 
   return {
-    initial() { return { mode: "CREATION" }; },
+    initial() { return { mode: "CREATION", countries: MOCK_COUNTRIES }; },
     make(onChange) {
       pushTo = onChange;
       return {
         async snapshot() { return JSON.stringify(state); },
         async newGame(name, gender, country, talent) {
+          return this.newGameFull(name, "", gender, country, "", talent);
+        },
+        async newGameFull(firstName, lastName, gender, country, city, talent) {
+          const cn = MOCK_COUNTRIES.find((c) => c.code === country || c.name === country) || MOCK_COUNTRIES[0];
           state = {
             mode: "PLAYING",
-            character: { name, gender, country, talent, age: 0, alive: true },
+            character: {
+              name: `${firstName} ${lastName}`.trim(),
+              first_name: firstName,
+              last_name: lastName,
+              gender,
+              country: cn.name,
+              city: city || cn.cities[0],
+              talent,
+              age: 0,
+              alive: true,
+            },
             stats: { happiness: 100, health: 90, smarts: 60, looks: 60 },
             money: 500,
             relationships: [
-              { npc_id: 1, name: "Mum", kind: "Mother", relationship: 90 },
-              { npc_id: 2, name: "Dad", kind: "Father", relationship: 90 },
+              { npc_id: 1, name: `Helen ${lastName}`.trim(), kind: "Mother", relationship: 90, alive: true },
+              { npc_id: 2, name: `Robert ${lastName}`.trim(), kind: "Father", relationship: 90, alive: true },
             ],
+            agents: [],
             career: null,
             education: { level: "None", in_school: false },
-            feed: [{ age: 0, text: `You were born in ${country}.`, kind: "special" }],
+            feed: [{ age: 0, text: `You were born in ${city || cn.cities[0]}, ${cn.name}.`, kind: "special" }],
             pending_event: null,
             tick: 0,
+            country_flag: cn.flag,
+            country_code: cn.code,
+            currency: cn.currency,
+            countries: MOCK_COUNTRIES,
             jobs: [
-              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, salary: 15000 },
-              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, salary: 16000 },
+              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, salary: 15000, track: "general" },
+              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, salary: 16000, track: "general" },
             ],
           };
           broadcast();
@@ -368,29 +484,28 @@ const MockBridge = (() => {
 document.addEventListener("DOMContentLoaded", async () => {
   Icons.hydrate();
 
-  // Populate creation dropdowns
-  const countrySel = document.getElementById("cre-country");
-  COUNTRIES.forEach(c => countrySel.add(new Option(c, c)));
-  const talentSel = document.getElementById("cre-talent");
-  TALENTS.forEach(t => talentSel.add(new Option(t, t)));
-
-  document.getElementById("btn-random").addEventListener("click", () => {
-    const g = document.getElementById("cre-gender").value;
-    const list = NAMES[g] || NAMES.NonBinary;
-    document.getElementById("cre-name").value = list[Math.floor(Math.random() * list.length)];
+  document.getElementById("btn-random").addEventListener("click", fillRandomName);
+  document.getElementById("cre-country").addEventListener("change", () => {
+    refreshFlag();
+    refreshCityOptions();
   });
 
   document.getElementById("creation-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    let name = document.getElementById("cre-name").value.trim();
+    let firstName = document.getElementById("cre-first-name").value.trim();
+    let lastName = document.getElementById("cre-last-name").value.trim();
     const gender = document.getElementById("cre-gender").value;
-    if (!name) {
-      const list = NAMES[gender] || NAMES.NonBinary;
-      name = list[Math.floor(Math.random() * list.length)];
+    if (!firstName) {
+      const list = FALLBACK_NAMES[gender] || FALLBACK_NAMES.NonBinary;
+      firstName = pickRandom(list);
+    }
+    if (!lastName) {
+      lastName = pickRandom(FALLBACK_SURNAMES);
     }
     const country = document.getElementById("cre-country").value;
+    const city = document.getElementById("cre-city").value;
     const talent = document.getElementById("cre-talent").value;
-    App.newGame(name, gender, country, talent);
+    App.newGame(firstName, lastName, gender, country, city, talent);
   });
 
   document.getElementById("btn-age-up").addEventListener("click", () => App.ageUp());
