@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Iterator, TextIO
 
 HERE = Path(__file__).resolve().parent.parent
-FORENAMES_CSV = HERE / "forenames.csv"
-SURNAMES_CSV = HERE / "surnames.csv"
+DATA_DIR = HERE / "data"
+FORENAMES_CSV = DATA_DIR / "forenames.csv"
+SURNAMES_CSV = DATA_DIR / "surnames.csv"
 OUT_PATH = HERE / "core" / "content" / "_names_data.py"
 
 TOP_PER_GROUP = 40  # top-N per (country, gender) for forenames; per country for surnames
