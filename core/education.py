@@ -26,4 +26,9 @@ def tick(state: GameState) -> str | None:
         state.education.level = "Secondary Education"
         state.education.in_school = False
         return "You have graduated from Secondary School."
+    if age == 19 and state.education.university_intent == "attend" and not state.education.university_dropped_out:
+        state.education.level = "University"
+        state.education.in_school = True
+        major = state.education.university_major or "an undeclared course"
+        return f"You started university, studying {major}."
     return None

@@ -137,6 +137,42 @@ class GameController:
             self._broadcast()
         return self.snapshot()
 
+    def set_university_plan(self, attend: bool, major: str = "") -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        s = self.state
+        s.education.university_intent = "attend" if attend else "skip"
+        s.education.university_major = major.strip() if attend else ""
+        s.feed.append(FeedEntry(
+            age=s.character.age,
+            text=(
+                f"You plan to attend university and study {s.education.university_major or 'an undeclared subject'}."
+                if attend
+                else "You decided not to attend university."
+            ),
+            kind="neutral",
+            entry_id=f"feed:edu_plan:{s.tick}",
+        ))
+        self._broadcast()
+        return self.snapshot()
+
+    def drop_out_university(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        s = self.state
+        if s.education.level != "University" or not s.education.in_school:
+            return self.snapshot()
+        s.education.in_school = False
+        s.education.university_dropped_out = True
+        s.feed.append(FeedEntry(
+            age=s.character.age,
+            text="You dropped out of university.",
+            kind="bad",
+            entry_id=f"feed:edu_dropout:{s.tick}",
+        ))
+        self._broadcast()
+        return self.snapshot()
+
     def apply_for_job(self, job_id: str) -> dict:
         if self.state is None:
             return self.snapshot()
