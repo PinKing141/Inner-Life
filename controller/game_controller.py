@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import economy, relationships, sim
+from core import economy, legend, relationships, sim
 from core.content import countries as countries_mod
 from core.state import FeedEntry, GameState
 
@@ -185,6 +185,11 @@ class GameController:
         ))
         self._broadcast()
         return self.snapshot()
+
+    def read_legend(self, target_entry_id: str = "") -> dict:
+        if self.state is None:
+            return {"target_entry_id": None, "target_text": "", "summary": "No life in progress.", "items": []}
+        return legend.read_legend(self.state, target_entry_id or None)
 
     def activity(self, kind: str) -> dict:
         if self.state is None or self.state.character is None:
