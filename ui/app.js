@@ -317,14 +317,32 @@ function populateCreation(countries) {
   const countrySel = document.getElementById("cre-country");
   if (!countrySel) return;
 
-  // Wipe and rebuild once. Subsequent snapshots reuse the populated form.
   if (!_creationPopulated) {
     countrySel.innerHTML = "";
+    const byContinent = new Map();
     countries.forEach((c) => {
-      const opt = new Option(c.name, c.code);
-      countrySel.add(opt);
+      const meta = (typeof FLAG_ASSET_MAP !== "undefined") ? FLAG_ASSET_MAP[c.code] : null;
+      const continent = meta?.continent || "other";
+      if (!byContinent.has(continent)) byContinent.set(continent, []);
+      byContinent.get(continent).push(c);
     });
-    // Default to the United Kingdom if available; otherwise first entry.
+
+    const order = ["africa", "asia", "europe", "north-america", "south-america", "oceania", "other"];
+    const label = {
+      "africa": "Africa", "asia": "Asia", "europe": "Europe", "north-america": "North America",
+      "south-america": "South America", "oceania": "Oceania", "other": "Other"
+    };
+
+    order.forEach((key) => {
+      const list = byContinent.get(key);
+      if (!list || !list.length) return;
+      const group = document.createElement("optgroup");
+      group.label = label[key];
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      list.forEach((c) => group.appendChild(new Option(c.name, c.code)));
+      countrySel.appendChild(group);
+    });
+
     const defaultIx = countries.findIndex((c) => c.code === "GB");
     countrySel.selectedIndex = defaultIx >= 0 ? defaultIx : 0;
 
@@ -346,7 +364,7 @@ function selectedCountry() {
 function refreshFlag() {
   const flagEl = document.getElementById("cre-country-flag");
   const c = selectedCountry();
-  flagEl.innerHTML = c ? (FLAGS[c.code] || "") : "";
+  flagEl.innerHTML = c ? flagSvgImg(c.code, c.name) : "";
 }
 
 function refreshCityOptions() {
@@ -404,7 +422,7 @@ function buildCountryPicker() {
       <div class="country-grid">
         ${group.countries.map(c => `
           <button type="button" class="country-option" data-code="${c.code}" data-name="${escapeHtml(c.name)}">
-            <span class="country-flag">${FLAGS[c.code] || ""}</span>
+            <span class="country-flag">${flagSvgImg(c.code, c.name)}</span>
             <span class="country-name">${escapeHtml(c.name)}</span>
           </button>
         `).join("")}
