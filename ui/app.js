@@ -43,7 +43,23 @@ const App = {
   activeTab: "feed",
   countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
 
+  async ensureQtWebChannel() {
+    if (typeof qt === "undefined" || typeof QWebChannel !== "undefined") {
+      return;
+    }
+
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "qrc:///qtwebchannel/qwebchannel.js";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Failed to load qtwebchannel.js"));
+      document.head.appendChild(script);
+    });
+  },
+
   async connect() {
+    await this.ensureQtWebChannel();
+
     if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined") {
       await new Promise((resolve) => {
         new QWebChannel(qt.webChannelTransport, (channel) => {
