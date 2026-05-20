@@ -19,8 +19,9 @@ class LegendOptions:
 def _label_for(node: dict) -> str:
     kind = node.get("kind", "")
     if kind == "event_choice":
-        event_id = node.get("event_id", "event")
-        choice = node.get("choice", "")
+        details = node.get("details") if isinstance(node.get("details"), dict) else {}
+        event_id = details.get("event_id") or node.get("event_id", "event")
+        choice = details.get("choice") or node.get("choice", "")
         if choice:
             return f"{event_id}: {choice}"
         return event_id
@@ -74,7 +75,10 @@ def read_legend(state: GameState, target_entry_id: str | None = None, *, options
             "label": _label_for(node),
             "kind": node.get("kind", "unknown"),
             "tick": node.get("tick"),
-            "event_id": node.get("event_id"),
+            "event_id": (node.get("details", {}) or {}).get("event_id", node.get("event_id")),
+            "parent_id": node.get("parent_id"),
+            "schema_version": node.get("schema_version"),
+            "source": node.get("source"),
         })
         current_id = node.get("parent_id")
         depth += 1
