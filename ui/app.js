@@ -170,8 +170,7 @@ const App = {
     document.getElementById("btn-age-up").disabled = !!s.pending_event;
 
     if (this.activeTab === "feed") {
-      const lastEntry = panel.querySelector(".feed-entry:last-child");
-      if (lastEntry) lastEntry.scrollIntoView({ behavior: "smooth", block: "end" });
+      panel.scrollTop = 0;
     }
   },
 
@@ -392,6 +391,40 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
+}
+
+function buildCountryPicker() {
+  const root = document.getElementById("cre-country-picker");
+  const hidden = document.getElementById("cre-country");
+  if (!root || typeof COUNTRIES_BY_CONTINENT === "undefined") return;
+
+  root.innerHTML = COUNTRIES_BY_CONTINENT.map(group => `
+    <div class="country-group">
+      <div class="country-group-label">${escapeHtml(group.name)}</div>
+      <div class="country-grid">
+        ${group.countries.map(c => `
+          <button type="button" class="country-option" data-code="${c.code}" data-name="${escapeHtml(c.name)}">
+            <span class="country-flag">${FLAGS[c.code] || ""}</span>
+            <span class="country-name">${escapeHtml(c.name)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  const setSelected = (btn) => {
+    root.querySelectorAll(".country-option.selected").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    hidden.value = btn.dataset.name;
+  };
+
+  root.querySelectorAll(".country-option").forEach((btn) => {
+    btn.addEventListener("click", () => setSelected(btn));
+  });
+
+  // Default to first country (United Kingdom).
+  const first = root.querySelector(".country-option");
+  if (first) setSelected(first);
 }
 
 // --------------------------------------------------------------------------

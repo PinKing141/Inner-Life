@@ -10,11 +10,40 @@ call at a time plus a state-broadcast slot.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
+from enum import Enum
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 from controller import GameController
+
+
+def _json_default(obj):
+    """Safety net for anything in the snapshot that isn't natively JSON-able.
+
+    The core has been growing — predicates, conditions, enums — and any new
+    object that finds its way into the snapshot tree shouldn't kill the whole
+    UI. Best-effort: unwrap dataclasses, enums, sets; everything else degrades
+    to a string with its class name so the UI can still render the rest.
+    """
+    if dataclasses.is_dataclass(obj):
+        return dataclasses.asdict(obj)
+    if isinstance(obj, Enum):
+        return obj.value
+    if isinstance(obj, (set, frozenset)):
+        return list(obj)
+    to_dict = getattr(obj, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return to_dict()
+        except Exception:
+            pass
+    return {"__type__": type(obj).__name__, "repr": repr(obj)}
+
+
+def _dumps(payload) -> str:
+    return json.dumps(payload, default=_json_default)
 
 
 class WebBridge(QObject):
@@ -34,17 +63,17 @@ class WebBridge(QObject):
         self._controller.subscribe(self._emit_state)
 
     def _emit_state(self, payload: dict) -> None:
-        self.stateChanged.emit(json.dumps(payload))
+        self.stateChanged.emit(_dumps(payload))
 
     # ---- Slots callable from JS ----
 
     @Slot(result=str)
     def snapshot(self) -> str:
-        return json.dumps(self._controller.snapshot())
+        return _dumps(self._controller.snapshot())
 
     @Slot(str, str, str, str, result=str)
     def newGame(self, name: str, gender: str, country: str, talent: str) -> str:
-        return json.dumps(self._controller.new_game(name, gender, country, talent))
+        return _dumps(self._controller.new_game(name, gender, country, talent))
 
     @Slot(str, str, str, str, str, str, result=str)
     def newGameFull(
@@ -70,16 +99,16 @@ class WebBridge(QObject):
 
     @Slot(result=str)
     def ageUp(self) -> str:
-        return json.dumps(self._controller.age_up())
+        return _dumps(self._controller.age_up())
 
     @Slot(int, result=str)
     def choose(self, choice_index: int) -> str:
-        return json.dumps(self._controller.choose(choice_index))
+        return _dumps(self._controller.choose(choice_index))
 
     @Slot(str, result=str)
     def applyForJob(self, job_id: str) -> str:
-        return json.dumps(self._controller.apply_for_job(job_id))
+        return _dumps(self._controller.apply_for_job(job_id))
 
     @Slot(str, result=str)
     def activity(self, kind: str) -> str:
-        return json.dumps(self._controller.activity(kind))
+        return _dumps(self._controller.activity(kind))
