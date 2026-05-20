@@ -44,3 +44,23 @@ def test_different_seeds_diverge():
     a_log = [f.text for f in a.feed]
     b_log = [f.text for f in b.feed]
     assert a_log != b_log, "Two different seeds produced identical lives; determinism broken in the wrong direction."
+
+
+def test_same_seed_same_university_transition_snapshot():
+    a = sim.new_game(seed=123, name="A", gender="Male", country="UK", talent="Sports")
+    b = sim.new_game(seed=123, name="A", gender="Male", country="UK", talent="Sports")
+    a.education.university_intent = "attend"
+    a.education.university_major = "Physics"
+    b.education.university_intent = "attend"
+    b.education.university_major = "Physics"
+
+    while a.character and a.character.age < 18:
+        sim.age_up(a)
+        sim.age_up(b)
+        if a.pending_event_id is not None:
+            sim.resolve_choice(a, 0)
+        if b.pending_event_id is not None:
+            sim.resolve_choice(b, 0)
+
+    assert a.education == b.education
+    assert [f.text for f in a.feed] == [f.text for f in b.feed]

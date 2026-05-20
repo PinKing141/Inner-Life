@@ -142,13 +142,15 @@ def test_university_plan_major_and_dropout_flow():
     c.set_university_plan(attend=True, major="Computer Science")
     assert c.state.education.university_intent == "attend"
     assert c.state.education.university_major == "Computer Science"
-    # age to 19 so education tick enrolls in university
-    while c.state.character and c.state.character.age < 19:
+    # age to 18 so education tick graduates + enrolls in the same year
+    while c.state.character and c.state.character.age < 18:
         c.age_up()
         if c.state.pending_event_id is not None:
             c.choose(0)
     assert c.state.education.level == "University"
     assert c.state.education.in_school is True
+    assert "You graduated secondary school." in c.state.feed[-1].text
+    assert "You enrolled in Computer Science course at university." in c.state.feed[-1].text
     c.drop_out_university()
     assert c.state.education.university_dropped_out is True
     assert c.state.education.in_school is False
@@ -162,3 +164,19 @@ def test_university_skip_plan_is_serialized():
     snap = c.state.to_dict()
     assert snap["education"]["university_intent"] == "skip"
     assert snap["education"]["university_major"] == ""
+
+
+def test_secondary_graduation_skip_happens_at_18():
+    c = GameController()
+    c.new_game(seed=11, name="", gender="Male", country="US", talent="Sports")
+    assert c.state is not None
+    c.set_university_plan(attend=False)
+    while c.state.character and c.state.character.age < 18:
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+    assert c.state.education.level == "Secondary Education"
+    assert c.state.education.in_school is False
+    age_18_entries = [f.text for f in c.state.feed if f.age == 18]
+    assert any("You graduated secondary school." in t for t in age_18_entries)
+    assert any("You chose not to attend university." in t for t in age_18_entries)
