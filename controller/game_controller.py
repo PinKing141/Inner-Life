@@ -58,18 +58,38 @@ class GameController:
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
             snap["country_flag"] = country.flag
-            snap["country_flag_svg"] = f"../data/svg/{country.code.lower()}.svg"
+            # Resolve the on-disk SVG location under ui/flags-svg/** and emit a
+            # path relative to the `ui/` folder so the frontend can load it.
+            repo_root = Path(__file__).resolve().parents[1]
+            ui_root = repo_root / "ui"
+            code = country.code.lower()
+            found = None
+            for p in (ui_root / "flags-svg").rglob(f"{code}.svg"):
+                found = p
+                break
+            if found:
+                snap["country_flag_svg"] = str(found.relative_to(ui_root)).replace('\\', '/')
+            else:
+                snap["country_flag_svg"] = f"flags-svg/other/{code}.svg"
             snap["country_code"] = country.code
             snap["currency"] = country.currency
         return snap
 
     def _countries_for_ui(self) -> list[dict]:
+        repo_root = Path(__file__).resolve().parents[1]
+        ui_root = repo_root / "ui"
+        def resolve_svg(code: str) -> str:
+            code_l = code.lower()
+            for p in (ui_root / "flags-svg").rglob(f"{code_l}.svg"):
+                return str(p.relative_to(ui_root)).replace('\\', '/')
+            return f"flags-svg/other/{code_l}.svg"
+
         return [
             {
                 "code": c.code,
                 "name": c.name,
                 "flag": c.flag,
-                "flag_svg": f"../data/svg/{c.code.lower()}.svg",
+                "flag_svg": resolve_svg(c.code),
                 "currency": c.currency,
                 "cities": list(c.cities),
             }

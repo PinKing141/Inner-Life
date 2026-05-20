@@ -31,7 +31,7 @@ const FALLBACK_NAMES = {
 };
 const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
 const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
-const DATA_BASE = "../data";
+const DATA_BASE = "flags-svg";
 
 // How many recent feed entries to render. 100 years of play used to be one
 // unbounded list — the UI would lag in late game. 30 is plenty for context.
@@ -417,7 +417,7 @@ function buildCountryPicker() {
       <div class="country-grid">
         ${group.countries.map(c => `
           <button type="button" class="country-option" data-code="${c.code}" data-name="${escapeHtml(c.name)}">
-            <span class="country-flag">${FLAGS[c.code] || ""}</span>
+            <span class="country-flag"><img src="${DATA_BASE}/${group.name.toLowerCase().replace(/\s+/g,'-')}/${c.code.toLowerCase()}.svg" alt="${escapeHtml(c.name)} flag" /></span>
             <span class="country-name">${escapeHtml(c.name)}</span>
           </button>
         `).join("")}
@@ -450,7 +450,7 @@ const MockBridge = (() => {
       code: "GB",
       name: "United Kingdom",
       flag: "🇬🇧",
-      flag_svg: "../data/svg/gb.svg",
+      flag_svg: "flags-svg/europe/gb.svg",
       currency: "GBP",
       cities: ["London","Manchester","Birmingham","Edinburgh","Glasgow","Liverpool","Bristol"],
     },
@@ -458,7 +458,7 @@ const MockBridge = (() => {
       code: "US",
       name: "United States",
       flag: "🇺🇸",
-      flag_svg: "../data/svg/us.svg",
+      flag_svg: "flags-svg/north-america/us.svg",
       currency: "USD",
       cities: ["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Francisco"],
     },
@@ -466,7 +466,7 @@ const MockBridge = (() => {
       code: "JP",
       name: "Japan",
       flag: "🇯🇵",
-      flag_svg: "../data/svg/jp.svg",
+      flag_svg: "flags-svg/asia/jp.svg",
       currency: "JPY",
       cities: ["Tokyo","Osaka","Yokohama","Nagoya","Sapporo","Kyoto","Fukuoka"],
     },
