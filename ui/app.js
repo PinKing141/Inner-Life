@@ -321,7 +321,7 @@ function populateCreation(countries) {
   if (!_creationPopulated) {
     countrySel.innerHTML = "";
     countries.forEach((c) => {
-      const opt = new Option(`${c.flag}  ${c.name}`, c.code);
+      const opt = new Option(c.name, c.code);
       countrySel.add(opt);
     });
     // Default to the United Kingdom if available; otherwise first entry.
@@ -346,7 +346,7 @@ function selectedCountry() {
 function refreshFlag() {
   const flagEl = document.getElementById("cre-country-flag");
   const c = selectedCountry();
-  flagEl.textContent = c ? c.flag : "";
+  flagEl.innerHTML = c ? (FLAGS[c.code] || "") : "";
 }
 
 function refreshCityOptions() {
