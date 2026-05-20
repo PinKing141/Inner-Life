@@ -96,6 +96,19 @@ class InDebt:
 
 # --- Career / education ---------------------------------------------------
 
+
+@dataclass(frozen=True)
+class DuringRecession:
+    def __call__(self, s: GameState) -> bool:
+        return s.world.recession
+
+
+@dataclass(frozen=True)
+class DuringWar:
+    def __call__(self, s: GameState) -> bool:
+        return s.world.war
+
+
 @dataclass(frozen=True)
 class HasJob:
     """True if the player has any job."""

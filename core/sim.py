@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, economy, education, events, relationships, social
+from core import agents, economy, education, events, relationships, social, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -120,6 +120,9 @@ def age_up(state: GameState) -> None:
     state.character.age += 1
     age = state.character.age
     tick_rng = Rng(state.seed).fork(state.tick)
+
+    # --- Macro world tick (Phase 4A) ---
+    world.tick_world(state, tick_rng.fork(29))
 
     # --- NPC world tick (Phase 1 — parents and friends age too) ---
     agents.tick_world(state, tick_rng.fork(31))

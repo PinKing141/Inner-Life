@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from core.world import World
+
 Stage = Literal["Baby", "Child", "Teenager", "Adult", "Elder"]
 GameMode = Literal["CREATION", "PLAYING", "DEATH"]
 
@@ -120,6 +122,7 @@ class GameState:
     pending_event_id: str | None = None  # event awaiting player choice
     fired_events: list[str] = field(default_factory=list)  # ids the player has already seen
     causal_chain: list[dict] = field(default_factory=list)
+    world: World = field(default_factory=World)
     tick: int = 0  # how many times age_up has been called
 
     # --- Serialization (for save/load and JS bridge) ---
@@ -159,6 +162,7 @@ class GameState:
             "social_edges": [e.to_dict() for e in self.social_edges],
             "rumours": [r.to_dict() for r in self.rumours],
             "causal_chain": list(self.causal_chain),
+            "world": self.world.to_dict(),
             "career": (
                 None
                 if self.career is None
@@ -269,6 +273,8 @@ class GameState:
             for f in data.get("feed", [])
         ]
 
+        world = World.from_dict(data.get("world") or {})
+
         return cls(
             seed=data.get("seed", 0),
             mode=data.get("mode", "CREATION"),
@@ -285,6 +291,7 @@ class GameState:
             pending_event_id=data.get("pending_event_id"),
             fired_events=list(data.get("fired_events", [])),
             causal_chain=list(data.get("causal_chain", [])),
+            world=world,
             tick=data.get("tick", 0),
         )
 

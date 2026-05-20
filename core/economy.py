@@ -44,10 +44,21 @@ def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
     """Returns (earnings, living_cost, note). State is NOT mutated."""
     if state.character is None or state.character.age < 18:
         return 0, 0, ""
-    earnings = state.career.salary if state.career else 0
-    living_cost = 5_000 + rng.randint(0, 2_000)
+    world = state.world.clamped()
+    inflation = world.inflation_index
+
+    base_living = 5_000 + rng.randint(0, 2_000)
+    recession_penalty = 600 if world.recession else 0
+    living_cost = int((base_living + recession_penalty) * inflation)
+
     if state.career:
-        note = f"You earned £{earnings:,} from your job."
+        unemployment_risk = max(0.0, world.unemployment_rate - 0.04)
+        salary_hit = min(0.35, unemployment_risk * 1.6 + (0.12 if world.recession else 0.0))
+        earnings = int(state.career.salary * (1.0 - salary_hit))
+        note = f"You earned £{earnings:,} from your job in a {'recession' if world.recession else 'volatile'} economy."
     else:
-        note = "You are unemployed and struggling."
-    return earnings, living_cost, note
+        pressure = int(400 * inflation) + (500 if world.recession else 0)
+        earnings = -pressure
+        note = "You are unemployed and struggling in a weak economy."
+
+    return earnings, max(0, living_cost), note

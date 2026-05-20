@@ -25,6 +25,7 @@ from core.predicates import (
     MinMoney,
     MinSmarts,
     NoJob,
+    DuringRecession,
 )
 
 # Each "choice" maps to: text shown to player, stat/money effects, log line.
@@ -220,6 +221,18 @@ EVENTS: list[dict] = [
              "log": "You went. Nobody really noticed you."},
             {"text": "Skip it", "effects": {"happiness": -3},
              "log": "You skipped. Awkward Monday morning."},
+        ],
+    },
+    {
+        "id": "recession_layoff_panic",
+        "min_age": 22, "max_age": 65, "prob": 0.25,
+        "predicates": [DuringRecession()],
+        "text": "Rumours of layoffs spread as companies slash budgets during the recession.",
+        "choices": [
+            {"text": "Cut spending immediately", "effects": {"money": 800, "happiness": -6},
+             "log": "You tightened your budget and built a small cash buffer."},
+            {"text": "Ignore it and hope for the best", "effects": {"money": -600, "happiness": -8},
+             "log": "You carried on spending and felt the squeeze when bills rose."},
         ],
     },
     {
