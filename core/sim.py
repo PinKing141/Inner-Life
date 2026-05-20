@@ -129,8 +129,7 @@ def new_game(
     elif talent == "Sports":
         base_health += 20
 
-    wealth_tiers = [0, 500, 2_000, 10_000]
-    starting_wealth = rng.choice(wealth_tiers)
+    starting_wealth = 0
 
     state = GameState(
         seed=seed,

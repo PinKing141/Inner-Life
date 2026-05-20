@@ -503,7 +503,7 @@ const MockBridge = (() => {
               alive: true,
             },
             stats: { happiness: 100, health: 90, smarts: 60, looks: 60 },
-            money: 500,
+            money: 0,
             relationships: [
               { npc_id: 1, name: `Helen ${lastName}`.trim(), kind: "Mother", relationship: 90, alive: true },
               { npc_id: 2, name: `Robert ${lastName}`.trim(), kind: "Father", relationship: 90, alive: true },
