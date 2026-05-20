@@ -58,13 +58,21 @@ class GameController:
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
             snap["country_flag"] = country.flag
+            snap["country_flag_svg"] = f"../data/svg/{country.code.lower()}.svg"
             snap["country_code"] = country.code
             snap["currency"] = country.currency
         return snap
 
     def _countries_for_ui(self) -> list[dict]:
         return [
-            {"code": c.code, "name": c.name, "flag": c.flag, "currency": c.currency, "cities": list(c.cities)}
+            {
+                "code": c.code,
+                "name": c.name,
+                "flag": c.flag,
+                "flag_svg": f"../data/svg/{c.code.lower()}.svg",
+                "currency": c.currency,
+                "cities": list(c.cities),
+            }
             for c in countries_mod.list_countries()
         ]
 

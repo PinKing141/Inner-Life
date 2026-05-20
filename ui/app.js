@@ -31,6 +31,7 @@ const FALLBACK_NAMES = {
 };
 const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
 const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
+const DATA_BASE = "../data";
 
 // How many recent feed entries to render. 100 years of play used to be one
 // unbounded list — the UI would lag in late game. 30 is plenty for context.
@@ -127,8 +128,15 @@ const App = {
     const ch = s.character;
     const stage = stageForAge(ch.age);
 
-    const flag = s.country_flag || "";
-    document.getElementById("hud-name").textContent = `${flag} ${ch.name}`.trim();
+    const flagEl = document.getElementById("hud-country-flag");
+    if (flagEl) {
+      if (s.country_flag_svg) {
+        flagEl.innerHTML = `<img src="${escapeHtml(s.country_flag_svg)}" alt="${escapeHtml(ch.country)} flag" />`;
+      } else {
+        flagEl.textContent = s.country_flag || "";
+      }
+    }
+    document.getElementById("hud-name").textContent = ch.name;
     document.getElementById("hud-meta").textContent = `${stage} · Age ${ch.age}`;
     const placeEl = document.getElementById("hud-place");
     if (placeEl) {
@@ -346,7 +354,12 @@ function selectedCountry() {
 function refreshFlag() {
   const flagEl = document.getElementById("cre-country-flag");
   const c = selectedCountry();
-  flagEl.innerHTML = c ? (FLAGS[c.code] || "") : "";
+  if (!flagEl) return;
+  if (c && c.flag_svg) {
+    flagEl.innerHTML = `<img src="${escapeHtml(c.flag_svg)}" alt="${escapeHtml(c.name)} flag" />`;
+  } else {
+    flagEl.textContent = c ? c.flag || "" : "";
+  }
 }
 
 function refreshCityOptions() {
@@ -433,12 +446,30 @@ function buildCountryPicker() {
 
 const MockBridge = (() => {
   const MOCK_COUNTRIES = [
-    { code: "GB", name: "United Kingdom", flag: "🇬🇧", currency: "GBP",
-      cities: ["London","Manchester","Birmingham","Edinburgh","Glasgow","Liverpool","Bristol"] },
-    { code: "US", name: "United States", flag: "🇺🇸", currency: "USD",
-      cities: ["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Francisco"] },
-    { code: "JP", name: "Japan", flag: "🇯🇵", currency: "JPY",
-      cities: ["Tokyo","Osaka","Yokohama","Nagoya","Sapporo","Kyoto","Fukuoka"] },
+    {
+      code: "GB",
+      name: "United Kingdom",
+      flag: "🇬🇧",
+      flag_svg: "../data/svg/gb.svg",
+      currency: "GBP",
+      cities: ["London","Manchester","Birmingham","Edinburgh","Glasgow","Liverpool","Bristol"],
+    },
+    {
+      code: "US",
+      name: "United States",
+      flag: "🇺🇸",
+      flag_svg: "../data/svg/us.svg",
+      currency: "USD",
+      cities: ["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Francisco"],
+    },
+    {
+      code: "JP",
+      name: "Japan",
+      flag: "🇯🇵",
+      flag_svg: "../data/svg/jp.svg",
+      currency: "JPY",
+      cities: ["Tokyo","Osaka","Yokohama","Nagoya","Sapporo","Kyoto","Fukuoka"],
+    },
   ];
 
   let state = { mode: "CREATION", countries: MOCK_COUNTRIES };
@@ -485,6 +516,7 @@ const MockBridge = (() => {
             pending_event: null,
             tick: 0,
             country_flag: cn.flag,
+            country_flag_svg: cn.flag_svg,
             country_code: cn.code,
             currency: cn.currency,
             countries: MOCK_COUNTRIES,
