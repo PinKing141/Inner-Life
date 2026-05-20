@@ -42,6 +42,7 @@ const App = {
   state: null,
   activeTab: "feed",
   countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
+  legend: null,
 
   async connect() {
     if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined") {
@@ -107,6 +108,12 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async readLegend(targetEntryId = "") {
+    if (!this.bridge.readLegend) return;
+    const result = await this.bridge.readLegend(targetEntryId);
+    this.legend = typeof result === "string" ? JSON.parse(result) : result;
+    this.render();
+  },
 
   // ---- Rendering ----
 
@@ -165,6 +172,7 @@ const App = {
     const panel = document.getElementById("panel");
     if (this.activeTab === "feed") panel.innerHTML = this.renderFeed();
     else if (this.activeTab === "career") panel.innerHTML = this.renderCareer();
+    else if (this.activeTab === "legend") panel.innerHTML = this.renderLegend();
     else if (this.activeTab === "relationships") panel.innerHTML = this.renderRelationships();
     else if (this.activeTab === "activities") panel.innerHTML = this.renderActivities();
 
@@ -235,6 +243,23 @@ const App = {
           <div class="job-row-salary">£${(j.salary / 1000).toFixed(0)}k</div>
         </button>
       `).join("")}
+    `;
+  },
+
+  renderLegend() {
+    const l = this.legend;
+    return `
+      <p class="panel-heading">Causal legend</p>
+      <button class="btn btn-ghost" data-action="legend-refresh">Explain latest moment</button>
+      ${!l ? `<p class="unemployed">No legend generated yet.</p>` : `
+        <div class="legend-card">
+          <p><strong>Target:</strong> ${escapeHtml(l.target_text || "")}</p>
+          <p>${escapeHtml(l.summary || "")}</p>
+          <ul class="legend-list">
+            ${(l.items || []).map(item => `<li>${escapeHtml(item.label || item.id || "")}</li>`).join("")}
+          </ul>
+        </div>
+      `}
     `;
   },
 
@@ -311,6 +336,9 @@ const App = {
     });
     root.querySelectorAll("[data-action='activity']").forEach((btn) => {
       btn.addEventListener("click", () => this.activity(btn.dataset.kind));
+    });
+    root.querySelectorAll("[data-action='legend-refresh']").forEach((btn) => {
+      btn.addEventListener("click", () => this.readLegend(""));
     });
   },
 };

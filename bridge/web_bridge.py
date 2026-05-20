@@ -112,3 +112,8 @@ class WebBridge(QObject):
     @Slot(str, result=str)
     def activity(self, kind: str) -> str:
         return _dumps(self._controller.activity(kind))
+
+    @Slot(str, result=str)
+    def readLegend(self, target_entry_id: str) -> str:
+        return _dumps(self._controller.read_legend(target_entry_id))
+
