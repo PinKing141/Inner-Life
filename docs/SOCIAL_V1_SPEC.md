@@ -106,5 +106,6 @@ Cooldown:
 
 - Player can set university intent to attend or skip.
 - If attending, player can choose major/subject.
+- Course choice is applied at the age-18 secondary graduation transition; enrolling in university (or skipping) happens in that same year.
 - Player can drop out after enrolling.
 - These choices should serialize in `education` state and produce feed entries.

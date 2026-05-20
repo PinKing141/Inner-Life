@@ -146,9 +146,9 @@ class GameController:
         s.feed.append(FeedEntry(
             age=s.character.age,
             text=(
-                f"You plan to attend university and study {s.education.university_major or 'an undeclared subject'}."
+                f"You chose to attend university and study {s.education.university_major or 'an undeclared subject'} after secondary graduation."
                 if attend
-                else "You decided not to attend university."
+                else "You chose not to attend university after secondary graduation."
             ),
             kind="neutral",
             entry_id=f"feed:edu_plan:{s.tick}",
