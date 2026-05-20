@@ -110,6 +110,14 @@ class DuringWar:
 
 
 @dataclass(frozen=True)
+class MinInflationIndex:
+    value: float
+
+    def __call__(self, s: GameState) -> bool:
+        return s.world.inflation_index >= self.value
+
+
+@dataclass(frozen=True)
 class HasJob:
     """True if the player has any job."""
 
