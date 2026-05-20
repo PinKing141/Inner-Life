@@ -141,7 +141,7 @@ const App = {
   renderPlaying() {
     const s = this.state;
     const ch = s.character;
-    const stage = stageForAge(ch.age);
+    const stage = stageForState(s);
 
     const flagEl = document.getElementById("hud-country-flag");
     if (flagEl) {
@@ -176,12 +176,15 @@ const App = {
       </div>
     `).join("");
 
+    this.syncDynamicTabLabels(s);
+
     // Panel by tab
     const panel = document.getElementById("panel");
     if (this.activeTab === "feed") panel.innerHTML = this.renderFeed();
     else if (this.activeTab === "career") panel.innerHTML = this.renderCareer();
     else if (this.activeTab === "relationships") panel.innerHTML = this.renderRelationships();
     else if (this.activeTab === "activities") panel.innerHTML = this.renderActivities();
+    else if (this.activeTab === "assets") panel.innerHTML = this.renderAssets();
 
     Icons.hydrate(panel);
     this.bindPanel(panel);
@@ -279,8 +282,9 @@ const App = {
   },
 
   renderActivities() {
+    const inSchool = !!(this.state.education && this.state.education.in_school);
     return `
-      <p class="panel-heading">Acts of will</p>
+      <p class="panel-heading">${inSchool ? "Activities..." : "Acts of will"}</p>
       <div class="activities">
         ${ACTIVITIES.map(a => `
           <button class="activity" data-action="activity" data-kind="${a.kind}">
@@ -293,6 +297,46 @@ const App = {
     `;
   },
 
+
+
+  renderAssets() {
+    const career = this.state.career;
+    const income = career ? career.salary : 0;
+    const expenses = 0;
+    return `
+      <p class="panel-heading">Assets</p>
+      <div class="education-card">
+        <div class="education-card-label">Income</div>
+        <div class="education-card-value">£${income.toLocaleString()} / yr</div>
+      </div>
+      <div class="education-card">
+        <div class="education-card-label">Expenses</div>
+        <div class="education-card-value">£${expenses.toLocaleString()} / yr</div>
+      </div>
+    `;
+  },
+
+  syncDynamicTabLabels(state) {
+    const inSchool = !!(state.education && state.education.in_school);
+
+    const relTab = document.querySelector('.tab[data-tab="relationships"]');
+    const relIcon = relTab ? relTab.querySelector('.tab-icon') : null;
+    const relLabel = relTab ? relTab.querySelector('span:last-child') : null;
+    if (relIcon) relIcon.setAttribute('data-icon', inSchool ? 'heart' : 'link');
+    if (relLabel) relLabel.textContent = inSchool ? 'Relations' : 'Ties';
+
+    const actTab = document.querySelector('.tab[data-tab="activities"]');
+    const actIcon = actTab ? actTab.querySelector('.tab-icon') : null;
+    const actLabel = actTab ? actTab.querySelector('span:last-child') : null;
+    if (actIcon) actIcon.setAttribute('data-icon', inSchool ? 'ellipsis' : 'pulse');
+    if (actLabel) actLabel.textContent = inSchool ? 'Activities...' : 'Acts';
+
+    const assetsTab = document.querySelector('.tab[data-tab="assets"]');
+    if (assetsTab) assetsTab.classList.toggle('hidden', !inSchool);
+    if (!inSchool && this.activeTab === 'assets') this.activeTab = 'feed';
+
+    Icons.hydrate(document.querySelector('.tabs'));
+  },
   renderDeath() {
     const s = this.state;
     const ch = s.character;
@@ -402,9 +446,10 @@ function fillRandomName() {
 // Helpers
 // --------------------------------------------------------------------------
 
-function stageForAge(age) {
-  if (age < 5) return "Baby";
-  if (age < 13) return "Child";
+function stageForState(state) {
+  const age = state.character.age;
+  if (age < 5) return "Infant";
+  if (state.education && state.education.in_school) return "School";
   if (age < 18) return "Teenager";
   if (age < 65) return "Adult";
   return "Elder";
