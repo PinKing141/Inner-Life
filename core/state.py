@@ -113,6 +113,7 @@ class GameState:
     education: Education = field(default_factory=Education)
     feed: list[FeedEntry] = field(default_factory=list)
     pending_event_id: str | None = None  # event awaiting player choice
+    fired_events: list[str] = field(default_factory=list)  # ids the player has already seen
     causal_chain: list[dict] = field(default_factory=list)
     tick: int = 0  # how many times age_up has been called
 
@@ -175,6 +176,7 @@ class GameState:
                 for f in self.feed
             ],
             "pending_event_id": self.pending_event_id,
+            "fired_events": list(self.fired_events),
             "tick": self.tick,
         }
 
@@ -263,6 +265,7 @@ class GameState:
             education=education,
             feed=feed,
             pending_event_id=data.get("pending_event_id"),
+            fired_events=list(data.get("fired_events", [])),
             causal_chain=list(data.get("causal_chain", [])),
             tick=data.get("tick", 0),
         )

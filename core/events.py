@@ -6,41 +6,48 @@ Two responsibilities:
 2. When the player picks a choice, apply its effects to state and write a
    feed entry with a `cause_id` so the causal chain stays intact.
 
-Notes for later: events should eventually consume *state* (not just age) so
-'teen_party' only fires if you actually have school-age friends, etc.
+An event may declare ``unique: True`` (the default) so it never fires twice
+in the same life. Predicates further gate eligibility by state.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from core.content.events import EVENTS
 from core.predicates import evaluate as evaluate_predicates
 from core.rng import Rng
-from core.state import FeedEntry, GameState, Stats
+from core.state import FeedEntry, GameState
+
+
+# Sentinel-style: fields with non-serializable values (like predicates,
+# which are callables / dataclass instances) must not be sent to JS.
+_NON_SERIALIZABLE_KEYS = frozenset({"predicates"})
+
+
+def _is_unique(event: dict) -> bool:
+    """Default to unique. Only events that explicitly opt out repeat."""
+    return event.get("unique", True)
 
 
 def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
     """Try to fire one event this tick. Returns the chosen event dict, or None.
 
-    Filters by age window first, then by the optional ``predicates`` field on
-    each event (see core.predicates) — this is what makes careers, wealth,
-    and stats actually gate which beats can fire.
+    Filters by age window, unique-event history, and predicates (in that
+    order) before rolling probability.
     """
     if state.character is None:
         return None
     age = state.character.age
+    seen = set(state.fired_events)
     candidates = [
         e for e in EVENTS
         if e["min_age"] <= age <= e["max_age"]
+        and not (_is_unique(e) and e["id"] in seen)
         and evaluate_predicates(e.get("predicates"), state)
     ]
     if not candidates:
         return None
-    # Single-roll model: shuffle candidates and pick the first whose prob hits.
-    # Keeps event count per year low. Swap for a deck/cooldown model later.
-    rng.choice  # ensure import
     shuffled = list(candidates)
-    # deterministic shuffle
     for i in range(len(shuffled) - 1, 0, -1):
         j = rng.randint(0, i)
         shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
@@ -51,10 +58,34 @@ def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
 
 
 def get_event(event_id: str) -> Optional[dict]:
+    """Return the raw event from the catalogue (engine-internal use)."""
     for e in EVENTS:
         if e["id"] == event_id:
             return e
     return None
+
+
+def get_event_for_ui(event_id: str) -> Optional[dict]:
+    """Same as get_event but stripped of non-JSON-serializable fields.
+
+    The runtime catalogue carries predicate *callables* (dataclass instances
+    from core.predicates) which json.dumps cannot serialise. Anything bound
+    for the bridge must go through this getter.
+    """
+    raw = get_event(event_id)
+    if raw is None:
+        return None
+    return _serializable_copy(raw)
+
+
+def _serializable_copy(event: dict) -> dict:
+    """Shallow copy stripped of non-serializable keys (e.g. predicates)."""
+    out: dict[str, Any] = {}
+    for k, v in event.items():
+        if k in _NON_SERIALIZABLE_KEYS:
+            continue
+        out[k] = v
+    return out
 
 
 def apply_effects(state: GameState, effects: dict) -> None:
@@ -98,6 +129,10 @@ def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
     side = choice.get("side_effect")
     if side:
         _apply_side_effect(state, side)
+
+    # Record this event as fired so unique events don't recur.
+    if _is_unique(event) and event_id not in state.fired_events:
+        state.fired_events.append(event_id)
 
     # Classify the feed entry by the net direction of the effects.
     eff = choice.get("effects", {})

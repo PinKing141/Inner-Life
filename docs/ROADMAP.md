@@ -53,7 +53,6 @@ Touchpoints:
 - `core.economy.annual_cashflow` consumes inflation/unemployment from `World`.
 - New event predicates: "during a war", "during recession".
 
-This is also where 867 AD / medieval mode could plug in (cf. Fantasy Engine).
 
 ## Phase 5 — Genealogy
 
@@ -63,8 +62,7 @@ grudges, family business.
 Touchpoints:
 
 - `Character` gains `parents`, `children`, `lineage_id`.
-- New game mode: `DYNASTY` (controller-level toggle, no new screens needed
-  initially — death screen offers "continue as your eldest").
+
 
 ## Phase 6 — State-gated events
 
@@ -88,12 +86,6 @@ Touchpoints:
 Wire up `GameController.load` for real. JSON for human-readable saves;
 optionally SQLite once the schema is stable.
 
-## Phase 8 — Faith and culture (lifted from Fantasy Engine Phase 7)
-
-Once world state exists, faith formation and schism pressure transfer
-almost directly from Fantasy Engine. Characters inherit faith, can drift,
-can convert, can lose it. Wars get a faith axis. This is the "make events
-feel different by region" payoff.
 
 ---
 
