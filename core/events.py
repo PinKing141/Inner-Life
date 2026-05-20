@@ -147,5 +147,3 @@ def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
         entry_id=f"feed:{state.tick}:{event_id}",
     ))
     state.pending_event_id = None
-    if event_id not in state.fired_event_ids:
-        state.fired_event_ids.append(event_id)
