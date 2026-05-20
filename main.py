@@ -25,7 +25,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Life — A Deeper Simulation")
-        self.resize(440, 820)
+        self.resize(440, 920)
+        self.setMinimumSize(440, 920)
 
         self.controller = GameController()
         self.bridge = WebBridge(self.controller, self)

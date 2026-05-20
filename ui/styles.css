@@ -96,7 +96,7 @@ body::before {
 }
 
 /* Creation screen needs to scroll if the country picker is taller than vh. */
-#screen-creation { overflow-y: auto; }
+#screen-creation { overflow-y: scroll; }
 
 .hidden { display: none !important; }
 
