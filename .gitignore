@@ -15,7 +15,8 @@ saves/
 .vscode/
 .idea/
 
-# Bulk name data — baked into core/content/_names_data.py at build time.
-# Re-generate with `python scripts/build_name_data.py` if you replace these.
+# Bulk name data — the gzipped CSVs ship via Git LFS; the uncompressed
+# files are too large to ship. core/content/_names_data.py is the baked
+# runtime artefact (regenerate with `python scripts/build_name_data.py`).
 forenames.csv
 surnames.csv

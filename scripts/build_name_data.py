@@ -4,6 +4,9 @@ The raw CSVs are too large to ship as runtime data (12M + 21M lines). This
 script reads them once and emits `core/content/_names_data.py` containing the
 top-N names per (country, gender) keyed by ISO-2 country code.
 
+Accepts either the plain `.csv` or the gzipped `.csv.gz` form — the gzipped
+files are what ships in the repo (LFS), the plain ones are gitignored.
+
 Run from the project root:
 
     python scripts/build_name_data.py
@@ -11,9 +14,12 @@ Run from the project root:
 from __future__ import annotations
 
 import csv
+import gzip
 import sys
 from collections import defaultdict
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator, TextIO
 
 HERE = Path(__file__).resolve().parent.parent
 FORENAMES_CSV = HERE / "forenames.csv"
@@ -23,9 +29,33 @@ OUT_PATH = HERE / "core" / "content" / "_names_data.py"
 TOP_PER_GROUP = 40  # top-N per (country, gender) for forenames; per country for surnames
 
 
+def _resolve(path: Path) -> Path | None:
+    """Find either the plain or gzipped form of the requested CSV."""
+    if path.exists():
+        return path
+    gz = path.with_suffix(path.suffix + ".gz")
+    if gz.exists():
+        return gz
+    return None
+
+
+@contextmanager
+def _open_csv(path: Path) -> Iterator[TextIO]:
+    """Open .csv or .csv.gz transparently as a text stream."""
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8", newline="") as f:
+            yield f
+    else:
+        with path.open(encoding="utf-8", newline="") as f:
+            yield f
+
+
 def top_forenames() -> dict[str, dict[str, list[str]]]:
     buckets: dict[tuple[str, str], list[tuple[int, str]]] = defaultdict(list)
-    with FORENAMES_CSV.open(encoding="utf-8") as f:
+    resolved = _resolve(FORENAMES_CSV)
+    if resolved is None:
+        raise FileNotFoundError(f"missing {FORENAMES_CSV} (and .gz)")
+    with _open_csv(resolved) as f:
         reader = csv.reader(f)
         next(reader, None)  # header
         for row in reader:
@@ -50,7 +80,10 @@ def top_surnames() -> dict[str, list[str]]:
     # Surnames are gendered in the CSV but we collapse — same surname pool for
     # M and F per country.
     buckets: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    with SURNAMES_CSV.open(encoding="utf-8") as f:
+    resolved = _resolve(SURNAMES_CSV)
+    if resolved is None:
+        raise FileNotFoundError(f"missing {SURNAMES_CSV} (and .gz)")
+    with _open_csv(resolved) as f:
         reader = csv.reader(f)
         next(reader, None)
         for row in reader:
@@ -102,11 +135,11 @@ def emit(forenames: dict[str, dict[str, list[str]]], surnames: dict[str, list[st
 
 
 def main() -> int:
-    if not FORENAMES_CSV.exists():
-        print(f"missing {FORENAMES_CSV}", file=sys.stderr)
+    if _resolve(FORENAMES_CSV) is None:
+        print(f"missing {FORENAMES_CSV} (or {FORENAMES_CSV}.gz)", file=sys.stderr)
         return 1
-    if not SURNAMES_CSV.exists():
-        print(f"missing {SURNAMES_CSV}", file=sys.stderr)
+    if _resolve(SURNAMES_CSV) is None:
+        print(f"missing {SURNAMES_CSV} (or {SURNAMES_CSV}.gz)", file=sys.stderr)
         return 1
     print("reading forenames…")
     fn = top_forenames()
