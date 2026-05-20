@@ -78,3 +78,21 @@ def test_world_cause_nodes_surface_in_legend():
     legend = read_legend(s, target.entry_id)
     assert legend["items"]
     assert legend["items"][0]["id"].startswith("world:")
+
+def test_world_long_horizon_recovery_and_stability():
+    s = sim.new_game(seed=222, name="A", gender="Female", country="US", talent="Acting")
+    saw_recession = False
+    saw_recovery = False
+    for _ in range(100):
+        was_recession = s.world.recession
+        sim.age_up(s)
+        if s.pending_event_id is not None:
+            sim.resolve_choice(s, 0)
+        saw_recession = saw_recession or s.world.recession or was_recession
+        if was_recession and not s.world.recession:
+            saw_recovery = True
+        assert 0.0 <= s.world.unemployment_rate <= 1.0
+        assert s.world.unemployment_rate < 0.30
+        assert 0.5 <= s.world.inflation_index <= 3.0
+    assert saw_recession
+    assert saw_recovery

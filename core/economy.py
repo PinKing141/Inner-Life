@@ -10,6 +10,14 @@ from core.content.jobs import JOBS, JobSpec, education_meets
 from core.rng import Rng
 from core.state import GameState, Job
 
+JOB_FAMILY_STABILITY: dict[str, float] = {
+    "doctor": 0.35,
+    "teacher": 0.25,
+    "developer": 0.10,
+    "retail_worker": -0.25,
+    "delivery_driver": -0.10,
+}
+
 
 def list_jobs() -> list[JobSpec]:
     return JOBS
@@ -52,8 +60,9 @@ def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
     living_cost = int((base_living + recession_penalty) * inflation)
 
     if state.career:
+        stability = JOB_FAMILY_STABILITY.get(state.career.job_id, 0.0)
         unemployment_risk = max(0.0, world.unemployment_rate - 0.04)
-        salary_hit = min(0.35, unemployment_risk * 1.6 + (0.12 if world.recession else 0.0))
+        salary_hit = min(0.40, max(0.0, unemployment_risk * (1.6 - stability) + (0.12 if world.recession else 0.0) - (0.05 * stability)))
         earnings = int(state.career.salary * (1.0 - salary_hit))
         note = f"You earned £{earnings:,} from your job in a {'recession' if world.recession else 'volatile'} economy."
     else:

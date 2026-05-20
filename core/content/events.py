@@ -26,6 +26,8 @@ from core.predicates import (
     MinSmarts,
     NoJob,
     DuringRecession,
+    DuringWar,
+    MinInflationIndex,
 )
 
 # Each "choice" maps to: text shown to player, stat/money effects, log line.
@@ -233,6 +235,42 @@ EVENTS: list[dict] = [
              "log": "You tightened your budget and built a small cash buffer."},
             {"text": "Ignore it and hope for the best", "effects": {"money": -600, "happiness": -8},
              "log": "You carried on spending and felt the squeeze when bills rose."},
+        ],
+    },
+    {
+        "id": "local_war_supply_shock",
+        "min_age": 18, "max_age": 90, "prob": 0.22,
+        "predicates": [DuringWar()],
+        "text": "Regional conflict disrupts transport routes and local supplies tighten.",
+        "choices": [
+            {"text": "Stock up early", "effects": {"money": -450, "happiness": 2},
+             "log": "You stocked up before shelves thinned out and felt prepared."},
+            {"text": "Wait it out", "effects": {"money": -700, "happiness": -5},
+             "log": "You waited and paid inflated prices for essentials."},
+        ],
+    },
+    {
+        "id": "inflation_rent_spike",
+        "min_age": 20, "max_age": 80, "prob": 0.26,
+        "predicates": [MinInflationIndex(1.18)],
+        "text": "Your landlord announces a steep rent increase.",
+        "choices": [
+            {"text": "Negotiate and compromise", "effects": {"money": -350, "smarts": 2},
+             "log": "You negotiated a smaller increase and kept the tenancy."},
+            {"text": "Move to a cheaper place", "effects": {"money": -200, "happiness": -6},
+             "log": "You moved to cut costs, but the upheaval wore you down."},
+        ],
+    },
+    {
+        "id": "recession_side_hustle",
+        "min_age": 18, "max_age": 70, "prob": 0.2,
+        "predicates": [DuringRecession(), NoJob()],
+        "text": "With hiring frozen, a neighbour offers cash work for weekend help.",
+        "choices": [
+            {"text": "Take the side hustle", "effects": {"money": 900, "health": -4},
+             "log": "You took extra shifts and kept your finances afloat."},
+            {"text": "Decline and keep searching", "effects": {"happiness": -4, "smarts": 2},
+             "log": "You focused on job applications and waited for a better role."},
         ],
     },
     {
