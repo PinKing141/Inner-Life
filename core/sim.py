@@ -11,14 +11,58 @@ from __future__ import annotations
 
 import uuid
 
-from core import economy, education, events, relationships
+from core import agents, economy, education, events, relationships
+from core.content import countries as countries_mod
+from core.content import names as names_mod
 from core.rng import Rng
 from core.state import Character, FeedEntry, GameState, Stats
 
 
-def new_game(seed: int, name: str, gender: str, country: str, talent: str) -> GameState:
-    """Initialise a fresh life. Stats are biased by talent."""
+def _split_name(full: str) -> tuple[str, str]:
+    parts = (full or "").strip().split(maxsplit=1)
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], parts[1]
+
+
+def new_game(
+    seed: int,
+    name: str,
+    gender: str,
+    country: str,
+    talent: str,
+    *,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    city: str | None = None,
+) -> GameState:
+    """Initialise a fresh life. Stats are biased by talent.
+
+    Either pass `name` (legacy) or `first_name` + `last_name`. Anything blank
+    is filled with a country-aware random pick so the character always has a
+    plausible local-sounding name.
+    """
     rng = Rng(seed)
+
+    # --- Resolve the country & city ---
+    country_info = countries_mod.resolve(country)
+    if city is None or not city:
+        city = country_info.cities[0]
+    elif city not in country_info.cities:
+        # Out-of-list city is allowed — players can type something custom.
+        city = city.strip() or country_info.cities[0]
+
+    # --- Resolve names ---
+    if first_name is None and last_name is None:
+        first_name, last_name = _split_name(name)
+    if not first_name:
+        first_name = names_mod.random_forename(country_info.code, gender, rng)
+    if not last_name:
+        last_name = names_mod.random_surname(country_info.code, rng)
+
+    # --- Stat rolls ---
     base_smarts = 50 + rng.randint(0, 20)
     base_looks = 50 + rng.randint(0, 20)
     base_health = 80 + rng.randint(0, 20)
@@ -35,7 +79,15 @@ def new_game(seed: int, name: str, gender: str, country: str, talent: str) -> Ga
     state = GameState(
         seed=seed,
         mode="PLAYING",
-        character=Character(name=name, gender=gender, country=country, talent=talent, age=0),
+        character=Character(
+            first_name=first_name,
+            last_name=last_name,
+            gender=gender,
+            country=country_info.name,
+            city=city,
+            talent=talent,
+            age=0,
+        ),
         stats=Stats(
             happiness=100,
             health=min(100, base_health),
@@ -44,11 +96,12 @@ def new_game(seed: int, name: str, gender: str, country: str, talent: str) -> Ga
         ),
         money=starting_wealth,
     )
-    relationships.seed_family(state)
+    relationships.seed_family(state, rng.fork(101))
+    agents.seed_world(state, rng.fork(202))
 
     state.feed.append(FeedEntry(
         age=0,
-        text=f"You were born in {country}. You are a {gender.lower()}.",
+        text=f"You were born in {city}, {country_info.name}. You are a {gender.lower()}.",
         kind="special",
         entry_id=f"feed:birth:{uuid.uuid4().hex[:8]}",
     ))
@@ -67,6 +120,9 @@ def age_up(state: GameState) -> None:
     state.character.age += 1
     age = state.character.age
     tick_rng = Rng(state.seed).fork(state.tick)
+
+    # --- NPC world tick (Phase 1 — parents and friends age too) ---
+    agents.tick_world(state, tick_rng.fork(31))
 
     summary_parts: list[str] = [f"You are now {age} years old."]
 

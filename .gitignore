@@ -14,3 +14,9 @@ saves/
 .DS_Store
 .vscode/
 .idea/
+
+# Bulk name data — the gzipped CSVs ship via Git LFS; the uncompressed
+# files are too large to ship. core/content/_names_data.py is the baked
+# runtime artefact (regenerate with `python scripts/build_name_data.py`).
+forenames.csv
+surnames.csv

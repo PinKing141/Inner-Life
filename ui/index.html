@@ -24,6 +24,19 @@
       </header>
 
       <form id="creation-form" class="creation-form">
+        <div class="field-pair">
+          <label class="field">
+            <span class="field-label">First name</span>
+            <input id="cre-first-name" type="text" placeholder="e.g. Oliver" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span class="field-label">Last name</span>
+            <input id="cre-last-name" type="text" placeholder="e.g. Smith" autocomplete="off" />
+          </label>
+        </div>
+
+        <button type="button" id="btn-random" class="btn btn-ghost btn-random">Random name</button>
+
         <label class="field">
           <span class="field-label">Gender</span>
           <select id="cre-gender">
@@ -34,18 +47,17 @@
         </label>
 
         <label class="field">
-          <span class="field-label">Name</span>
+          <span class="field-label">Country</span>
           <div class="field-row">
-            <input id="cre-name" type="text" placeholder="e.g. Oliver" autocomplete="off" />
-            <button type="button" id="btn-random" class="btn btn-ghost">Random</button>
+            <span id="cre-country-flag" class="country-flag" aria-hidden="true"></span>
+            <select id="cre-country" class="country-select"></select>
           </div>
         </label>
 
-        <div class="field">
-          <span class="field-label">Country</span>
-          <div class="country-picker" id="cre-country-picker"></div>
-          <input type="hidden" id="cre-country" />
-        </div>
+        <label class="field">
+          <span class="field-label">City</span>
+          <select id="cre-city"></select>
+        </label>
 
         <label class="field">
           <span class="field-label">Talent</span>
@@ -63,6 +75,7 @@
         <div class="hud-identity">
           <h2 id="hud-name"></h2>
           <p id="hud-meta"></p>
+          <p id="hud-place" class="hud-place"></p>
         </div>
         <div class="hud-money">
           <p class="hud-money-label">Balance</p>

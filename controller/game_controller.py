@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from core import economy, relationships, sim
+from core.content import countries as countries_mod
 from core.state import FeedEntry, GameState
 
 
@@ -42,24 +43,57 @@ class GameController:
     def snapshot(self) -> dict:
         """The single source of truth that gets sent to the UI."""
         if self.state is None:
-            return {"mode": "CREATION"}
+            return {"mode": "CREATION", "countries": self._countries_for_ui()}
         snap = self.state.to_dict()
         snap["pending_event"] = sim.get_pending_event(self.state)
         snap["jobs"] = [
             {
                 "job_id": j.job_id, "title": j.title, "min_age": j.min_age,
                 "min_smarts": j.min_smarts, "salary": j.salary,
+                "track": getattr(j, "track", "general"),
             }
             for j in economy.list_jobs()
         ]
+        snap["countries"] = self._countries_for_ui()
+        if self.state.character is not None:
+            country = countries_mod.resolve(self.state.character.country)
+            snap["country_flag"] = country.flag
+            snap["country_code"] = country.code
+            snap["currency"] = country.currency
         return snap
+
+    def _countries_for_ui(self) -> list[dict]:
+        return [
+            {"code": c.code, "name": c.name, "flag": c.flag, "currency": c.currency, "cities": list(c.cities)}
+            for c in countries_mod.list_countries()
+        ]
 
     # ---- Verbs the UI calls ----
 
-    def new_game(self, name: str, gender: str, country: str, talent: str, seed: int | None = None) -> dict:
+    def new_game(
+        self,
+        name: str,
+        gender: str,
+        country: str,
+        talent: str,
+        seed: int | None = None,
+        *,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        city: str | None = None,
+    ) -> dict:
         if seed is None:
             seed = int(time.time() * 1000) & 0x7FFFFFFF
-        self.state = sim.new_game(seed=seed, name=name, gender=gender, country=country, talent=talent)
+        self.state = sim.new_game(
+            seed=seed,
+            name=name,
+            gender=gender,
+            country=country,
+            talent=talent,
+            first_name=first_name,
+            last_name=last_name,
+            city=city,
+        )
         self._broadcast()
         return self.snapshot()
 
@@ -138,7 +172,11 @@ class GameController:
         path.write_text(json.dumps(self.snapshot(), indent=2, default=str))
 
     def load(self, path: Path) -> dict:
-        # Loading is one-way for now: it just refreshes the snapshot from disk.
-        # Full hydration into a GameState would round-trip through to_dict; left
-        # as an exercise once the field set stabilises.
-        raise NotImplementedError("Load is stubbed; see docs/ROADMAP.md")
+        """Phase 7 — rebuild a full GameState from a JSON snapshot on disk."""
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        # Snapshots from `save()` are decorated with UI fields (jobs, pending_event,
+        # countries, …); GameState.from_dict ignores the extras.
+        self.state = GameState.from_dict(data)
+        self._broadcast()
+        return self.snapshot()
