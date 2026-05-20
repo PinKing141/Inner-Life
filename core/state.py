@@ -51,6 +51,11 @@ class Character:
     city: str = ""
     age: int = 0
     alive: bool = True
+    parents: list[int] = field(default_factory=list)
+    children: list[int] = field(default_factory=list)
+    lineage_id: str = ""
+    birth_story: str = ""
+    parent_details: list[dict] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -144,6 +149,11 @@ class GameState:
                     "talent": self.character.talent,
                     "age": self.character.age,
                     "alive": self.character.alive,
+                    "parents": list(self.character.parents),
+                    "children": list(self.character.children),
+                    "lineage_id": self.character.lineage_id,
+                    "birth_story": self.character.birth_story,
+                    "parent_details": list(self.character.parent_details),
                 }
             ),
             "stats": self.stats.to_dict(),
@@ -221,6 +231,11 @@ class GameState:
                 talent=char_d.get("talent", ""),
                 age=char_d.get("age", 0),
                 alive=char_d.get("alive", True),
+                parents=list(char_d.get("parents", [])),
+                children=list(char_d.get("children", [])),
+                lineage_id=char_d.get("lineage_id", ""),
+                birth_story=char_d.get("birth_story", ""),
+                parent_details=list(char_d.get("parent_details", [])),
             )
 
         stats_d = data.get("stats") or {}
