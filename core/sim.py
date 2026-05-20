@@ -17,6 +17,48 @@ from core.content import names as names_mod
 from core.rng import Rng
 from core.state import Character, FeedEntry, GameState, Stats
 
+CONCEPTION_STORIES = [
+    "an unplanned pregnancy after a late-night party",
+    "a honeymoon surprise",
+    "a planned pregnancy after months of trying",
+    "a spontaneous road-trip weekend",
+    "a backseat-of-a-car mistake after a concert",
+    "a reunion after years apart",
+    "a New Year's Eve celebration that got out of hand",
+    "a vacation fling that became serious",
+    "a deliberate IVF cycle",
+    "an IUI treatment at a fertility clinic",
+    "a donor conception arranged through a clinic",
+    "a one-night stand that changed everything",
+    "a college romance that lasted just long enough",
+    "a whirlwind workplace romance",
+    "a reconciled relationship after a breakup",
+    "a festival weekend hookup",
+    "a planned second child conversation",
+    "an accidental missed birth-control week",
+    "a post-wedding celebration surprise",
+    "a long-distance visit that turned lucky",
+    "a hopeful 'let's see what happens' month",
+    "a cabin getaway during winter break",
+    "a carefully tracked ovulation plan",
+    "a surprise after doctors said it was unlikely",
+    "a friends-to-lovers turning point",
+    "a dating-app match that moved fast",
+    "a family-planned adoption path",
+    "a surrogate journey",
+    "a spring-break romance",
+    "a music-festival weekend",
+    "a city blackout candlelit night",
+    "a proposal-night celebration",
+]
+
+PARENT_JOBS = [
+    "Nurse", "Teacher", "Retail Manager", "Software Engineer", "Delivery Driver",
+    "Electrician", "Chef", "Accountant", "Police Officer", "Mechanic",
+    "Sales Representative", "Graphic Designer", "Pharmacist", "Truck Driver",
+    "Construction Worker", "Real Estate Agent", "HR Specialist", "Barber",
+    "Dentist", "Plumber",
+]
 
 def _split_name(full: str) -> tuple[str, str]:
     parts = (full or "").strip().split(maxsplit=1)
@@ -61,6 +103,20 @@ def new_game(
         first_name = names_mod.random_forename(country_info.code, gender, rng)
     if not last_name:
         last_name = names_mod.random_surname(country_info.code, rng)
+    mother_first = names_mod.random_forename(country_info.code, "Female", rng.fork(41))
+    father_first = names_mod.random_forename(country_info.code, "Male", rng.fork(42))
+    mother_age = rng.fork(43).randint(20, 45)
+    father_age = rng.fork(44).randint(20, 50)
+    mother_job = rng.fork(45).choice(PARENT_JOBS)
+    father_job = rng.fork(46).choice(PARENT_JOBS)
+    mother_name = f"{mother_first} {last_name}".strip()
+    father_name = f"{father_first} {last_name}".strip()
+    lineage_id = f"{country_info.code.lower()}-{last_name.lower()}-{seed % 10_000}"
+    birth_story = rng.fork(47).choice(CONCEPTION_STORIES)
+    parent_details = [
+        {"name": mother_name, "role": "Mother", "age_at_birth": mother_age, "job": mother_job},
+        {"name": father_name, "role": "Father", "age_at_birth": father_age, "job": father_job},
+    ]
 
     # --- Stat rolls ---
     base_smarts = 50 + rng.randint(0, 20)
@@ -87,6 +143,11 @@ def new_game(
             city=city,
             talent=talent,
             age=0,
+            parents=[1, 2],
+            children=[],
+            lineage_id=lineage_id,
+            birth_story=birth_story,
+            parent_details=parent_details,
         ),
         stats=Stats(
             happiness=100,
@@ -96,12 +157,17 @@ def new_game(
         ),
         money=starting_wealth,
     )
-    relationships.seed_family(state, rng.fork(101))
+    relationships.seed_family(state, rng.fork(101), mother_name=mother_name, father_name=father_name)
     agents.seed_world(state, rng.fork(202))
 
     state.feed.append(FeedEntry(
         age=0,
-        text=f"You were born in {city}, {country_info.name}. You are a {gender.lower()}.",
+        text=(
+            f"You were born in {city}, {country_info.name}. You are a {gender.lower()}. "
+            f"You were conceived through {birth_story}. "
+            f"Your mother is {mother_name}, age {mother_age}, working as a {mother_job}. "
+            f"Your father is {father_name}, age {father_age}, working as a {father_job}."
+        ),
         kind="special",
         entry_id=f"feed:birth:{uuid.uuid4().hex[:8]}",
     ))

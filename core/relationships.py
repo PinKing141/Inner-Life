@@ -12,7 +12,13 @@ from core.rng import Rng
 from core.state import GameState, Relationship
 
 
-def seed_family(state: GameState, rng: Rng | None = None) -> None:
+def seed_family(
+    state: GameState,
+    rng: Rng | None = None,
+    *,
+    mother_name: str | None = None,
+    father_name: str | None = None,
+) -> None:
     """Spawn the player's parents at birth with culture-appropriate names."""
     rng = rng or Rng(state.seed ^ 0xA1B2C3)
     country = state.character.country if state.character else ""
@@ -21,8 +27,8 @@ def seed_family(state: GameState, rng: Rng | None = None) -> None:
     mum_first = names_mod.random_forename(country, "Female", rng.fork(1))
     dad_first = names_mod.random_forename(country, "Male", rng.fork(2))
     # Keep parents on the player's surname for clarity in the early UI.
-    mum_name = f"{mum_first} {surname}".strip()
-    dad_name = f"{dad_first} {surname}".strip()
+    mum_name = mother_name or f"{mum_first} {surname}".strip()
+    dad_name = father_name or f"{dad_first} {surname}".strip()
 
     state.relationships.append(Relationship(npc_id=1, name=mum_name, kind="Mother", relationship=90))
     state.relationships.append(Relationship(npc_id=2, name=dad_name, kind="Father", relationship=90))
