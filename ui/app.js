@@ -141,8 +141,6 @@ const App = {
   renderPlaying() {
     const s = this.state;
     const ch = s.character;
-    const stage = stageForAge(ch.age);
-
     const flagEl = document.getElementById("hud-country-flag");
     if (flagEl) {
       if (s.country_flag_svg) {
@@ -152,7 +150,7 @@ const App = {
       }
     }
     document.getElementById("hud-name").textContent = ch.name;
-    document.getElementById("hud-meta").textContent = `${stage} · Age ${ch.age}`;
+    document.getElementById("hud-meta").textContent = `${lifePhaseLabel(ch.age)} · Age ${ch.age}`;
     const placeEl = document.getElementById("hud-place");
     if (placeEl) {
       const place = [ch.city, ch.country].filter(Boolean).join(", ");
@@ -182,6 +180,7 @@ const App = {
     else if (this.activeTab === "career") panel.innerHTML = this.renderCareer();
     else if (this.activeTab === "relationships") panel.innerHTML = this.renderRelationships();
     else if (this.activeTab === "activities") panel.innerHTML = this.renderActivities();
+    else if (this.activeTab === "assets") panel.innerHTML = this.renderAssets();
 
     Icons.hydrate(panel);
     this.bindPanel(panel);
@@ -256,7 +255,7 @@ const App = {
   renderRelationships() {
     const rels = this.state.relationships || [];
     return `
-      <p class="panel-heading">Ties</p>
+      <p class="panel-heading">Relations</p>
       ${rels.length === 0 ? `<p class="unemployed">No-one of note.</p>` : ""}
       ${rels.map(r => {
         const c = r.relationship > 70 ? "var(--good)"
@@ -280,7 +279,7 @@ const App = {
 
   renderActivities() {
     return `
-      <p class="panel-heading">Acts of will</p>
+      <p class="panel-heading">Activities</p>
       <div class="activities">
         ${ACTIVITIES.map(a => `
           <button class="activity" data-action="activity" data-kind="${a.kind}">
@@ -289,6 +288,22 @@ const App = {
             <span class="activity-cost">${a.cost}</span>
           </button>
         `).join("")}
+      </div>
+    `;
+  },
+
+  renderAssets() {
+    const salary = this.state.career ? this.state.career.salary : 0;
+    const expenses = 0;
+    return `
+      <p class="panel-heading">Assets</p>
+      <div class="education-card">
+        <div class="education-card-label">Income</div>
+        <div class="education-card-value">£${salary.toLocaleString()} / yr</div>
+      </div>
+      <div class="education-card">
+        <div class="education-card-label">Expenses</div>
+        <div class="education-card-value">£${expenses.toLocaleString()} / yr</div>
       </div>
     `;
   },
@@ -401,6 +416,11 @@ function fillRandomName() {
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
+
+function lifePhaseLabel(age) {
+  if (age < 5) return "Infant";
+  return "School";
+}
 
 function stageForAge(age) {
   if (age < 5) return "Baby";
