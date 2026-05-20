@@ -109,6 +109,8 @@ class GameState:
     money: int = 0
     relationships: list[Relationship] = field(default_factory=list)
     agents: list = field(default_factory=list)  # list[Agent]; typed via core.agents
+    social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
+    rumours: list = field(default_factory=list)  # list[Rumour]; typed via core.social
     career: Job | None = None
     education: Education = field(default_factory=Education)
     feed: list[FeedEntry] = field(default_factory=list)
@@ -151,6 +153,8 @@ class GameState:
                 for r in self.relationships
             ],
             "agents": [a.to_dict() for a in self.agents],
+            "social_edges": [e.to_dict() for e in self.social_edges],
+            "rumours": [r.to_dict() for r in self.rumours],
             "causal_chain": list(self.causal_chain),
             "career": (
                 None
@@ -185,6 +189,7 @@ class GameState:
     def from_dict(cls, data: dict) -> "GameState":
         """Inverse of to_dict. Tolerant to missing fields from older snapshots."""
         from core.agents import Agent  # local import to avoid cycle at module-load
+        from core.social import Rumour, SocialEdge
 
         char_d = data.get("character")
         character: Character | None = None
@@ -228,6 +233,8 @@ class GameState:
         ]
 
         agents = [Agent.from_dict(a) for a in data.get("agents", [])]
+        social_edges = [SocialEdge.from_dict(e) for e in data.get("social_edges", [])]
+        rumours = [Rumour.from_dict(r) for r in data.get("rumours", [])]
 
         career_d = data.get("career")
         career = (
@@ -261,6 +268,8 @@ class GameState:
             money=data.get("money", 0),
             relationships=relationships,
             agents=agents,
+            social_edges=social_edges,
+            rumours=rumours,
             career=career,
             education=education,
             feed=feed,
