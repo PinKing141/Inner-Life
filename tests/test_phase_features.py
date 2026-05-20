@@ -16,6 +16,7 @@ from core.predicates import (
     evaluate,
 )
 from core.state import GameState, Job
+from controller.game_controller import GameController
 
 
 def _new(seed: int = 1, country: str = "US", gender: str = "Male") -> GameState:
@@ -132,3 +133,32 @@ def test_rumour_propagation_attenuates():
     ))
     social.tick_social(state, Rng(state.seed).fork(1001))
     assert any(r.intensity < 1.0 for r in state.rumours if r.topic == "test_rumour")
+
+
+def test_university_plan_major_and_dropout_flow():
+    c = GameController()
+    c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")
+    assert c.state is not None
+    c.set_university_plan(attend=True, major="Computer Science")
+    assert c.state.education.university_intent == "attend"
+    assert c.state.education.university_major == "Computer Science"
+    # age to 19 so education tick enrolls in university
+    while c.state.character and c.state.character.age < 19:
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+    assert c.state.education.level == "University"
+    assert c.state.education.in_school is True
+    c.drop_out_university()
+    assert c.state.education.university_dropped_out is True
+    assert c.state.education.in_school is False
+
+
+def test_university_skip_plan_is_serialized():
+    c = GameController()
+    c.new_game(seed=7, name="", gender="Male", country="US", talent="Sports")
+    assert c.state is not None
+    c.set_university_plan(attend=False)
+    snap = c.state.to_dict()
+    assert snap["education"]["university_intent"] == "skip"
+    assert snap["education"]["university_major"] == ""

@@ -84,6 +84,9 @@ class Job:
 class Education:
     level: str = "None"
     in_school: bool = False
+    university_intent: str = "undecided"  # undecided | attend | skip
+    university_major: str = ""  # only meaningful when intent=attend
+    university_dropped_out: bool = False
 
 
 @dataclass
@@ -168,6 +171,9 @@ class GameState:
             "education": {
                 "level": self.education.level,
                 "in_school": self.education.in_school,
+                "university_intent": self.education.university_intent,
+                "university_major": self.education.university_major,
+                "university_dropped_out": self.education.university_dropped_out,
             },
             "feed": [
                 {
@@ -247,6 +253,9 @@ class GameState:
         education = Education(
             level=edu_d.get("level", "None"),
             in_school=edu_d.get("in_school", False),
+            university_intent=edu_d.get("university_intent", "undecided"),
+            university_major=edu_d.get("university_major", ""),
+            university_dropped_out=edu_d.get("university_dropped_out", False),
         )
 
         feed = [
