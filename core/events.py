@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from core.content.events import EVENTS
 from core.predicates import evaluate as evaluate_predicates
+from core.causal import append_cause
 from core.rng import Rng
 from core.state import FeedEntry, GameState
 
@@ -117,13 +118,18 @@ def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
     choice = event["choices"][choice_index]
 
     cause_id = f"event:{event_id}:{state.tick}"
-    state.causal_chain.append({
-        "id": cause_id,
-        "kind": "event_choice",
-        "event_id": event_id,
-        "choice": choice["text"],
-        "tick": state.tick,
-    })
+    append_cause(
+        state,
+        node_id=cause_id,
+        kind="event_choice",
+        source="events.resolve_choice",
+        details={
+            "event_id": event_id,
+            "choice": choice["text"],
+            "effects": dict(choice.get("effects", {})),
+            "side_effect": choice.get("side_effect"),
+        },
+    )
 
     apply_effects(state, choice.get("effects", {}))
     side = choice.get("side_effect")
