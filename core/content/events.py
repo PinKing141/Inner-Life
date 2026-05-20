@@ -67,6 +67,7 @@ EVENTS: list[dict] = [
     {
         "id": "found_money",
         "min_age": 10, "max_age": 99, "prob": 0.1,
+        "repeatable": True,
         "text": "You find a crumpled £20 note on the pavement.",
         "choices": [
             {"text": "Pocket it", "effects": {"money": 20, "happiness": 5},

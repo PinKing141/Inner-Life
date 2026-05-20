@@ -29,7 +29,6 @@ const NAMES = {
   Female: ["Olivia","Amelia","Isla","Ava","Ivy","Freya","Lily","Florence","Mia","Willow"],
   NonBinary: ["Alex","Jordan","Charlie","Sam","Taylor","Morgan","Casey","Riley","Quinn","Rowan"],
 };
-const COUNTRIES = ["United Kingdom","United States","Australia","Canada","Japan"];
 const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
 
 // --------------------------------------------------------------------------
@@ -149,10 +148,11 @@ const App = {
     // Disable age up while an event is pending
     document.getElementById("btn-age-up").disabled = !!s.pending_event;
 
-    // Auto-scroll feed
+    // Newest entry is already rendered first (we reverse the array). Keep the
+    // panel's own scroll position at the top so the latest line is visible
+    // without dragging the whole page.
     if (this.activeTab === "feed") {
-      const lastEntry = panel.querySelector(".feed-entry:last-child");
-      if (lastEntry) lastEntry.scrollIntoView({ behavior: "smooth", block: "end" });
+      panel.scrollTop = 0;
     }
   },
 
@@ -306,6 +306,40 @@ function escapeHtml(str) {
   );
 }
 
+function buildCountryPicker() {
+  const root = document.getElementById("cre-country-picker");
+  const hidden = document.getElementById("cre-country");
+  if (!root || typeof COUNTRIES_BY_CONTINENT === "undefined") return;
+
+  root.innerHTML = COUNTRIES_BY_CONTINENT.map(group => `
+    <div class="country-group">
+      <div class="country-group-label">${escapeHtml(group.name)}</div>
+      <div class="country-grid">
+        ${group.countries.map(c => `
+          <button type="button" class="country-option" data-code="${c.code}" data-name="${escapeHtml(c.name)}">
+            <span class="country-flag">${FLAGS[c.code] || ""}</span>
+            <span class="country-name">${escapeHtml(c.name)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  const setSelected = (btn) => {
+    root.querySelectorAll(".country-option.selected").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    hidden.value = btn.dataset.name;
+  };
+
+  root.querySelectorAll(".country-option").forEach((btn) => {
+    btn.addEventListener("click", () => setSelected(btn));
+  });
+
+  // Default to first country (United Kingdom).
+  const first = root.querySelector(".country-option");
+  if (first) setSelected(first);
+}
+
 // --------------------------------------------------------------------------
 // Mock bridge — runs entirely in the browser, just enough to design against.
 // --------------------------------------------------------------------------
@@ -369,8 +403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   Icons.hydrate();
 
   // Populate creation dropdowns
-  const countrySel = document.getElementById("cre-country");
-  COUNTRIES.forEach(c => countrySel.add(new Option(c, c)));
+  buildCountryPicker();
   const talentSel = document.getElementById("cre-talent");
   TALENTS.forEach(t => talentSel.add(new Option(t, t)));
 
@@ -388,7 +421,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const list = NAMES[gender] || NAMES.NonBinary;
       name = list[Math.floor(Math.random() * list.length)];
     }
-    const country = document.getElementById("cre-country").value;
+    const country = document.getElementById("cre-country").value || "United Kingdom";
     const talent = document.getElementById("cre-talent").value;
     App.newGame(name, gender, country, talent);
   });

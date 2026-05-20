@@ -19,11 +19,21 @@ from core.state import FeedEntry, GameState, Stats
 
 
 def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
-    """Try to fire one event this tick. Returns the chosen event dict, or None."""
+    """Try to fire one event this tick. Returns the chosen event dict, or None.
+
+    Non-repeatable events (the default) are filtered once their id appears in
+    state.fired_event_ids — life-once moments like 'first_word' should never
+    fire twice.
+    """
     if state.character is None:
         return None
     age = state.character.age
-    candidates = [e for e in EVENTS if e["min_age"] <= age <= e["max_age"]]
+    fired = set(state.fired_event_ids)
+    candidates = [
+        e for e in EVENTS
+        if e["min_age"] <= age <= e["max_age"]
+        and (e.get("repeatable", False) or e["id"] not in fired)
+    ]
     if not candidates:
         return None
     # Single-roll model: shuffle candidates and pick the first whose prob hits.
@@ -91,3 +101,5 @@ def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:
         entry_id=f"feed:{state.tick}:{event_id}",
     ))
     state.pending_event_id = None
+    if event_id not in state.fired_event_ids:
+        state.fired_event_ids.append(event_id)

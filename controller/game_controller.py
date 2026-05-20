@@ -135,7 +135,7 @@ class GameController:
     def save(self, path: Path) -> None:
         if self.state is None:
             return
-        path.write_text(json.dumps(self.snapshot(), indent=2))
+        path.write_text(json.dumps(self.snapshot(), indent=2, default=str))
 
     def load(self, path: Path) -> dict:
         # Loading is one-way for now: it just refreshes the snapshot from disk.
