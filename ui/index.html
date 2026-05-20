@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+  <main id="app">
+    <!-- Character creation -->
+    <section id="screen-creation" class="screen">
+      <header class="creation-header">
+        <p class="creation-eyebrow">A deeper life simulator</p>
+        <h1 class="creation-title">Begin</h1>
+        <p class="creation-sub">Every choice will leave a trace.</p>
+      </header>
+
+      <form id="creation-form" class="creation-form">
+        <label class="field">
+          <span class="field-label">Gender</span>
+          <select id="cre-gender">
+            <option>Male</option>
+            <option>Female</option>
+            <option>NonBinary</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Name</span>
+          <div class="field-row">
+            <input id="cre-name" type="text" placeholder="e.g. Oliver" autocomplete="off" />
+            <button type="button" id="btn-random" class="btn btn-ghost">Random</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Country</span>
+          <select id="cre-country"></select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Talent</span>
+          <select id="cre-talent"></select>
+          <p class="field-hint">Talents grant a hidden bias to starting stats.</p>
+        </label>
+
+        <button type="submit" class="btn btn-primary">Begin life</button>
+      </form>
+    </section>
+
+    <!-- Playing -->
+    <section id="screen-playing" class="screen hidden">
+      <header class="hud">
+        <div class="hud-identity">
+          <h2 id="hud-name"></h2>
+          <p id="hud-meta"></p>
+        </div>
+        <div class="hud-money">
+          <p class="hud-money-label">Balance</p>
+          <p id="hud-money" class="hud-money-value"></p>
+        </div>
+      </header>
+
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div class="panel" id="panel"></div>
+
+      <button id="btn-age-up" class="btn btn-age-up">
+        <span class="age-up-glyph" data-icon="hourglass"></span>
+        <span>Age Up</span>
+      </button>
+
+      <nav class="tabs">
+        <button class="tab" data-tab="feed">
+          <span class="tab-icon" data-icon="list"></span>
+          <span>Life</span>
+        </button>
+        <button class="tab" data-tab="career">
+          <span class="tab-icon" data-icon="briefcase"></span>
+          <span>Career</span>
+        </button>
+        <button class="tab" data-tab="relationships">
+          <span class="tab-icon" data-icon="link"></span>
+          <span>Ties</span>
+        </button>
+        <button class="tab" data-tab="activities">
+          <span class="tab-icon" data-icon="pulse"></span>
+          <span>Acts</span>
+        </button>
+      </nav>
+    </section>
+
+    <!-- Death -->
+    <section id="screen-death" class="screen hidden">
+      <div class="death-card">
+        <p class="death-eyebrow">In memoriam</p>
+        <h2 id="death-name"></h2>
+        <p id="death-meta"></p>
+        <hr />
+        <dl class="death-stats">
+          <dt>Final balance</dt><dd id="death-money"></dd>
+          <dt>Career</dt><dd id="death-career"></dd>
+        </dl>
+        <button id="btn-restart" class="btn btn-primary">Begin another life</button>
+      </div>
+    </section>
+
+    <!-- Event modal -->
+    <div id="event-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow">A choice</p>
+        <h3 id="event-text"></h3>
+        <div id="event-choices" class="event-choices"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
