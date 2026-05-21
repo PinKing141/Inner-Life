@@ -722,6 +722,28 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   transition: border-color 0.12s, background 0.12s;
 }
 .event-choice:hover { border-color: var(--accent-dim); background: var(--surface-3); }
+.event-choice.revealed { border-color: var(--good); background: rgba(120, 180, 120, 0.12); }
+
+.exam-cheat {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: none;
+  color: #d9534f;
+  text-decoration: underline;
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+.exam-cheat:hover { color: #ff6b66; }
+
+.university-admit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--info);
+  margin-bottom: 16px;
+}
 
 /* ==========================================================================
    Death

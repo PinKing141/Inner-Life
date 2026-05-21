@@ -18,6 +18,7 @@ from typing import Callable
 from core import economy, education, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
+from core.rng import Rng
 from core.state import FeedEntry, GameState
 
 
@@ -57,6 +58,7 @@ class GameController:
             for j in economy.list_jobs()
         ]
         snap["courses"] = courses_mod.list_courses_for_ui()
+        snap["exam"] = self._exam_for_ui()
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -77,6 +79,27 @@ class GameController:
             snap["country_code"] = country.code
             snap["currency"] = country.currency
         return snap
+
+    def _exam_for_ui(self) -> dict | None:
+        """UI-safe view of the active exam — never leaks the answer key, only
+        the answer for a question the player has successfully cheated on."""
+        if self.state is None or self.state.exam is None:
+            return None
+        ex = self.state.exam
+        qs = ex.get("questions", [])
+        idx = ex.get("index", 0)
+        current = None
+        if 0 <= idx < len(qs):
+            q = qs[idx]
+            current = {"prompt": q["prompt"], "options": list(q["options"]), "subject": q.get("subject", "")}
+        return {
+            "index": idx,
+            "total": len(qs),
+            "current": current,
+            "finished": ex.get("finished", False),
+            "caught": ex.get("caught", False),
+            "revealed": ex.get("revealed"),
+        }
 
     def _countries_for_ui(self) -> list[dict]:
         repo_root = Path(__file__).resolve().parents[1]
@@ -155,9 +178,10 @@ class GameController:
             edu.awaiting_university_choice = False
             if attend:
                 education.enroll_university(s)
-                text = f"You enrolled in {edu.university_major or 'an undeclared course'} at {edu.university_name}."
+                scholar = "" if edu.scholarship == "none" else f" on a {edu.scholarship} scholarship"
+                text = f"You enrolled in {edu.university_major or 'an undeclared course'} at {edu.university_name}{scholar}."
             else:
-                text = "You chose not to attend university."
+                text = "You chose not to attend university. You can apply later from the Career tab."
         else:
             text = (
                 f"You chose to attend university and study {edu.university_major or 'an undeclared subject'} after secondary graduation."
@@ -178,6 +202,89 @@ class GameController:
         if self.state is None or self.state.character is None:
             return self.snapshot()
         self.state.education.degree_award_pending = False
+        self._broadcast()
+        return self.snapshot()
+
+    def _feed(self, text: str, kind: str, tag: str) -> None:
+        s = self.state
+        s.feed.append(FeedEntry(
+            age=s.character.age if s.character else 0,
+            text=text, kind=kind, entry_id=f"feed:{tag}:{s.tick}",
+        ))
+
+    def answer_exam(self, choice_index: int) -> dict:
+        if self.state is None or self.state.exam is None:
+            return self.snapshot()
+        s = self.state
+        ex = s.exam
+        if ex.get("finished"):
+            return self.snapshot()
+        qs = ex["questions"]
+        i = ex.get("index", 0)
+        if i >= len(qs):
+            return self.snapshot()
+        ex["answers"].append(choice_index)
+        if choice_index == qs[i]["answer"]:
+            ex["correct"] += 1
+        ex["revealed"] = None
+        ex["index"] = i + 1
+        if ex["index"] >= len(qs):
+            msg = education.finalize_exam(s)
+            self._feed(msg, "neutral", "exam_result")
+        self._broadcast()
+        return self.snapshot()
+
+    def cheat_exam(self) -> dict:
+        """Reveal the current answer — unless you're caught, which ends the exam."""
+        if self.state is None or self.state.exam is None:
+            return self.snapshot()
+        s = self.state
+        ex = s.exam
+        if ex.get("finished"):
+            return self.snapshot()
+        rng = Rng(s.seed).fork(s.tick).fork(ex.get("index", 0) * 7 + 1)
+        if rng.chance(0.40):
+            ex["caught"] = True
+            self._feed("You were caught cheating and thrown out of the exam.", "bad", "exam_cheat")
+            msg = education.finalize_exam(s)
+            self._feed(msg, "neutral", "exam_result")
+        else:
+            ex["revealed"] = ex["questions"][ex["index"]]["answer"]
+        self._broadcast()
+        return self.snapshot()
+
+    def apply_university_now(self) -> dict:
+        """Apply to university later (e.g. after declining at graduation)."""
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        edu = self.state.education
+        if edu.in_school or edu.degree_completed or self.state.character.age < 18:
+            return self.snapshot()
+        if not edu.admitted_tier:
+            # No place from the exam — adult education always offers community.
+            edu.admitted_tier = "Community"
+            edu.scholarship = "none"
+        edu.university_intent = "undecided"
+        edu.awaiting_university_choice = True
+        self._broadcast()
+        return self.snapshot()
+
+    def enroll_postgrad(self, program: str) -> dict:
+        """Begin a master's or doctorate from the Career tab."""
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        edu = self.state.education
+        if edu.in_school:
+            return self.snapshot()
+        if program == "Master's Degree" and not edu.degree_completed:
+            return self.snapshot()
+        if program == "Doctorate" and not edu.masters_completed:
+            return self.snapshot()
+        if program not in education.PROGRAMS:
+            return self.snapshot()
+        education.enroll_program(self.state, program)
+        label = education.PROGRAMS[program]["label"]
+        self._feed(f"You enrolled in a {label} at {edu.university_name}.", "neutral", "postgrad")
         self._broadcast()
         return self.snapshot()
 

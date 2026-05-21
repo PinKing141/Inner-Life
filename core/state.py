@@ -97,9 +97,19 @@ class Education:
     university_name: str = ""  # generated when the player enrols
     degree_field: str = ""  # broad field of the chosen course (gates degree jobs)
     degree_completed: bool = False  # True once the undergraduate degree is earned
-    student_debt: int = 0  # accrues yearly while studying, then grows with interest
+    masters_completed: bool = False
+    doctorate_completed: bool = False
+    study_years_left: int = 0  # years remaining in the current university program
+    scholarship: str = "none"  # none | partial | full (applies to undergrad tuition)
     awaiting_university_choice: bool = False  # UI should prompt the course picker
     degree_award_pending: bool = False  # UI should show the "you graduated" popup
+    degree_award_label: str = ""  # e.g. "undergraduate degree", "master's degree"
+    # Final school exam (sat at 18) -> grade gates admission and scholarships.
+    awaiting_exam: bool = False
+    exam_taken: bool = False
+    final_school_grade: str = ""
+    exam_correct: int = 0
+    admitted_tier: str = ""  # Prestigious | Standard | Community | "" (not admitted)
 
 
 @dataclass
@@ -135,6 +145,7 @@ class GameState:
     causal_chain: list[dict] = field(default_factory=list)
     world: World = field(default_factory=World)
     tick: int = 0  # how many times age_up has been called
+    exam: dict | None = None  # active/finished final school exam (interactive)
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -197,9 +208,18 @@ class GameState:
                 "university_name": self.education.university_name,
                 "degree_field": self.education.degree_field,
                 "degree_completed": self.education.degree_completed,
-                "student_debt": self.education.student_debt,
+                "masters_completed": self.education.masters_completed,
+                "doctorate_completed": self.education.doctorate_completed,
+                "study_years_left": self.education.study_years_left,
+                "scholarship": self.education.scholarship,
                 "awaiting_university_choice": self.education.awaiting_university_choice,
                 "degree_award_pending": self.education.degree_award_pending,
+                "degree_award_label": self.education.degree_award_label,
+                "awaiting_exam": self.education.awaiting_exam,
+                "exam_taken": self.education.exam_taken,
+                "final_school_grade": self.education.final_school_grade,
+                "exam_correct": self.education.exam_correct,
+                "admitted_tier": self.education.admitted_tier,
             },
             "feed": [
                 {
@@ -214,6 +234,7 @@ class GameState:
             "pending_event_id": self.pending_event_id,
             "fired_events": list(self.fired_events),
             "tick": self.tick,
+            "exam": self.exam,
         }
 
 
@@ -290,9 +311,18 @@ class GameState:
             university_name=edu_d.get("university_name", ""),
             degree_field=edu_d.get("degree_field", ""),
             degree_completed=edu_d.get("degree_completed", False),
-            student_debt=edu_d.get("student_debt", 0),
+            masters_completed=edu_d.get("masters_completed", False),
+            doctorate_completed=edu_d.get("doctorate_completed", False),
+            study_years_left=edu_d.get("study_years_left", 0),
+            scholarship=edu_d.get("scholarship", "none"),
             awaiting_university_choice=edu_d.get("awaiting_university_choice", False),
             degree_award_pending=edu_d.get("degree_award_pending", False),
+            degree_award_label=edu_d.get("degree_award_label", ""),
+            awaiting_exam=edu_d.get("awaiting_exam", False),
+            exam_taken=edu_d.get("exam_taken", False),
+            final_school_grade=edu_d.get("final_school_grade", ""),
+            exam_correct=edu_d.get("exam_correct", 0),
+            admitted_tier=edu_d.get("admitted_tier", ""),
         )
 
         feed = [
@@ -326,6 +356,7 @@ class GameState:
             causal_chain=list(data.get("causal_chain", [])),
             world=world,
             tick=data.get("tick", 0),
+            exam=data.get("exam"),
         )
 
 

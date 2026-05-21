@@ -30,7 +30,6 @@ const FALLBACK_NAMES = {
   NonBinary: ["Alex","Jordan","Charlie","Sam","Taylor","Morgan","Casey","Riley","Quinn","Rowan"],
 };
 const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
-const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
 const STAGE_ICONS = { Infant: "infant", School: "school", Teenager: "school", Career: "briefcase" };
 const DATA_BASE = "flags-svg";
 
@@ -134,6 +133,26 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async answerExam(i) {
+    const result = await this.bridge.answerExam(i);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async cheatExam() {
+    const result = await this.bridge.cheatExam();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async applyUniversity() {
+    const result = await this.bridge.applyUniversity();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async enrollPostgrad(program) {
+    const result = await this.bridge.enrollPostgrad(program);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   // ---- Rendering ----
 
   render() {
@@ -147,8 +166,30 @@ const App = {
     if (s.mode === "PLAYING") this.renderPlaying();
     if (s.mode === "DEATH") this.renderDeath();
     this.renderModal();
+    this.renderExamModal();
     this.renderUniversityModal();
     this.renderDegreeModal();
+  },
+
+  renderExamModal() {
+    const modal = document.getElementById("exam-modal");
+    if (!modal) return;
+    const ex = this.state.exam;
+    const show = this.state.mode === "PLAYING" && ex && ex.current && !ex.finished && !this.state.pending_event;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+
+    const q = ex.current;
+    document.getElementById("exam-progress").textContent =
+      `${q.subject || "Final exam"} · Question ${ex.index + 1} of ${ex.total}`;
+    document.getElementById("exam-question").textContent = q.prompt;
+    const opts = document.getElementById("exam-options");
+    opts.innerHTML = q.options.map((o, i) =>
+      `<button class="event-choice${ex.revealed === i ? " revealed" : ""}" data-exam-answer="${i}">${escapeHtml(o)}</button>`
+    ).join("");
+    opts.querySelectorAll("[data-exam-answer]").forEach((btn) => {
+      btn.addEventListener("click", () => this.answerExam(parseInt(btn.dataset.examAnswer, 10)));
+    });
   },
 
   renderUniversityModal() {
@@ -158,6 +199,15 @@ const App = {
     const show = this.state.mode === "PLAYING" && edu && edu.awaiting_university_choice && !this.state.pending_event;
     modal.classList.toggle("hidden", !show);
     if (!show) return;
+
+    const admit = document.getElementById("university-admit");
+    if (admit) {
+      const parts = [];
+      if (edu.final_school_grade) parts.push(`Final grade: ${edu.final_school_grade}`);
+      if (edu.admitted_tier) parts.push(`${edu.admitted_tier} university`);
+      if (edu.scholarship && edu.scholarship !== "none") parts.push(`${edu.scholarship} scholarship`);
+      admit.textContent = parts.join(" · ");
+    }
 
     const sel = document.getElementById("university-course");
     if (sel && !sel.dataset.populated) {
@@ -177,8 +227,9 @@ const App = {
     if (!show) return;
     const major = edu.university_major || "your subject";
     const uni = edu.university_name || "university";
+    const label = edu.degree_award_label || "undergraduate degree";
     document.getElementById("degree-text").textContent =
-      `You earned your undergraduate degree in ${major} from ${uni}!`;
+      `You earned your ${label} in ${major} from ${uni}!`;
   },
 
   renderPlaying() {
@@ -252,9 +303,10 @@ const App = {
       el.classList.toggle("active", el.dataset.tab === this.activeTab);
     });
 
+    const examActive = !!(s.exam && s.exam.current && !s.exam.finished);
     document.getElementById("btn-age-up").disabled =
-      !!s.pending_event ||
-      !!(s.education && (s.education.awaiting_university_choice || s.education.degree_award_pending));
+      !!s.pending_event || examActive ||
+      !!(s.education && (s.education.awaiting_exam || s.education.awaiting_university_choice || s.education.degree_award_pending));
 
     if (this.activeTab === "feed") {
       panel.scrollTop = 0;
@@ -304,6 +356,8 @@ const App = {
         <div class="education-card-state">Field: ${escapeHtml((edu.degree_field || "general").replace(/_/g, " "))}</div>
       </div>` : ""}
 
+      ${this.renderStudyActions(edu)}
+
       <p class="panel-heading">Career</p>
       ${career ? `
         <div class="current-job">
@@ -326,6 +380,22 @@ const App = {
         </button>
       `).join("")}
     `;
+  },
+
+  renderStudyActions(edu) {
+    const age = this.state.character.age;
+    const buttons = [];
+    if (age >= 18 && !edu.in_school && !edu.degree_completed) {
+      buttons.push(`<button class="job-row" data-action="apply-uni"><div><div class="job-row-title">Apply to university</div><div class="job-row-req">Start an undergraduate degree</div></div></button>`);
+    }
+    if (edu.degree_completed && !edu.masters_completed && !edu.in_school) {
+      buttons.push(`<button class="job-row" data-action="postgrad" data-program="Master's Degree"><div><div class="job-row-title">Apply for a Master's</div><div class="job-row-req">Graduate school · 2 years</div></div></button>`);
+    }
+    if (edu.masters_completed && !edu.doctorate_completed && !edu.in_school) {
+      buttons.push(`<button class="job-row" data-action="postgrad" data-program="Doctorate"><div><div class="job-row-title">Apply for a Doctorate</div><div class="job-row-req">Postgraduate · 3 years</div></div></button>`);
+    }
+    if (!buttons.length) return "";
+    return `<p class="panel-heading">Study</p>${buttons.join("")}`;
   },
 
   renderRelationships() {
@@ -375,24 +445,28 @@ const App = {
 
   renderAssets() {
     const career = this.state.career;
+    const edu = this.state.education || {};
     const income = career ? career.salary : 0;
-    const expenses = 0;
-    const debt = (this.state.education && this.state.education.student_debt) || 0;
+    const TUITION = { "University": 9250, "Master's Degree": 11000, "Doctorate": 4500 };
+    let tuition = (edu.in_school && TUITION[edu.level]) || 0;
+    if (edu.level === "University" && edu.scholarship === "full") tuition = 0;
+    else if (edu.level === "University" && edu.scholarship === "partial") tuition = Math.floor(tuition / 2);
+    const money = this.state.money || 0;
     return `
       <p class="panel-heading">Assets</p>
+      <div class="education-card">
+        <div class="education-card-label">Bank balance</div>
+        <div class="education-card-value">${money < 0 ? "-" : ""}£${Math.abs(money).toLocaleString()}</div>
+        ${money < 0 ? `<div class="education-card-state">In the negatives — a job will pay this back</div>` : ""}
+      </div>
       <div class="education-card">
         <div class="education-card-label">Income</div>
         <div class="education-card-value">£${income.toLocaleString()} / yr</div>
       </div>
       <div class="education-card">
         <div class="education-card-label">Expenses</div>
-        <div class="education-card-value">£${expenses.toLocaleString()} / yr</div>
+        <div class="education-card-value">£${tuition.toLocaleString()} / yr${tuition > 0 ? " tuition" : ""}</div>
       </div>
-      ${debt > 0 ? `
-      <div class="education-card">
-        <div class="education-card-label">Student debt</div>
-        <div class="education-card-value">£${debt.toLocaleString()}</div>
-      </div>` : ""}
     `;
   },
 
@@ -433,6 +507,12 @@ const App = {
     root.querySelectorAll("[data-action='activity']").forEach((btn) => {
       btn.addEventListener("click", () => this.activity(btn.dataset.kind));
     });
+    root.querySelectorAll("[data-action='apply-uni']").forEach((btn) => {
+      btn.addEventListener("click", () => this.applyUniversity());
+    });
+    root.querySelectorAll("[data-action='postgrad']").forEach((btn) => {
+      btn.addEventListener("click", () => this.enrollPostgrad(btn.dataset.program));
+    });
   },
 };
 
@@ -456,10 +536,6 @@ function populateCreation(countries) {
     // Default to the United Kingdom if available; otherwise first entry.
     const defaultIx = countries.findIndex((c) => c.code === "GB");
     countrySel.selectedIndex = defaultIx >= 0 ? defaultIx : 0;
-
-    const talentSel = document.getElementById("cre-talent");
-    talentSel.innerHTML = "";
-    TALENTS.forEach((t) => talentSel.add(new Option(t, t)));
 
     refreshCityOptions();
     refreshFlag();
@@ -643,10 +719,14 @@ const MockBridge = (() => {
             education: {
               level: "None", in_school: false, university_intent: "undecided",
               university_major: "", university_name: "", degree_field: "",
-              degree_completed: false, student_debt: 0,
-              awaiting_university_choice: false, degree_award_pending: false,
+              degree_completed: false, masters_completed: false, doctorate_completed: false,
+              study_years_left: 0, scholarship: "none",
+              awaiting_university_choice: false, degree_award_pending: false, degree_award_label: "",
+              awaiting_exam: false, exam_taken: false, final_school_grade: "",
+              exam_correct: 0, admitted_tier: "",
             },
             courses: MOCK_COURSES,
+            exam: null,
             feed: [{ age: 0, text: `You were born in ${city || cn.cities[0]}, ${cn.name}.`, kind: "special" }],
             pending_event: null,
             tick: 0,
@@ -698,6 +778,20 @@ const MockBridge = (() => {
           broadcast();
           return JSON.stringify(state);
         },
+        async answerExam() { broadcast(); return JSON.stringify(state); },
+        async cheatExam() { broadcast(); return JSON.stringify(state); },
+        async applyUniversity() {
+          state.education.awaiting_university_choice = true;
+          if (!state.education.admitted_tier) state.education.admitted_tier = "Community";
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async enrollPostgrad(program) {
+          state.education.level = program;
+          state.education.in_school = true;
+          broadcast();
+          return JSON.stringify(state);
+        },
       };
     },
   };
@@ -730,8 +824,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const country = document.getElementById("cre-country").value;
     const city = document.getElementById("cre-city").value;
-    const talent = document.getElementById("cre-talent").value;
-    App.newGame(firstName, lastName, gender, country, city, talent);
+    App.newGame(firstName, lastName, gender, country, city, "");
   });
 
   document.getElementById("btn-age-up").addEventListener("click", () => App.ageUp());
@@ -743,6 +836,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("btn-uni-skip").addEventListener("click", () => App.setUniversityPlan(false, ""));
   document.getElementById("btn-degree-ok").addEventListener("click", () => App.acknowledgeDegree());
+  document.getElementById("btn-cheat").addEventListener("click", () => {
+    if (window.confirm("Are you sure you want to cheat? If you get caught you'll be thrown out of the exam.")) {
+      App.cheatExam();
+    }
+  });
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {

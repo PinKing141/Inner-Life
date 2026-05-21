@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, economy, sim, social
+from core import agents, economy, education, sim, social
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -189,40 +189,119 @@ def _age_to(c, target):
             c.choose(0)
 
 
-def test_university_popup_flow_enrols_accrues_debt_and_awards_degree():
+def _take_exam(c, correct=True):
+    while c.state.exam and not c.state.exam.get("finished"):
+        i = c.state.exam["index"]
+        q = c.state.exam["questions"][i]
+        ans = q["answer"] if correct else (q["answer"] + 1) % 3
+        c.answer_exam(ans)
+
+
+def test_final_exam_then_university_popup_and_degree():
     c = GameController()
-    c.new_game(seed=99, name="", gender="Female", country="US", talent="Academics")
+    c.new_game(seed=99, name="Ada", gender="Female", country="US", talent="Academics")
     assert c.state is not None
-    # No pre-set intent: graduating secondary should raise the course picker.
+    # Secondary graduation triggers the final exam, not the course picker yet.
     _age_to(c, 18)
     edu = c.state.education
-    assert edu.awaiting_university_choice is True
-    assert edu.in_school is False
+    assert edu.awaiting_exam is True
+    assert c.state.exam is not None and len(c.state.exam["questions"]) == 10
+    assert c.state.exam["questions"][0]["prompt"] == "What is your name?"
 
-    # Player picks a science course in the popup -> immediate enrolment.
+    # Ace the exam -> top grade -> admitted with the course picker open.
+    _take_exam(c, correct=True)
+    edu = c.state.education
+    assert edu.exam_taken is True
+    assert edu.final_school_grade == "A"
+    assert edu.admitted_tier == "Prestigious"
+    assert edu.scholarship == "full"
+    assert edu.awaiting_university_choice is True
+
+    # Enrol in a science course.
     c.set_university_plan(attend=True, major="Physics")
     edu = c.state.education
-    assert edu.awaiting_university_choice is False
-    assert edu.in_school is True
-    assert edu.level == "University"
+    assert edu.in_school is True and edu.level == "University"
     assert edu.degree_field == "science"
-    assert edu.university_name  # a school was generated
+    assert edu.university_name
 
-    # Debt grows every year of study.
-    _age_to(c, 19)
-    debt_at_19 = c.state.education.student_debt
-    assert debt_at_19 > 0
-    _age_to(c, 20)
-    assert c.state.education.student_debt > debt_at_19
-
-    # Degree is awarded at graduation with a popup flag.
+    # Graduate after four years.
     _age_to(c, 22)
     edu = c.state.education
     assert edu.degree_completed is True
-    assert edu.in_school is False
     assert edu.degree_award_pending is True
     c.acknowledge_degree()
     assert c.state.education.degree_award_pending is False
+
+
+def test_tuition_pushes_balance_negative_and_work_repays():
+    c = GameController()
+    c.new_game(seed=3, name="", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    edu = c.state.education
+    edu.admitted_tier = "Standard"
+    edu.scholarship = "none"
+    c.state.character.age = 18
+    education.enroll_program(c.state, "University", major="Physics")
+
+    start = c.state.money
+    _age_to(c, 19)
+    assert c.state.money < start  # tuition put us into the negatives
+    after_one = c.state.money
+    _age_to(c, 20)
+    assert c.state.money < after_one  # debt deepens each study year
+
+    _age_to(c, 22)
+    assert c.state.education.degree_completed is True
+
+    # A salary repays the negative balance over the working years.
+    c.state.stats.smarts = 95
+    for _ in range(30):
+        c.state.tick += 1
+        ok, _msg = economy.apply_for_job(c.state, "grocer")
+        if ok:
+            break
+    assert c.state.career is not None
+    low = c.state.money
+    _age_to(c, c.state.character.age + 12)
+    assert c.state.money > low
+
+
+def test_postgrad_master_then_doctorate():
+    c = GameController()
+    c.new_game(seed=8, name="", gender="Female", country="US", talent="Academics")
+    assert c.state is not None
+    edu = c.state.education
+    edu.degree_completed = True
+    edu.university_major = "Physics"
+    edu.degree_field = "science"
+    c.state.character.age = 22
+
+    c.enroll_postgrad("Master's Degree")
+    assert c.state.education.level == "Master's Degree"
+    assert c.state.education.in_school is True
+    _age_to(c, 24)
+    assert c.state.education.masters_completed is True
+
+    c.acknowledge_degree()
+    c.enroll_postgrad("Doctorate")
+    assert c.state.education.level == "Doctorate"
+    _age_to(c, 27)
+    assert c.state.education.doctorate_completed is True
+
+
+def test_cheating_reveals_answer_or_ends_exam():
+    c = GameController()
+    c.new_game(seed=2, name="Bo", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    _age_to(c, 18)
+    assert c.state.exam is not None
+    c.cheat_exam()
+    ex = c.state.exam
+    if ex.get("caught"):
+        assert ex.get("finished") is True
+        assert c.state.education.final_school_grade == "F"
+    else:
+        assert ex.get("revealed") is not None
 
 
 def test_degree_field_gates_jobs():

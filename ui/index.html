@@ -58,12 +58,6 @@
           <select id="cre-city"></select>
         </label>
 
-        <label class="field">
-          <span class="field-label">Talent</span>
-          <select id="cre-talent"></select>
-          <p class="field-hint">Talents grant a hidden bias to starting stats.</p>
-        </label>
-
         <button type="submit" class="btn btn-primary">Begin life</button>
       </form>
     </section>
@@ -138,11 +132,22 @@
       </div>
     </div>
 
+    <!-- Final school exam -->
+    <div id="exam-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow" id="exam-progress">Final exam</p>
+        <h3 id="exam-question"></h3>
+        <div id="exam-options" class="event-choices"></div>
+        <button id="btn-cheat" class="exam-cheat">cheat</button>
+      </div>
+    </div>
+
     <!-- University course picker -->
     <div id="university-modal" class="modal hidden">
       <div class="modal-card">
-        <p class="modal-eyebrow">Graduation</p>
-        <h3 id="university-text">You graduated secondary school. Will you go to university?</h3>
+        <p class="modal-eyebrow">University</p>
+        <h3 id="university-text">Will you go to university?</h3>
+        <p id="university-admit" class="university-admit"></p>
         <label class="field">
           <span class="field-label">Course</span>
           <select id="university-course"></select>

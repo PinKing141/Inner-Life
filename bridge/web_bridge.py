@@ -121,6 +121,22 @@ class WebBridge(QObject):
     def dropOutUniversity(self) -> str:
         return _dumps(self._controller.drop_out_university())
 
+    @Slot(int, result=str)
+    def answerExam(self, choice_index: int) -> str:
+        return _dumps(self._controller.answer_exam(choice_index))
+
+    @Slot(result=str)
+    def cheatExam(self) -> str:
+        return _dumps(self._controller.cheat_exam())
+
+    @Slot(result=str)
+    def applyUniversity(self) -> str:
+        return _dumps(self._controller.apply_university_now())
+
+    @Slot(str, result=str)
+    def enrollPostgrad(self, program: str) -> str:
+        return _dumps(self._controller.enroll_postgrad(program))
+
     @Slot(str, result=str)
     def activity(self, kind: str) -> str:
         return _dumps(self._controller.activity(kind))
