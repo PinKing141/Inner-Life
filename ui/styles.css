@@ -539,6 +539,23 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
 .rel-bar-fill { height: 100%; transition: width 0.4s; }
 
 /* Activities */
+.panel-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px 12px 6px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.panel-back:hover { border-color: var(--accent-dim); color: var(--ink); }
+.panel-back svg { width: 16px; height: 16px; stroke: currentColor; }
+
 .activities {
   display: flex;
   flex-direction: column;

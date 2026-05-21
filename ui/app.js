@@ -176,15 +176,25 @@ const App = {
       </div>
     `).join("");
 
-    this.syncDynamicTabLabels(s);
+    // The leftmost nav button is the only label that changes with life stage:
+    // Infant → School → Career. Every other tab stays fixed.
+    const careerTab = document.querySelector('.tab[data-tab="career"]');
+    const careerLabel = careerTab ? careerTab.querySelector('span:last-child') : null;
+    if (careerLabel) careerLabel.textContent = stage;
 
-    // Panel by tab
+    // Panel by tab. The feed is the home/records view; it has no dedicated
+    // button — tapping a tab opens its panel, tapping it again returns here.
     const panel = document.getElementById("panel");
-    if (this.activeTab === "feed") panel.innerHTML = this.renderFeed();
-    else if (this.activeTab === "career") panel.innerHTML = this.renderCareer();
-    else if (this.activeTab === "relationships") panel.innerHTML = this.renderRelationships();
-    else if (this.activeTab === "activities") panel.innerHTML = this.renderActivities();
-    else if (this.activeTab === "assets") panel.innerHTML = this.renderAssets();
+    let panelHtml = "";
+    if (this.activeTab === "feed") panelHtml = this.renderFeed();
+    else if (this.activeTab === "career") panelHtml = this.renderCareer();
+    else if (this.activeTab === "relationships") panelHtml = this.renderRelationships();
+    else if (this.activeTab === "activities") panelHtml = this.renderActivities();
+    else if (this.activeTab === "assets") panelHtml = this.renderAssets();
+    if (this.activeTab !== "feed") {
+      panelHtml = `<button class="panel-back" data-action="back"><span data-icon="chevron-left"></span>Back</button>` + panelHtml;
+    }
+    panel.innerHTML = panelHtml;
 
     Icons.hydrate(panel);
     this.bindPanel(panel);
@@ -259,7 +269,7 @@ const App = {
   renderRelationships() {
     const rels = this.state.relationships || [];
     return `
-      <p class="panel-heading">Ties</p>
+      <p class="panel-heading">Relations</p>
       ${rels.length === 0 ? `<p class="unemployed">No-one of note.</p>` : ""}
       ${rels.map(r => {
         const c = r.relationship > 70 ? "var(--good)"
@@ -282,9 +292,8 @@ const App = {
   },
 
   renderActivities() {
-    const schoolEraOrLater = stageForState(this.state) !== "Infant";
     return `
-      <p class="panel-heading">${schoolEraOrLater ? "Activities..." : "Acts of will"}</p>
+      <p class="panel-heading">Activities</p>
       <div class="activities">
         ${ACTIVITIES.map(a => `
           <button class="activity" data-action="activity" data-kind="${a.kind}">
@@ -319,30 +328,6 @@ const App = {
     `;
   },
 
-  syncDynamicTabLabels(state) {
-    // The school-era labelling (Relations / Activities / Assets) begins when
-    // school starts and stays for the rest of life — it never reverts to the
-    // infant-era labels once the player has left infancy.
-    const schoolEraOrLater = stageForState(state) !== "Infant";
-
-    const relTab = document.querySelector('.tab[data-tab="relationships"]');
-    const relIcon = relTab ? relTab.querySelector('.tab-icon') : null;
-    const relLabel = relTab ? relTab.querySelector('span:last-child') : null;
-    if (relIcon) relIcon.setAttribute('data-icon', schoolEraOrLater ? 'heart' : 'link');
-    if (relLabel) relLabel.textContent = schoolEraOrLater ? 'Relations' : 'Ties';
-
-    const actTab = document.querySelector('.tab[data-tab="activities"]');
-    const actIcon = actTab ? actTab.querySelector('.tab-icon') : null;
-    const actLabel = actTab ? actTab.querySelector('span:last-child') : null;
-    if (actIcon) actIcon.setAttribute('data-icon', schoolEraOrLater ? 'ellipsis' : 'pulse');
-    if (actLabel) actLabel.textContent = schoolEraOrLater ? 'Activities...' : 'Acts';
-
-    const assetsTab = document.querySelector('.tab[data-tab="assets"]');
-    if (assetsTab) assetsTab.classList.toggle('hidden', !schoolEraOrLater);
-    if (!schoolEraOrLater && this.activeTab === 'assets') this.activeTab = 'feed';
-
-    Icons.hydrate(document.querySelector('.tabs'));
-  },
   renderDeath() {
     const s = this.state;
     const ch = s.character;
@@ -371,6 +356,9 @@ const App = {
   },
 
   bindPanel(root) {
+    root.querySelectorAll("[data-action='back']").forEach((btn) => {
+      btn.addEventListener("click", () => { this.activeTab = "feed"; this.render(); });
+    });
     root.querySelectorAll("[data-action='apply']").forEach((btn) => {
       btn.addEventListener("click", () => this.applyForJob(btn.dataset.job));
     });
@@ -644,7 +632,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {
-      App.activeTab = el.dataset.tab;
+      // Tapping the active tab again returns to the records page.
+      App.activeTab = App.activeTab === el.dataset.tab ? "feed" : el.dataset.tab;
       App.render();
     });
   });
