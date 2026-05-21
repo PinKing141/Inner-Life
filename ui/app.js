@@ -445,6 +445,8 @@ const App = {
     const fields = [["Relationship", rel.alive ? rel.kind : `${rel.kind} (deceased)`]];
     if (agent) {
       fields.push(["Age", `${agent.age}`]);
+      fields.push(["Marital status", agent.marital_status || "Single"]);
+      fields.push(["Education", agent.education || "None"]);
       fields.push(["Occupation", agent.job_title || "Unemployed"]);
       fields.push(["Bank", formatMoney(agent.money || 0)]);
     }
@@ -457,6 +459,7 @@ const App = {
 
     const bars = [bar("Relationship", rel.relationship, relColor)];
     if (agent) {
+      bars.push(bar("Generosity", agent.generosity, "var(--stat-looks)"));
       bars.push(bar("Happiness", agent.happiness, "var(--stat-happy)"));
       bars.push(bar("Health", agent.health, "var(--stat-health)"));
       bars.push(bar("Smarts", agent.smarts, "var(--stat-smarts)"));
@@ -785,7 +788,10 @@ const MockBridge = (() => {
               { npc_id: 1, name: `Helen ${lastName}`.trim(), kind: "Mother", relationship: 90, alive: true },
               { npc_id: 2, name: `Robert ${lastName}`.trim(), kind: "Father", relationship: 90, alive: true },
             ],
-            agents: [],
+            agents: [
+              { npc_id: 1, name: `Helen ${lastName}`.trim(), role: "Mother", age: 38, gender: "Female", health: 85, happiness: 70, smarts: 60, looks: 60, generosity: 72, money: 15000, job_title: "School Psychologist", marital_status: "Married", education: "University", alive: true },
+              { npc_id: 2, name: `Robert ${lastName}`.trim(), role: "Father", age: 41, gender: "Male", health: 80, happiness: 65, smarts: 55, looks: 55, generosity: 48, money: 8000, job_title: "Engineer", marital_status: "Married", education: "Secondary Education", alive: true },
+            ],
             career: null,
             education: {
               level: "None", in_school: false, university_intent: "undecided",
