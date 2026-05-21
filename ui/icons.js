@@ -25,6 +25,7 @@ const Icons = (() => {
     ellipsis: wrap(`<circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18" cy="12" r="1.5" fill="currentColor"/>`),
     heart: wrap(`<path d="M20.4 4.6a5.5 5.5 0 0 0-7.8 0L12 5.2l-.6-.6a5.5 5.5 0 0 0-7.8 7.8l.6.6L12 20.8l7.8-7.8.6-.6a5.5 5.5 0 0 0 0-7.8z"/>`),
     book: wrap(`<path d="M4 5a2 2 0 0 1 2-2h13v17H6a2 2 0 0 0-2 2V5z"/><line x1="19" y1="20" x2="6" y2="20"/>`),
+    chevron: wrap(`<polyline points="9 6 15 12 9 18"/>`),
     dumbbell: wrap(`<line x1="5" y1="8" x2="5" y2="16"/><line x1="3" y1="10" x2="3" y2="14"/><line x1="19" y1="8" x2="19" y2="16"/><line x1="21" y1="10" x2="21" y2="14"/><line x1="7" y1="12" x2="17" y2="12"/>`),
     stethoscope: wrap(`<path d="M5 4v6a4 4 0 0 0 8 0V4"/><line x1="5" y1="4" x2="5" y2="3"/><line x1="13" y1="4" x2="13" y2="3"/><path d="M9 14v2a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4v-2"/><circle cx="17" cy="11" r="2"/>`),
     people: wrap(`<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="10" r="2.5"/><path d="M14 20c0-2 1.7-4 4-4s3 1 3 3"/>`),

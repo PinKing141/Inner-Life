@@ -282,15 +282,18 @@ const App = {
   },
 
   renderActivities() {
-    const inSchool = !!(this.state.education && this.state.education.in_school);
+    const schoolEraOrLater = stageForState(this.state) !== "Infant";
     return `
-      <p class="panel-heading">${inSchool ? "Activities..." : "Acts of will"}</p>
+      <p class="panel-heading">${schoolEraOrLater ? "Activities..." : "Acts of will"}</p>
       <div class="activities">
         ${ACTIVITIES.map(a => `
           <button class="activity" data-action="activity" data-kind="${a.kind}">
-            <span data-icon="${a.icon}"></span>
-            <span class="activity-name">${a.name}</span>
-            <span class="activity-cost">${a.cost}</span>
+            <span class="activity-icon" data-icon="${a.icon}"></span>
+            <span class="activity-body">
+              <span class="activity-name">${a.name}</span>
+              <span class="activity-cost">${a.cost}</span>
+            </span>
+            <span class="activity-chevron" data-icon="chevron"></span>
           </button>
         `).join("")}
       </div>
@@ -317,23 +320,26 @@ const App = {
   },
 
   syncDynamicTabLabels(state) {
-    const inSchool = !!(state.education && state.education.in_school);
+    // The school-era labelling (Relations / Activities / Assets) begins when
+    // school starts and stays for the rest of life — it never reverts to the
+    // infant-era labels once the player has left infancy.
+    const schoolEraOrLater = stageForState(state) !== "Infant";
 
     const relTab = document.querySelector('.tab[data-tab="relationships"]');
     const relIcon = relTab ? relTab.querySelector('.tab-icon') : null;
     const relLabel = relTab ? relTab.querySelector('span:last-child') : null;
-    if (relIcon) relIcon.setAttribute('data-icon', inSchool ? 'heart' : 'link');
-    if (relLabel) relLabel.textContent = inSchool ? 'Relations' : 'Ties';
+    if (relIcon) relIcon.setAttribute('data-icon', schoolEraOrLater ? 'heart' : 'link');
+    if (relLabel) relLabel.textContent = schoolEraOrLater ? 'Relations' : 'Ties';
 
     const actTab = document.querySelector('.tab[data-tab="activities"]');
     const actIcon = actTab ? actTab.querySelector('.tab-icon') : null;
     const actLabel = actTab ? actTab.querySelector('span:last-child') : null;
-    if (actIcon) actIcon.setAttribute('data-icon', inSchool ? 'ellipsis' : 'pulse');
-    if (actLabel) actLabel.textContent = inSchool ? 'Activities...' : 'Acts';
+    if (actIcon) actIcon.setAttribute('data-icon', schoolEraOrLater ? 'ellipsis' : 'pulse');
+    if (actLabel) actLabel.textContent = schoolEraOrLater ? 'Activities...' : 'Acts';
 
     const assetsTab = document.querySelector('.tab[data-tab="assets"]');
-    if (assetsTab) assetsTab.classList.toggle('hidden', !inSchool);
-    if (!inSchool && this.activeTab === 'assets') this.activeTab = 'feed';
+    if (assetsTab) assetsTab.classList.toggle('hidden', !schoolEraOrLater);
+    if (!schoolEraOrLater && this.activeTab === 'assets') this.activeTab = 'feed';
 
     Icons.hydrate(document.querySelector('.tabs'));
   },
@@ -448,11 +454,11 @@ function fillRandomName() {
 
 function stageForState(state) {
   const age = state.character.age;
+  const inSchool = state.education && state.education.in_school;
+  if (inSchool) return "School";
   if (age < 5) return "Infant";
-  if (state.education && state.education.in_school) return "School";
-  if (age < 18) return "Teenager";
-  if (age < 65) return "Adult";
-  return "Elder";
+  if (age >= 18) return "Career";
+  return "Teenager";
 }
 
 function formatMoney(n) {
