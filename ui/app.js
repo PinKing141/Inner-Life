@@ -31,6 +31,7 @@ const FALLBACK_NAMES = {
 };
 const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
 const TALENTS = ["Sports","Music","Academics","Crime","Acting"];
+const STAGE_ICONS = { Infant: "infant", School: "school", Teenager: "school", Career: "briefcase" };
 const DATA_BASE = "flags-svg";
 
 // How many recent feed entries to render. 100 years of play used to be one
@@ -176,11 +177,17 @@ const App = {
       </div>
     `).join("");
 
-    // The leftmost nav button is the only label that changes with life stage:
-    // Infant → School → Career. Every other tab stays fixed.
+    // The leftmost nav button is the only one that changes with life stage:
+    // Infant → School → Career, each with its own label and icon. Every other
+    // tab stays fixed.
     const careerTab = document.querySelector('.tab[data-tab="career"]');
     const careerLabel = careerTab ? careerTab.querySelector('span:last-child') : null;
+    const careerIcon = careerTab ? careerTab.querySelector('.tab-icon') : null;
     if (careerLabel) careerLabel.textContent = stage;
+    if (careerIcon) {
+      careerIcon.setAttribute('data-icon', STAGE_ICONS[stage] || 'briefcase');
+      Icons.hydrate(careerIcon);
+    }
 
     // Panel by tab. The feed is the home/records view; it has no dedicated
     // button — tapping a tab opens its panel, tapping it again returns here.
