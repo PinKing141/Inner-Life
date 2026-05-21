@@ -137,6 +137,34 @@
         <div id="event-choices" class="event-choices"></div>
       </div>
     </div>
+
+    <!-- University course picker -->
+    <div id="university-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow">Graduation</p>
+        <h3 id="university-text">You graduated secondary school. Will you go to university?</h3>
+        <label class="field">
+          <span class="field-label">Course</span>
+          <select id="university-course"></select>
+          <p class="field-hint">Your degree's field decides which careers will accept you.</p>
+        </label>
+        <div class="event-choices">
+          <button id="btn-uni-enroll" class="event-choice">Enrol at university</button>
+          <button id="btn-uni-skip" class="event-choice">Don't go to university</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Degree award -->
+    <div id="degree-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow">Congratulations</p>
+        <h3 id="degree-text"></h3>
+        <div class="event-choices">
+          <button id="btn-degree-ok" class="event-choice">Continue</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="icons.js"></script>

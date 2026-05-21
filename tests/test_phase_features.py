@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, sim, social
+from core import agents, economy, sim, social
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -180,3 +180,74 @@ def test_secondary_graduation_skip_happens_at_18():
     age_18_entries = [f.text for f in c.state.feed if f.age == 18]
     assert any("You graduated secondary school." in t for t in age_18_entries)
     assert any("You chose not to attend university." in t for t in age_18_entries)
+
+
+def _age_to(c, target):
+    while c.state.character and c.state.character.age < target:
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+
+
+def test_university_popup_flow_enrols_accrues_debt_and_awards_degree():
+    c = GameController()
+    c.new_game(seed=99, name="", gender="Female", country="US", talent="Academics")
+    assert c.state is not None
+    # No pre-set intent: graduating secondary should raise the course picker.
+    _age_to(c, 18)
+    edu = c.state.education
+    assert edu.awaiting_university_choice is True
+    assert edu.in_school is False
+
+    # Player picks a science course in the popup -> immediate enrolment.
+    c.set_university_plan(attend=True, major="Physics")
+    edu = c.state.education
+    assert edu.awaiting_university_choice is False
+    assert edu.in_school is True
+    assert edu.level == "University"
+    assert edu.degree_field == "science"
+    assert edu.university_name  # a school was generated
+
+    # Debt grows every year of study.
+    _age_to(c, 19)
+    debt_at_19 = c.state.education.student_debt
+    assert debt_at_19 > 0
+    _age_to(c, 20)
+    assert c.state.education.student_debt > debt_at_19
+
+    # Degree is awarded at graduation with a popup flag.
+    _age_to(c, 22)
+    edu = c.state.education
+    assert edu.degree_completed is True
+    assert edu.in_school is False
+    assert edu.degree_award_pending is True
+    c.acknowledge_degree()
+    assert c.state.education.degree_award_pending is False
+
+
+def test_degree_field_gates_jobs():
+    c = GameController()
+    c.new_game(seed=5, name="", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    # Force a completed Fine Art degree and adult age with high smarts.
+    edu = c.state.education
+    edu.level = "University"
+    edu.degree_completed = True
+    edu.degree_field = "arts"
+    c.state.character.age = 30
+    c.state.stats.smarts = 95
+
+    # Scientist needs a science degree -> hard reject for a Fine Art graduate.
+    ok, msg = economy.apply_for_job(c.state, "scientist")
+    assert ok is False
+    assert "require" in msg.lower()
+
+    # A no-degree job should accept (probability is generous; both forks succeed).
+    hired = False
+    for _ in range(20):
+        c.state.tick += 1
+        ok, _msg = economy.apply_for_job(c.state, "grocer")
+        if ok:
+            hired = True
+            break
+    assert hired is True

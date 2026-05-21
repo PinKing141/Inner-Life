@@ -44,6 +44,22 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
     if not education_meets(state.education.level, spec.min_education):
         return False, f"You need at least {spec.min_education} to be a {spec.title}."
 
+    # Degree-gated professions hard-reject anyone without the right field.
+    if spec.required_field:
+        edu = state.education
+        if not edu.degree_completed or edu.degree_field != spec.required_field:
+            return False, (
+                f"Your application to be a {spec.title} was rejected — "
+                f"they require a degree in {spec.required_field.replace('_', ' ')}."
+            )
+
+    # Even when you meet every requirement, a hire isn't guaranteed.
+    salt = sum(ord(c) for c in job_id)
+    rng = Rng(state.seed).fork(state.tick).fork(salt)
+    hire_chance = 0.9 if spec.required_field else 0.85
+    if not rng.chance(hire_chance):
+        return False, f"You interviewed for {spec.title} but weren't offered the role this time."
+
     state.career = Job(job_id=spec.job_id, title=spec.title, salary=spec.salary)
     return True, f"You were hired as a {spec.title}. Your salary is £{spec.salary:,}."
 

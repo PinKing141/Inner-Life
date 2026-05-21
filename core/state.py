@@ -94,6 +94,12 @@ class Education:
     university_intent: str = "undecided"  # undecided | attend | skip
     university_major: str = ""  # only meaningful when intent=attend
     university_dropped_out: bool = False
+    university_name: str = ""  # generated when the player enrols
+    degree_field: str = ""  # broad field of the chosen course (gates degree jobs)
+    degree_completed: bool = False  # True once the undergraduate degree is earned
+    student_debt: int = 0  # accrues yearly while studying, then grows with interest
+    awaiting_university_choice: bool = False  # UI should prompt the course picker
+    degree_award_pending: bool = False  # UI should show the "you graduated" popup
 
 
 @dataclass
@@ -188,6 +194,12 @@ class GameState:
                 "university_intent": self.education.university_intent,
                 "university_major": self.education.university_major,
                 "university_dropped_out": self.education.university_dropped_out,
+                "university_name": self.education.university_name,
+                "degree_field": self.education.degree_field,
+                "degree_completed": self.education.degree_completed,
+                "student_debt": self.education.student_debt,
+                "awaiting_university_choice": self.education.awaiting_university_choice,
+                "degree_award_pending": self.education.degree_award_pending,
             },
             "feed": [
                 {
@@ -275,6 +287,12 @@ class GameState:
             university_intent=edu_d.get("university_intent", "undecided"),
             university_major=edu_d.get("university_major", ""),
             university_dropped_out=edu_d.get("university_dropped_out", False),
+            university_name=edu_d.get("university_name", ""),
+            degree_field=edu_d.get("degree_field", ""),
+            degree_completed=edu_d.get("degree_completed", False),
+            student_debt=edu_d.get("student_debt", 0),
+            awaiting_university_choice=edu_d.get("awaiting_university_choice", False),
+            degree_award_pending=edu_d.get("degree_award_pending", False),
         )
 
         feed = [

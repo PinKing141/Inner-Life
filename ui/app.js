@@ -124,6 +124,16 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async setUniversityPlan(attend, major) {
+    const result = await this.bridge.setUniversityPlan(attend, major || "");
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async acknowledgeDegree() {
+    const result = await this.bridge.acknowledgeDegree();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   // ---- Rendering ----
 
   render() {
@@ -137,6 +147,38 @@ const App = {
     if (s.mode === "PLAYING") this.renderPlaying();
     if (s.mode === "DEATH") this.renderDeath();
     this.renderModal();
+    this.renderUniversityModal();
+    this.renderDegreeModal();
+  },
+
+  renderUniversityModal() {
+    const modal = document.getElementById("university-modal");
+    if (!modal) return;
+    const edu = this.state.education;
+    const show = this.state.mode === "PLAYING" && edu && edu.awaiting_university_choice && !this.state.pending_event;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+
+    const sel = document.getElementById("university-course");
+    if (sel && !sel.dataset.populated) {
+      const courses = this.state.courses || [];
+      sel.innerHTML = "";
+      courses.forEach((c) => sel.add(new Option(`${c.major} (${c.field.replace(/_/g, " ")})`, c.major)));
+      sel.dataset.populated = "1";
+    }
+  },
+
+  renderDegreeModal() {
+    const modal = document.getElementById("degree-modal");
+    if (!modal) return;
+    const edu = this.state.education;
+    const show = this.state.mode === "PLAYING" && edu && edu.degree_award_pending && !this.state.pending_event;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    const major = edu.university_major || "your subject";
+    const uni = edu.university_name || "university";
+    document.getElementById("degree-text").textContent =
+      `You earned your undergraduate degree in ${major} from ${uni}!`;
   },
 
   renderPlaying() {
@@ -210,7 +252,9 @@ const App = {
       el.classList.toggle("active", el.dataset.tab === this.activeTab);
     });
 
-    document.getElementById("btn-age-up").disabled = !!s.pending_event;
+    document.getElementById("btn-age-up").disabled =
+      !!s.pending_event ||
+      !!(s.education && (s.education.awaiting_university_choice || s.education.degree_award_pending));
 
     if (this.activeTab === "feed") {
       panel.scrollTop = 0;
@@ -241,13 +285,24 @@ const App = {
     const career = s.career;
     const jobs = s.jobs || [];
 
+    const studyingUni = edu.level === "University" && edu.in_school;
+    const eduValue = studyingUni && edu.university_major
+      ? `${escapeHtml(edu.university_major)} at ${escapeHtml(edu.university_name || "university")}`
+      : escapeHtml(edu.level);
+
     return `
       <p class="panel-heading">Education</p>
       <div class="education-card">
         <div class="education-card-label">Current</div>
-        <div class="education-card-value">${escapeHtml(edu.level)}</div>
+        <div class="education-card-value">${eduValue}</div>
         ${edu.in_school ? `<div class="education-card-state">Currently attending</div>` : ""}
       </div>
+      ${edu.degree_completed ? `
+      <div class="education-card">
+        <div class="education-card-label">Degree</div>
+        <div class="education-card-value">${escapeHtml(edu.university_major || "Undergraduate")}</div>
+        <div class="education-card-state">Field: ${escapeHtml((edu.degree_field || "general").replace(/_/g, " "))}</div>
+      </div>` : ""}
 
       <p class="panel-heading">Career</p>
       ${career ? `
@@ -265,7 +320,7 @@ const App = {
         <button class="job-row" data-action="apply" data-job="${j.job_id}">
           <div>
             <div class="job-row-title">${escapeHtml(j.title)}${j.track && j.track !== "general" ? ` <span class="job-track">(${j.track})</span>` : ""}</div>
-            <div class="job-row-req">Req age ${j.min_age} · smarts ${j.min_smarts}</div>
+            <div class="job-row-req">Req age ${j.min_age} · smarts ${j.min_smarts}${j.required_field ? ` · ${escapeHtml(j.required_field.replace(/_/g, " "))} degree` : ""}</div>
           </div>
           <div class="job-row-salary">£${(j.salary / 1000).toFixed(0)}k</div>
         </button>
@@ -322,6 +377,7 @@ const App = {
     const career = this.state.career;
     const income = career ? career.salary : 0;
     const expenses = 0;
+    const debt = (this.state.education && this.state.education.student_debt) || 0;
     return `
       <p class="panel-heading">Assets</p>
       <div class="education-card">
@@ -332,6 +388,11 @@ const App = {
         <div class="education-card-label">Expenses</div>
         <div class="education-card-value">£${expenses.toLocaleString()} / yr</div>
       </div>
+      ${debt > 0 ? `
+      <div class="education-card">
+        <div class="education-card-label">Student debt</div>
+        <div class="education-card-value">£${debt.toLocaleString()}</div>
+      </div>` : ""}
     `;
   },
 
@@ -506,6 +567,13 @@ function buildCountryPicker() {
 // --------------------------------------------------------------------------
 
 const MockBridge = (() => {
+  const MOCK_COURSES = [
+    { major: "Computer Science", field: "technology" },
+    { major: "Physics", field: "science" },
+    { major: "Medicine", field: "medicine" },
+    { major: "Law", field: "law" },
+    { major: "Fine Art", field: "arts" },
+  ];
   const MOCK_COUNTRIES = [
     {
       code: "GB",
@@ -572,7 +640,13 @@ const MockBridge = (() => {
             ],
             agents: [],
             career: null,
-            education: { level: "None", in_school: false },
+            education: {
+              level: "None", in_school: false, university_intent: "undecided",
+              university_major: "", university_name: "", degree_field: "",
+              degree_completed: false, student_debt: 0,
+              awaiting_university_choice: false, degree_award_pending: false,
+            },
+            courses: MOCK_COURSES,
             feed: [{ age: 0, text: `You were born in ${city || cn.cities[0]}, ${cn.name}.`, kind: "special" }],
             pending_event: null,
             tick: 0,
@@ -598,6 +672,32 @@ const MockBridge = (() => {
         async choose() { broadcast(); return JSON.stringify(state); },
         async applyForJob() { broadcast(); return JSON.stringify(state); },
         async activity() { broadcast(); return JSON.stringify(state); },
+        async setUniversityPlan(attend, major) {
+          const edu = state.education;
+          edu.university_intent = attend ? "attend" : "skip";
+          edu.university_major = attend ? major : "";
+          if (edu.awaiting_university_choice) {
+            edu.awaiting_university_choice = false;
+            if (attend) {
+              edu.level = "University";
+              edu.in_school = true;
+              edu.university_name = `University of ${state.character.city}`;
+            }
+          }
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async acknowledgeDegree() {
+          state.education.degree_award_pending = false;
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async dropOutUniversity() {
+          state.education.in_school = false;
+          state.education.university_dropped_out = true;
+          broadcast();
+          return JSON.stringify(state);
+        },
       };
     },
   };
@@ -636,6 +736,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("btn-age-up").addEventListener("click", () => App.ageUp());
   document.getElementById("btn-restart").addEventListener("click", () => location.reload());
+
+  document.getElementById("btn-uni-enroll").addEventListener("click", () => {
+    const major = document.getElementById("university-course").value;
+    App.setUniversityPlan(true, major);
+  });
+  document.getElementById("btn-uni-skip").addEventListener("click", () => App.setUniversityPlan(false, ""));
+  document.getElementById("btn-degree-ok").addEventListener("click", () => App.acknowledgeDegree());
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {

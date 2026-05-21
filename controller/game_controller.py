@@ -15,8 +15,9 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import economy, relationships, sim
+from core import economy, education, relationships, sim
 from core.content import countries as countries_mod
+from core.content import courses as courses_mod
 from core.state import FeedEntry, GameState
 
 
@@ -51,9 +52,11 @@ class GameController:
                 "job_id": j.job_id, "title": j.title, "min_age": j.min_age,
                 "min_smarts": j.min_smarts, "salary": j.salary,
                 "track": getattr(j, "track", "general"),
+                "required_field": getattr(j, "required_field", ""),
             }
             for j in economy.list_jobs()
         ]
+        snap["courses"] = courses_mod.list_courses_for_ui()
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -141,18 +144,40 @@ class GameController:
         if self.state is None or self.state.character is None:
             return self.snapshot()
         s = self.state
-        s.education.university_intent = "attend" if attend else "skip"
-        s.education.university_major = major.strip() if attend else ""
-        s.feed.append(FeedEntry(
-            age=s.character.age,
-            text=(
-                f"You chose to attend university and study {s.education.university_major or 'an undeclared subject'} after secondary graduation."
+        edu = s.education
+        edu.university_intent = "attend" if attend else "skip"
+        edu.university_major = major.strip() if attend else ""
+
+        # Popup path: the player is being prompted right now at graduation, so
+        # the decision takes effect immediately rather than pre-registering an
+        # intent for a future secondary graduation.
+        if edu.awaiting_university_choice:
+            edu.awaiting_university_choice = False
+            if attend:
+                education.enroll_university(s)
+                text = f"You enrolled in {edu.university_major or 'an undeclared course'} at {edu.university_name}."
+            else:
+                text = "You chose not to attend university."
+        else:
+            text = (
+                f"You chose to attend university and study {edu.university_major or 'an undeclared subject'} after secondary graduation."
                 if attend
                 else "You chose not to attend university after secondary graduation."
-            ),
+            )
+
+        s.feed.append(FeedEntry(
+            age=s.character.age,
+            text=text,
             kind="neutral",
             entry_id=f"feed:edu_plan:{s.tick}",
         ))
+        self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_degree(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        self.state.education.degree_award_pending = False
         self._broadcast()
         return self.snapshot()
 
