@@ -109,6 +109,10 @@ class WebBridge(QObject):
     def applyForJob(self, job_id: str) -> str:
         return _dumps(self._controller.apply_for_job(job_id))
 
+    @Slot(int, str, result=str)
+    def relationshipAction(self, npc_id: int, action: str) -> str:
+        return _dumps(self._controller.relationship_action(npc_id, action))
+
     @Slot(bool, str, result=str)
     def setUniversityPlan(self, attend: bool, major: str) -> str:
         return _dumps(self._controller.set_university_plan(attend, major))

@@ -304,6 +304,34 @@ def test_cheating_reveals_answer_or_ends_exam():
         assert ex.get("revealed") is not None
 
 
+def test_relationship_interactions_move_the_bar():
+    c = GameController()
+    c.new_game(seed=42, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    nid = c.state.relationships[0].npc_id
+    base = c.state.relationships[0].relationship
+
+    c.relationship_action(nid, "argue")
+    after_argue = c.state.relationships[0].relationship
+    assert after_argue < base
+
+    c.relationship_action(nid, "compliment")
+    assert c.state.relationships[0].relationship > after_argue
+
+    # A gift you can't afford is rejected and changes nothing.
+    c.state.money = 0
+    before = c.state.relationships[0].relationship
+    c.relationship_action(nid, "gift")
+    assert c.state.relationships[0].relationship == before
+    assert "afford" in c.state.feed[-1].text
+
+    # With cash, the gift lands and costs money.
+    c.state.money = 500
+    c.relationship_action(nid, "gift")
+    assert c.state.money == 450
+    assert c.state.relationships[0].relationship > before
+
+
 def test_degree_field_gates_jobs():
     c = GameController()
     c.new_game(seed=5, name="", gender="Male", country="US", talent="Academics")

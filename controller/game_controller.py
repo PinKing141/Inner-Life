@@ -305,6 +305,14 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    def relationship_action(self, npc_id: int, action: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = relationships.interact(self.state, npc_id, action)
+        self._feed(msg, "good" if ok else "bad", f"rel:{npc_id}:{action}")
+        self._broadcast()
+        return self.snapshot()
+
     def apply_for_job(self, job_id: str) -> dict:
         if self.state is None:
             return self.snapshot()

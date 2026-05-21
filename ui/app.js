@@ -41,6 +41,7 @@ const App = {
   bridge: null,
   state: null,
   activeTab: "feed",
+  selectedNpcId: null,
   countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
 
   async ensureQtWebChannel() {
@@ -153,6 +154,11 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async relationshipAction(npcId, action) {
+    const result = await this.bridge.relationshipAction(npcId, action);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   // ---- Rendering ----
 
   render() {
@@ -169,6 +175,7 @@ const App = {
     this.renderExamModal();
     this.renderUniversityModal();
     this.renderDegreeModal();
+    this.renderRelationshipModal();
   },
 
   renderExamModal() {
@@ -409,7 +416,7 @@ const App = {
                 : "var(--bad)";
         const kindLabel = r.alive ? r.kind : `${r.kind} (deceased)`;
         return `
-          <div class="rel-row${r.alive ? "" : " deceased"}">
+          <button class="rel-row${r.alive ? "" : " deceased"}" data-action="profile" data-npc="${r.npc_id}">
             <div>
               <div class="rel-name">${escapeHtml(r.name)}</div>
               <div class="rel-kind">${escapeHtml(kindLabel)}</div>
@@ -417,10 +424,68 @@ const App = {
             <div class="rel-bar">
               <div class="rel-bar-fill" style="width:${r.relationship}%;background:${c}"></div>
             </div>
-          </div>
+          </button>
         `;
       }).join("")}
     `;
+  },
+
+  renderRelationshipModal() {
+    const modal = document.getElementById("relationship-modal");
+    if (!modal) return;
+    const id = this.selectedNpcId;
+    const rel = id == null ? null : (this.state.relationships || []).find(r => r.npc_id === id);
+    const show = this.state.mode === "PLAYING" && !!rel;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+
+    const agent = (this.state.agents || []).find(a => a.npc_id === id);
+    const relColor = rel.relationship > 70 ? "var(--good)" : rel.relationship > 30 ? "var(--warn)" : "var(--bad)";
+
+    const fields = [["Relationship", rel.alive ? rel.kind : `${rel.kind} (deceased)`]];
+    if (agent) {
+      fields.push(["Age", `${agent.age}`]);
+      fields.push(["Occupation", agent.job_title || "Unemployed"]);
+      fields.push(["Bank", formatMoney(agent.money || 0)]);
+    }
+
+    const bar = (label, val, color) => `
+      <div class="profile-bar-row">
+        <span class="profile-bar-label">${label}</span>
+        <div class="profile-bar"><div class="profile-bar-fill" style="width:${val}%;background:${color}"></div></div>
+      </div>`;
+
+    const bars = [bar("Relationship", rel.relationship, relColor)];
+    if (agent) {
+      bars.push(bar("Happiness", agent.happiness, "var(--stat-happy)"));
+      bars.push(bar("Health", agent.health, "var(--stat-health)"));
+      bars.push(bar("Smarts", agent.smarts, "var(--stat-smarts)"));
+    }
+
+    const actions = rel.alive ? `
+      <div class="profile-actions">
+        <button class="profile-action" data-rel-act="talk">Talk</button>
+        <button class="profile-action" data-rel-act="compliment">Compliment</button>
+        <button class="profile-action" data-rel-act="argue">Argue</button>
+        <button class="profile-action" data-rel-act="gift">Give gift (£50)</button>
+      </div>` : "";
+
+    document.getElementById("relationship-body").innerHTML = `
+      <div class="profile-header">
+        <div class="profile-name">${escapeHtml(rel.name)}</div>
+        <span class="profile-role">${escapeHtml(rel.kind)}</span>
+      </div>
+      <p class="modal-eyebrow">Profile</p>
+      <div class="profile-fields">
+        ${fields.map(([k, v]) => `<div class="profile-field"><span>${k}</span><span>${escapeHtml(v)}</span></div>`).join("")}
+      </div>
+      <div class="profile-bars">${bars.join("")}</div>
+      ${actions}
+    `;
+
+    document.querySelectorAll("#relationship-body [data-rel-act]").forEach((btn) => {
+      btn.addEventListener("click", () => this.relationshipAction(id, btn.dataset.relAct));
+    });
   },
 
   renderActivities() {
@@ -512,6 +577,12 @@ const App = {
     });
     root.querySelectorAll("[data-action='postgrad']").forEach((btn) => {
       btn.addEventListener("click", () => this.enrollPostgrad(btn.dataset.program));
+    });
+    root.querySelectorAll("[data-action='profile']").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.selectedNpcId = parseInt(btn.dataset.npc, 10);
+        this.render();
+      });
     });
   },
 };
@@ -780,6 +851,16 @@ const MockBridge = (() => {
         },
         async answerExam() { broadcast(); return JSON.stringify(state); },
         async cheatExam() { broadcast(); return JSON.stringify(state); },
+        async relationshipAction(npcId, action) {
+          const rel = (state.relationships || []).find(r => r.npc_id === npcId);
+          if (rel && rel.alive) {
+            const delta = { talk: 3, compliment: 5, argue: -8, gift: 10 }[action] || 0;
+            rel.relationship = Math.max(0, Math.min(100, rel.relationship + delta));
+            if (action === "gift") state.money -= 50;
+          }
+          broadcast();
+          return JSON.stringify(state);
+        },
         async applyUniversity() {
           state.education.awaiting_university_choice = true;
           if (!state.education.admitted_tier) state.education.admitted_tier = "Community";
@@ -840,6 +921,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.confirm("Are you sure you want to cheat? If you get caught you'll be thrown out of the exam.")) {
       App.cheatExam();
     }
+  });
+
+  const closeProfile = () => { App.selectedNpcId = null; App.render(); };
+  document.getElementById("btn-rel-close").addEventListener("click", closeProfile);
+  document.getElementById("relationship-modal").addEventListener("click", (e) => {
+    if (e.target.id === "relationship-modal") closeProfile();
   });
 
   document.querySelectorAll(".tab").forEach((el) => {
