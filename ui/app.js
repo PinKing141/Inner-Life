@@ -18,10 +18,10 @@ const STAT_META = [
 ];
 
 const ACTIVITIES = [
-  { kind: "study",      name: "Study",       cost: "Free", icon: "book" },
-  { kind: "gym",        name: "Train",       cost: "£30",  icon: "dumbbell" },
-  { kind: "doctor",     name: "Doctor",      cost: "£100", icon: "stethoscope" },
-  { kind: "spend_time", name: "Visit kin",   cost: "Free", icon: "people" },
+  { kind: "study",      name: "Study",       cost: "Free", icon: "book",        color: "var(--stat-smarts)" },
+  { kind: "gym",        name: "Train",       cost: "£30",  icon: "dumbbell",    color: "var(--stat-health)" },
+  { kind: "doctor",     name: "Doctor",      cost: "£100", icon: "stethoscope", color: "var(--stat-health)" },
+  { kind: "spend_time", name: "Visit kin",   cost: "Free", icon: "people",      color: "var(--stat-happy)" },
 ];
 
 const FALLBACK_NAMES = {
@@ -39,6 +39,7 @@ const FEED_VISIBLE = 30;
 
 const App = {
   bridge: null,
+  windowControls: null,
   state: null,
   activeTab: "feed",
   careerView: null,   // null | "jobs" — sub-page inside the Career tab
@@ -70,6 +71,7 @@ const App = {
       await new Promise((resolve) => {
         new QWebChannel(qt.webChannelTransport, (channel) => {
           this.bridge = channel.objects.bridge;
+          this.windowControls = channel.objects.windowControls || null;
           this.bridge.stateChanged.connect((json) => {
             this.state = JSON.parse(json);
             this.onSnapshot();
@@ -619,7 +621,8 @@ const App = {
       !!(s.education && (s.education.awaiting_exam || s.education.awaiting_university_choice || s.education.degree_award_pending));
 
     if (this.activeTab === "feed") {
-      panel.scrollTop = 0;
+      // Newest entry sits at the bottom — keep it in view.
+      panel.scrollTop = panel.scrollHeight;
     }
   },
 
@@ -628,9 +631,11 @@ const App = {
     const all = this.state.feed || [];
     const trimmed = all.slice(-FEED_VISIBLE);
     const omitted = all.length - trimmed.length;
-    const entries = trimmed.slice().reverse();
+    // Chronological order: oldest at the top, newest at the bottom.
+    const entries = trimmed.slice();
     return `
       <p class="panel-heading">The record</p>
+      ${omitted > 0 ? `<p class="feed-truncated">${omitted} earlier entries kept in the record</p>` : ""}
       ${entries.map(e => {
         const tag = feedTag(e.kind);
         return `
@@ -639,14 +644,12 @@ const App = {
           <div class="feed-card">
             <div class="feed-tag">
               <i style="background:${tag.color}"></i>
-              <span style="color:${tag.color}">${tag.label}</span>
               <span class="feed-tag-age">Age ${e.age}</span>
             </div>
             <div class="feed-text">${escapeHtml(e.text)}</div>
           </div>
         </div>`;
       }).join("")}
-      ${omitted > 0 ? `<p class="feed-truncated">${omitted} earlier entries kept in the record</p>` : ""}
     `;
   },
 
@@ -846,7 +849,7 @@ const App = {
       <div class="activities">
         ${ACTIVITIES.map(a => `
           <button class="activity" data-action="activity" data-kind="${a.kind}">
-            <span class="activity-icon" data-icon="${a.icon}"></span>
+            <span class="activity-icon" style="--c:${a.color}" data-icon="${a.icon}"></span>
             <span class="activity-body">
               <span class="activity-name">${a.name}</span>
               <span class="activity-cost">${a.cost}</span>
@@ -878,8 +881,10 @@ const App = {
     const properties = s.properties || [];
     const market = s.housing_market || [];
 
+    const holdings = netWorth - money;
     const money_str = `${money < 0 ? "-" : ""}£${Math.abs(money).toLocaleString()}`;
     const nw_str = `${netWorth < 0 ? "-" : ""}£${Math.abs(netWorth).toLocaleString()}`;
+    const hold_str = `${holdings < 0 ? "-" : ""}£${Math.abs(holdings).toLocaleString()}`;
 
     // The property market is a sub-page behind a "Houses" menu button.
     if (this.assetsView === "houses") {
@@ -898,15 +903,15 @@ const App = {
 
     return `
       <p class="panel-heading">Assets</p>
-      <div class="education-card">
-        <div class="education-card-label">Net worth</div>
-        <div class="education-card-value">${nw_str}</div>
+      <div class="networth">
+        <div class="networth-label">Net worth</div>
+        <div class="networth-total${netWorth < 0 ? " negative" : ""}">${nw_str}</div>
+        <div class="networth-split">
+          <div><div class="networth-k">Cash</div><div class="networth-v">${money_str}</div></div>
+          <div><div class="networth-k">Holdings</div><div class="networth-v">${hold_str}</div></div>
+        </div>
       </div>
-      <div class="education-card">
-        <div class="education-card-label">Bank balance</div>
-        <div class="education-card-value">${money_str}</div>
-        ${money < 0 ? `<div class="education-card-state">In the negatives — income will pay this back</div>` : ""}
-      </div>
+      ${money < 0 ? `<div class="education-card"><div class="education-card-label">Bank balance</div><div class="education-card-value">${money_str}</div><div class="education-card-state">In the negatives — income will pay this back</div></div>` : ""}
       <div class="education-card">
         <div class="education-card-label">Income</div>
         <div class="education-card-value">£${income.toLocaleString()} / yr</div>
@@ -1442,6 +1447,46 @@ const MockBridge = (() => {
 })();
 
 // --------------------------------------------------------------------------
+// Titlebar — drives the frameless Qt window (no-op in a plain browser)
+// --------------------------------------------------------------------------
+
+function setupTitlebar() {
+  const bar = document.getElementById("titlebar");
+  if (!bar) return;
+
+  // In a plain browser there's no frameless window to control — hide the
+  // buttons so they aren't dead, and skip drag wiring.
+  if (typeof qt === "undefined") {
+    const controls = bar.querySelector(".win-controls");
+    if (controls) controls.style.display = "none";
+    return;
+  }
+
+  const actions = {
+    min: () => App.windowControls && App.windowControls.minimize(),
+    max: () => App.windowControls && App.windowControls.toggleMaximize(),
+    close: () => App.windowControls && App.windowControls.closeWindow(),
+  };
+  bar.querySelectorAll(".win-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const fn = actions[btn.dataset.win];
+      if (fn) fn();
+    });
+  });
+
+  // Drag the window by the bar; double-click toggles maximize.
+  bar.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || e.target.closest(".win-btn")) return;
+    if (App.windowControls) App.windowControls.startDrag();
+  });
+  bar.addEventListener("dblclick", (e) => {
+    if (e.target.closest(".win-btn")) return;
+    if (App.windowControls) App.windowControls.toggleMaximize();
+  });
+}
+
+// --------------------------------------------------------------------------
 // Wire-up
 // --------------------------------------------------------------------------
 
@@ -1526,6 +1571,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       App.render();
     });
   });
+
+  setupTitlebar();
 
   await App.connect();
   App.activeTab = "feed";

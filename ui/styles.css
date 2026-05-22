@@ -111,6 +111,61 @@ html, body {
   mix-blend-mode: overlay;
 }
 
+/* ==========================================================================
+   Titlebar — the persistent wordmark / logo chrome
+   ========================================================================== */
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-soft);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+.titlebar .mark {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold-deep));
+}
+.titlebar .name {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  flex: 1;
+}
+.titlebar .win-controls { display: flex; align-items: center; gap: 2px; }
+.win-btn {
+  width: 30px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink-faint);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.win-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.win-btn:hover { background: var(--bg-3); color: var(--ink); }
+.win-btn.win-close:hover { background: #c8412e; color: #fff; }
+
 .screen {
   display: flex;
   flex-direction: column;
@@ -145,7 +200,7 @@ html, body {
 }
 .btn:hover { background: var(--bg-3); }
 .btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled { cursor: not-allowed; }
 
 .btn-primary {
   background: linear-gradient(180deg, var(--gold-bright), var(--gold-deep));
@@ -155,9 +210,8 @@ html, body {
   letter-spacing: 0.14em;
   font-size: 12px;
   padding: 15px 20px;
-  box-shadow: 0 10px 24px -12px rgba(217, 184, 120, .55), inset 0 1px 0 rgba(255, 255, 255, .35);
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -12px rgba(217, 184, 120, .7), inset 0 1px 0 rgba(255, 255, 255, .4); }
+.btn-primary:hover { transform: translateY(-1px); background: linear-gradient(180deg, var(--gold-bright), var(--gold-deep)); }
 
 .btn-ghost {
   background: transparent;
@@ -608,6 +662,57 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   text-align: center;
 }
 
+/* Net-worth hero card — kit-style gradient with a soft radial glow. */
+.networth {
+  background: linear-gradient(160deg, #2a2114, var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px 18px 16px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.networth::after {
+  content: "";
+  position: absolute;
+  right: -30px; top: -30px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(217, 184, 120, .13), transparent 70%);
+}
+.networth-label {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.networth-total {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.05;
+  margin-top: 3px;
+}
+.networth-total.negative { color: var(--bad); }
+.networth-split { display: flex; gap: 22px; margin-top: 14px; }
+.networth-split > div { flex: 0 0 auto; }
+.networth-k {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.networth-v {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink-mute);
+  margin-top: 2px;
+}
+
 .education-card {
   padding: 14px 16px;
   border: 1px solid var(--line-soft);
@@ -647,7 +752,6 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
 .job-row:hover { border-color: var(--line); background: var(--bg-3); transform: translateX(2px); }
 .job-row.disabled,
 .job-row:disabled {
-  opacity: 0.45;
   cursor: not-allowed;
 }
 .job-row.disabled:hover,
@@ -795,11 +899,11 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   align-items: center;
   justify-content: center;
   background: rgba(217, 184, 120, 0.14);
-  background: color-mix(in srgb, var(--gold) 16%, var(--bg-3));
+  background: color-mix(in srgb, var(--c, var(--gold)) 16%, var(--bg-3));
   border: 1px solid rgba(217, 184, 120, 0.3);
-  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  border-color: color-mix(in srgb, var(--c, var(--gold)) 30%, transparent);
 }
-.activity-icon svg { width: 19px; height: 19px; stroke: var(--gold); }
+.activity-icon svg { width: 19px; height: 19px; stroke: var(--c, var(--gold)); }
 .activity-chevron svg { width: 18px; height: 18px; stroke: var(--ink-faint); }
 
 /* ==========================================================================
@@ -824,19 +928,15 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 10px 24px -10px rgba(217, 184, 120, .55), inset 0 1px 0 rgba(255, 255, 255, .35);
-  transition: transform 0.12s var(--ease), box-shadow 0.25s var(--ease);
+  transition: transform 0.12s var(--ease);
 }
 .btn-age-up:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px -10px rgba(217, 184, 120, .7), inset 0 1px 0 rgba(255, 255, 255, .4);
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold-deep));
 }
 .btn-age-up:active { transform: translateY(1px) scale(.99); }
 .btn-age-up:disabled {
-  background: var(--bg-3);
-  color: var(--ink-faint);
   cursor: not-allowed;
-  box-shadow: none;
   transform: none;
 }
 .age-up-glyph svg { width: 16px; height: 16px; stroke: currentColor; transition: transform 0.6s var(--ease); }
@@ -951,7 +1051,7 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
 }
 .event-choice:hover { border-color: var(--gold-deep); background: var(--bg-3); }
 .event-choice.revealed { border-color: var(--good); background: rgba(143, 198, 168, 0.12); }
-.event-choice:disabled { opacity: 0.4; cursor: not-allowed; }
+.event-choice:disabled { cursor: not-allowed; }
 .event-choice:disabled:hover { border-color: var(--line-soft); background: var(--bg-2); }
 
 .exam-cheat {
