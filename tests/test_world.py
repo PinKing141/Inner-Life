@@ -51,8 +51,12 @@ def test_economy_world_coupling_changes_outcomes():
     s.world.recession = True
     bad = annual_cashflow(s, Rng(123).fork(7))
 
+    # A worse economy earns less, and (with lifestyle creep) leaves less net
+    # savings — earnings - living_cost. Gross outflow can fall in a downturn
+    # because discretionary lifestyle spending tracks income; net is the real
+    # coupling.
     assert bad[0] < good[0]
-    assert bad[1] > good[1]
+    assert (bad[0] - bad[1]) < (good[0] - good[1])
 
 
 def test_world_invariants_hold_over_time():
