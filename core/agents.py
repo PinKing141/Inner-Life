@@ -270,6 +270,10 @@ def tick_world(state: GameState, rng: Rng) -> None:
 HELP_MIN_RELATIONSHIP = 60
 HELP_MIN_GENEROSITY = 60
 HELP_ELIGIBLE_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
+# Only steps in for genuine trouble, and not every year — otherwise a single
+# rich relative would erase financial failure and hollow out the economy.
+HELP_HARDSHIP_BALANCE = -1000  # must be deeper in debt than this
+HELP_COOLDOWN_YEARS = 5
 
 
 def _help_chance(generosity: int, relationship: int) -> float:
@@ -278,13 +282,16 @@ def _help_chance(generosity: int, relationship: int) -> float:
 
 
 def offer_financial_help(state: GameState, rng: Rng) -> bool:
-    """If the player is in debt, a close & generous NPC may give them money.
+    """If the player is in severe debt, a close & generous NPC may give money.
 
-    Picks the most generous eligible helper (deterministic tie-break by id),
-    rolls a generosity-weighted chance, then transfers up to half the helper's
-    cash to cover the shortfall. Returns True if help was actually given.
+    Gated by a hardship threshold and a cooldown so it can't dominate the
+    economy. Picks the most generous eligible helper (deterministic tie-break
+    by id), rolls a generosity-weighted chance, then transfers up to half the
+    helper's cash to cover the shortfall. Returns True if help was given.
     """
-    if state.character is None or state.money >= 0:
+    if state.character is None or state.money >= HELP_HARDSHIP_BALANCE:
+        return False
+    if state.tick - state.last_help_tick < HELP_COOLDOWN_YEARS:
         return False
     need = -state.money
 
@@ -314,6 +321,7 @@ def offer_financial_help(state: GameState, rng: Rng) -> bool:
 
     state.money += gift
     agent.money -= gift
+    state.last_help_tick = state.tick
     rel.relationship = min(100, rel.relationship + 5)
     state.stats.happiness = min(100, state.stats.happiness + 5)
     state.feed.append(FeedEntry(

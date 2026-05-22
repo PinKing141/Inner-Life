@@ -148,6 +148,7 @@ class GameState:
     causal_chain: list[dict] = field(default_factory=list)
     world: World = field(default_factory=World)
     tick: int = 0  # how many times age_up has been called
+    last_help_tick: int = -100  # tick of the last NPC financial bailout (cooldown)
     exam: dict | None = None  # active/finished final school exam (interactive)
     pending_job_offer: dict | None = None  # "you got the job" popup
     pending_promotion: dict | None = None  # "you got promoted" popup
@@ -248,6 +249,7 @@ class GameState:
             "pending_event_id": self.pending_event_id,
             "fired_events": list(self.fired_events),
             "tick": self.tick,
+            "last_help_tick": self.last_help_tick,
             "exam": self.exam,
             "pending_job_offer": self.pending_job_offer,
             "pending_promotion": self.pending_promotion,
@@ -381,6 +383,7 @@ class GameState:
             feed=feed,
             pending_event_id=data.get("pending_event_id"),
             fired_events=list(data.get("fired_events", [])),
+            last_help_tick=data.get("last_help_tick", -100),
             causal_chain=list(data.get("causal_chain", [])),
             world=world,
             tick=data.get("tick", 0),

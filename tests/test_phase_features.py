@@ -145,6 +145,7 @@ def test_generous_relative_bails_out_player_in_debt():
             assert delta > 0
             assert mom.money == before_mom - delta
             assert state.money <= 0  # never overpays past the shortfall
+            assert state.last_help_tick == state.tick  # cooldown stamped
     assert fired > 0, "a generous, wealthy, close relative should sometimes help"
 
 
@@ -167,6 +168,34 @@ def test_no_help_when_player_is_not_in_debt():
     mom.money = 10000
     assert agents.offer_financial_help(state, Rng(1).fork(37)) is False
     assert state.money == 500
+
+
+def test_no_help_for_mild_debt_above_hardship_threshold():
+    state = _new(seed=1)
+    state.money = -200  # in the red, but not severe enough to summon help
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 10000
+    for seed in range(20):
+        assert agents.offer_financial_help(state, Rng(seed).fork(37)) is False
+    assert state.money == -200
+
+
+def test_bailout_respects_cooldown():
+    state = _new(seed=3)
+    state.tick = 10
+    state.last_help_tick = 10  # already helped this very year
+    state.money = -5000
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 50000
+    for seed in range(20):
+        assert agents.offer_financial_help(state, Rng(seed).fork(37)) is False
+    assert state.money == -5000
 
 
 def test_university_plan_major_and_dropout_flow():
