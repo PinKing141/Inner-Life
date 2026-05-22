@@ -54,6 +54,7 @@ class GameController:
                 "min_smarts": j.min_smarts, "salary": j.salary,
                 "track": getattr(j, "track", "general"),
                 "required_field": getattr(j, "required_field", ""),
+                "employer": economy.employer_for(self.state, j.job_id),
             }
             for j in economy.list_jobs()
         ]
@@ -267,6 +268,32 @@ class GameController:
         edu.university_intent = "undecided"
         edu.awaiting_university_choice = True
         self._broadcast()
+        return self.snapshot()
+
+    def work_harder(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        msg = economy.work_harder(self.state)
+        self._feed(msg, "good" if self.state.career else "bad", "work")
+        self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_job_offer(self) -> dict:
+        if self.state is not None:
+            self.state.pending_job_offer = None
+            self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_promotion(self) -> dict:
+        if self.state is not None:
+            self.state.pending_promotion = None
+            self._broadcast()
+        return self.snapshot()
+
+    def clear_application_error(self) -> dict:
+        if self.state is not None:
+            self.state.job_application_error = None
+            self._broadcast()
         return self.snapshot()
 
     def enroll_postgrad(self, program: str) -> dict:

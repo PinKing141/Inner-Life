@@ -85,6 +85,10 @@ class Job:
     job_id: str
     title: str
     salary: int
+    employer: str = ""
+    career: str = ""  # the profession (Title may gain a rank prefix on promotion)
+    level: int = 0  # promotion rank, 0 = entry
+    performance: int = 50  # 0-100, raised by working harder, drives promotions
 
 
 @dataclass
@@ -146,6 +150,9 @@ class GameState:
     world: World = field(default_factory=World)
     tick: int = 0  # how many times age_up has been called
     exam: dict | None = None  # active/finished final school exam (interactive)
+    pending_job_offer: dict | None = None  # "you got the job" popup
+    pending_promotion: dict | None = None  # "you got promoted" popup
+    job_application_error: str | None = None  # last rejected application message
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -197,6 +204,10 @@ class GameState:
                     "job_id": self.career.job_id,
                     "title": self.career.title,
                     "salary": self.career.salary,
+                    "employer": self.career.employer,
+                    "career": self.career.career,
+                    "level": self.career.level,
+                    "performance": self.career.performance,
                 }
             ),
             "education": {
@@ -235,6 +246,9 @@ class GameState:
             "fired_events": list(self.fired_events),
             "tick": self.tick,
             "exam": self.exam,
+            "pending_job_offer": self.pending_job_offer,
+            "pending_promotion": self.pending_promotion,
+            "job_application_error": self.job_application_error,
         }
 
 
@@ -298,7 +312,15 @@ class GameState:
         career = (
             None
             if career_d is None
-            else Job(job_id=career_d["job_id"], title=career_d["title"], salary=career_d["salary"])
+            else Job(
+                job_id=career_d["job_id"],
+                title=career_d["title"],
+                salary=career_d["salary"],
+                employer=career_d.get("employer", ""),
+                career=career_d.get("career", ""),
+                level=career_d.get("level", 0),
+                performance=career_d.get("performance", 50),
+            )
         )
 
         edu_d = data.get("education") or {}
@@ -357,6 +379,9 @@ class GameState:
             world=world,
             tick=data.get("tick", 0),
             exam=data.get("exam"),
+            pending_job_offer=data.get("pending_job_offer"),
+            pending_promotion=data.get("pending_promotion"),
+            job_application_error=data.get("job_application_error"),
         )
 
 

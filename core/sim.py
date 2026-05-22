@@ -213,6 +213,14 @@ def age_up(state: GameState) -> None:
         if not state.career:
             state.stats.happiness -= 5
 
+    # --- Career progression (promotions) ---
+    promotion = economy.career_tick(state, tick_rng.fork(8))
+    if promotion is not None:
+        state.pending_promotion = promotion
+        summary_parts.append(
+            f"You were promoted to {promotion['title']} (+{promotion['pct']}%)."
+        )
+
     # --- Natural drift ---
     if age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)

@@ -831,6 +831,45 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
 }
 .profile-action:hover { border-color: var(--accent-dim); background: var(--surface-3); }
 
+/* ---- Job / promotion popups ---- */
+.job-apply-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.job-apply-sub {
+  text-align: center;
+  color: var(--ink-mute);
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.job-apply-error {
+  color: var(--bad);
+  font-size: 13px;
+  text-align: center;
+  margin: 14px 0;
+}
+.popup-card { text-align: center; cursor: pointer; }
+.popup-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.popup-sub { color: var(--ink-soft); margin-bottom: 18px; }
+.popup-card .profile-fields { text-align: left; }
+.popup-continue {
+  margin-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
 /* ==========================================================================
    Death
    ========================================================================== */

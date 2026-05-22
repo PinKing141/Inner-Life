@@ -42,6 +42,7 @@ const App = {
   state: null,
   activeTab: "feed",
   selectedNpcId: null,
+  selectedJobId: null,
   countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
 
   async ensureQtWebChannel() {
@@ -117,6 +118,7 @@ const App = {
   async applyForJob(jobId) {
     const result = await this.bridge.applyForJob(jobId);
     if (typeof result === "string") this.state = JSON.parse(result);
+    if (this.state.pending_job_offer) this.selectedJobId = null;
     this.render();
   },
   async activity(kind) {
@@ -159,6 +161,26 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async workHarder() {
+    const result = await this.bridge.workHarder();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async acknowledgeJobOffer() {
+    const result = await this.bridge.acknowledgeJobOffer();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async acknowledgePromotion() {
+    const result = await this.bridge.acknowledgePromotion();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async clearApplicationError() {
+    const result = await this.bridge.clearApplicationError();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   // ---- Rendering ----
 
   render() {
@@ -176,6 +198,80 @@ const App = {
     this.renderUniversityModal();
     this.renderDegreeModal();
     this.renderRelationshipModal();
+    this.renderJobApplyModal();
+    this.renderJobOfferModal();
+    this.renderPromotionModal();
+  },
+
+  renderJobApplyModal() {
+    const modal = document.getElementById("job-apply-modal");
+    if (!modal) return;
+    const id = this.selectedJobId;
+    const job = id == null ? null : (this.state.jobs || []).find(j => j.job_id === id);
+    // The offer/error popups take over once a decision is made.
+    const show = this.state.mode === "PLAYING" && !!job && !this.state.pending_job_offer;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+
+    const err = this.state.job_application_error;
+    document.getElementById("job-apply-body").innerHTML = `
+      <button class="modal-close" data-job-close aria-label="Close">&times;</button>
+      <h3 class="job-apply-title">${escapeHtml(job.title)}</h3>
+      <p class="job-apply-sub">Apply for this open position today!</p>
+      <div class="profile-fields">
+        <div class="profile-field"><span>Title</span><span>${escapeHtml(job.title)}</span></div>
+        <div class="profile-field"><span>Career</span><span>${escapeHtml(job.title)}</span></div>
+        <div class="profile-field"><span>Employer</span><span>${escapeHtml(job.employer || "—")}</span></div>
+        <div class="profile-field"><span>Salary</span><span>£${job.salary.toLocaleString()}</span></div>
+      </div>
+      ${err ? `<p class="job-apply-error">${escapeHtml(err)}</p>` : ""}
+      <button class="btn btn-primary" data-job-apply style="width:100%">Apply for this position</button>
+    `;
+    document.querySelector("#job-apply-body [data-job-apply]").addEventListener("click", () => this.applyForJob(id));
+    document.querySelector("#job-apply-body [data-job-close]").addEventListener("click", () => {
+      this.selectedJobId = null;
+      if (this.state.job_application_error) { this.clearApplicationError(); } else { this.render(); }
+    });
+  },
+
+  renderJobOfferModal() {
+    const modal = document.getElementById("job-offer-modal");
+    if (!modal) return;
+    const offer = this.state.pending_job_offer;
+    const show = this.state.mode === "PLAYING" && !!offer;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    document.getElementById("job-offer-body").innerHTML = `
+      <h2 class="popup-title">Bringing home the bacon</h2>
+      <p class="popup-sub">Welcome to ${escapeHtml(offer.employer)}!</p>
+      <div class="profile-fields">
+        <div class="profile-field"><span>Title</span><span>${escapeHtml(offer.title)}</span></div>
+        <div class="profile-field"><span>Career</span><span>${escapeHtml(offer.career)}</span></div>
+        <div class="profile-field"><span>Employer</span><span>${escapeHtml(offer.employer)}</span></div>
+        <div class="profile-field"><span>Salary</span><span>£${offer.salary.toLocaleString()}</span></div>
+      </div>
+      <p class="popup-continue">tap anywhere to continue</p>
+    `;
+  },
+
+  renderPromotionModal() {
+    const modal = document.getElementById("promotion-modal");
+    if (!modal) return;
+    const promo = this.state.pending_promotion;
+    const show = this.state.mode === "PLAYING" && !!promo;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    document.getElementById("promotion-body").innerHTML = `
+      <h2 class="popup-title">Moving on up</h2>
+      <p class="popup-sub">You have been promoted to ${escapeHtml(promo.title)}.</p>
+      <div class="profile-fields">
+        <div class="profile-field"><span>New Title</span><span>${escapeHtml(promo.title)}</span></div>
+        <div class="profile-field"><span>New Salary</span><span>£${promo.salary.toLocaleString()} (+${promo.pct}%)</span></div>
+        <div class="profile-field"><span>Career</span><span>${escapeHtml(promo.career)}</span></div>
+        <div class="profile-field"><span>Employer</span><span>${escapeHtml(promo.employer)}</span></div>
+      </div>
+      <p class="popup-continue">tap anywhere to continue</p>
+    `;
   },
 
   renderExamModal() {
@@ -312,7 +408,7 @@ const App = {
 
     const examActive = !!(s.exam && s.exam.current && !s.exam.finished);
     document.getElementById("btn-age-up").disabled =
-      !!s.pending_event || examActive ||
+      !!s.pending_event || examActive || !!s.pending_job_offer || !!s.pending_promotion ||
       !!(s.education && (s.education.awaiting_exam || s.education.awaiting_university_choice || s.education.degree_award_pending));
 
     if (this.activeTab === "feed") {
@@ -370,7 +466,12 @@ const App = {
         <div class="current-job">
           <div class="current-job-label">Current role</div>
           <div class="current-job-title">${escapeHtml(career.title)}</div>
-          <div class="current-job-meta">Salary £${career.salary.toLocaleString()} / yr</div>
+          <div class="current-job-meta">${escapeHtml(career.employer || "")} · £${career.salary.toLocaleString()} / yr</div>
+          <div class="profile-bar-row" style="margin-top:12px">
+            <span class="profile-bar-label">Performance</span>
+            <div class="profile-bar"><div class="profile-bar-fill" style="width:${career.performance || 0}%;background:var(--stat-smarts)"></div></div>
+          </div>
+          <button class="profile-action" data-action="work" style="margin-top:12px;width:100%">Work harder</button>
         </div>
       ` : `
         <p class="unemployed">No present occupation.</p>
@@ -463,6 +564,7 @@ const App = {
       bars.push(bar("Happiness", agent.happiness, "var(--stat-happy)"));
       bars.push(bar("Health", agent.health, "var(--stat-health)"));
       bars.push(bar("Smarts", agent.smarts, "var(--stat-smarts)"));
+      bars.push(bar("Looks", agent.looks, "var(--stat-looks)"));
     }
 
     const actions = rel.alive ? `
@@ -570,7 +672,13 @@ const App = {
       btn.addEventListener("click", () => { this.activeTab = "feed"; this.render(); });
     });
     root.querySelectorAll("[data-action='apply']").forEach((btn) => {
-      btn.addEventListener("click", () => this.applyForJob(btn.dataset.job));
+      btn.addEventListener("click", () => {
+        this.selectedJobId = btn.dataset.job;
+        this.render();
+      });
+    });
+    root.querySelectorAll("[data-action='work']").forEach((btn) => {
+      btn.addEventListener("click", () => this.workHarder());
     });
     root.querySelectorAll("[data-action='activity']").forEach((btn) => {
       btn.addEventListener("click", () => this.activity(btn.dataset.kind));
@@ -813,9 +921,12 @@ const MockBridge = (() => {
             currency: cn.currency,
             countries: MOCK_COUNTRIES,
             jobs: [
-              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, salary: 15000, track: "general" },
-              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, salary: 16000, track: "general" },
+              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, salary: 15000, track: "general", employer: "City Holdings" },
+              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, salary: 16000, track: "general", employer: "Solutions Group" },
             ],
+            pending_job_offer: null,
+            pending_promotion: null,
+            job_application_error: null,
           };
           broadcast();
           return JSON.stringify(state);
@@ -827,8 +938,25 @@ const MockBridge = (() => {
           return JSON.stringify(state);
         },
         async choose() { broadcast(); return JSON.stringify(state); },
-        async applyForJob() { broadcast(); return JSON.stringify(state); },
+        async applyForJob(jobId) {
+          const job = (state.jobs || []).find(j => j.job_id === jobId);
+          if (job) {
+            state.career = { job_id: job.job_id, title: job.title, salary: job.salary, employer: job.employer, career: job.title, level: 0, performance: 50 };
+            state.pending_job_offer = { title: job.title, career: job.title, employer: job.employer, salary: job.salary };
+            state.job_application_error = null;
+          }
+          broadcast();
+          return JSON.stringify(state);
+        },
         async activity() { broadcast(); return JSON.stringify(state); },
+        async workHarder() {
+          if (state.career) state.career.performance = Math.min(100, (state.career.performance || 0) + 8);
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async acknowledgeJobOffer() { state.pending_job_offer = null; broadcast(); return JSON.stringify(state); },
+        async acknowledgePromotion() { state.pending_promotion = null; broadcast(); return JSON.stringify(state); },
+        async clearApplicationError() { state.job_application_error = null; broadcast(); return JSON.stringify(state); },
         async setUniversityPlan(attend, major) {
           const edu = state.education;
           edu.university_intent = attend ? "attend" : "skip";
@@ -934,6 +1062,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("relationship-modal").addEventListener("click", (e) => {
     if (e.target.id === "relationship-modal") closeProfile();
   });
+
+  // Tap-anywhere-to-continue popups.
+  document.getElementById("job-offer-modal").addEventListener("click", () => App.acknowledgeJobOffer());
+  document.getElementById("promotion-modal").addEventListener("click", () => App.acknowledgePromotion());
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {

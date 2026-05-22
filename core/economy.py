@@ -18,6 +18,20 @@ JOB_FAMILY_STABILITY: dict[str, float] = {
     "delivery_driver": -0.10,
 }
 
+# Promotion ladder: a rank prefix is added to the profession as the player
+# climbs. Index 0 is the entry-level title.
+RANK_PREFIX = ["", "Senior ", "Lead ", "Principal ", "Chief "]
+MAX_LEVEL = len(RANK_PREFIX) - 1
+
+_EMPLOYER_PATTERNS = [
+    "{city} {noun}", "{noun} Group", "{noun} & Partners",
+    "{city} {noun} Co.", "United {noun}", "{noun} International",
+]
+_EMPLOYER_NOUNS = [
+    "Holdings", "Solutions", "Industries", "Systems", "Logistics",
+    "Associates", "Enterprises", "Ventures", "Works", "Trading",
+]
+
 
 def list_jobs() -> list[JobSpec]:
     return JOBS
@@ -28,6 +42,20 @@ def find_job(job_id: str) -> JobSpec | None:
         if j.job_id == job_id:
             return j
     return None
+
+
+def employer_for(state: GameState, job_id: str) -> str:
+    """A stable employer name for a given job listing (same seed + job_id)."""
+    salt = sum(ord(c) for c in job_id)
+    rng = Rng(state.seed).fork(salt * 13 + 5)
+    city = (state.character.city if state.character else "") or "City"
+    noun = rng.choice(_EMPLOYER_NOUNS)
+    return rng.choice(_EMPLOYER_PATTERNS).format(city=city, noun=noun)
+
+
+def title_for(career: str, level: int) -> str:
+    level = max(0, min(MAX_LEVEL, level))
+    return f"{RANK_PREFIX[level]}{career}".strip()
 
 
 def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
@@ -58,10 +86,65 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
     rng = Rng(state.seed).fork(state.tick).fork(salt)
     hire_chance = 0.9 if spec.required_field else 0.85
     if not rng.chance(hire_chance):
-        return False, f"You interviewed for {spec.title} but weren't offered the role this time."
+        msg = f"You interviewed for {spec.title} but weren't offered the role this time."
+        state.job_application_error = msg
+        return False, msg
 
-    state.career = Job(job_id=spec.job_id, title=spec.title, salary=spec.salary)
-    return True, f"You were hired as a {spec.title}. Your salary is £{spec.salary:,}."
+    employer = employer_for(state, job_id)
+    state.career = Job(
+        job_id=spec.job_id,
+        title=spec.title,
+        salary=spec.salary,
+        employer=employer,
+        career=spec.title,
+        level=0,
+        performance=50,
+    )
+    state.job_application_error = None
+    state.pending_job_offer = {
+        "title": spec.title,
+        "career": spec.title,
+        "employer": employer,
+        "salary": spec.salary,
+    }
+    return True, f"You were hired as a {spec.title} at {employer}. Your salary is £{spec.salary:,}."
+
+
+def work_harder(state: GameState) -> str:
+    """Push for a promotion. Raises job performance at a small happiness cost."""
+    if state.career is None:
+        return "You don't have a job to work at."
+    state.career.performance = min(100, state.career.performance + 8)
+    state.stats.happiness = max(0, state.stats.happiness - 2)
+    return "You put in extra hours at work. Your performance improved."
+
+
+def career_tick(state: GameState, rng: Rng) -> dict | None:
+    """Run a year of career progression. Returns promotion details if promoted."""
+    job = state.career
+    if job is None or state.character is None:
+        return None
+    # Performance drifts down if you coast.
+    job.performance = max(0, job.performance - rng.fork(1).randint(0, 4))
+    if job.level >= MAX_LEVEL or job.performance < 70:
+        return None
+    promote_chance = (job.performance - 60) / 100.0
+    if not rng.fork(2).chance(promote_chance):
+        return None
+
+    old_salary = job.salary
+    pct = rng.fork(3).randint(10, 20)
+    job.level += 1
+    job.salary = int(old_salary * (1 + pct / 100.0))
+    job.title = title_for(job.career, job.level)
+    job.performance = 55
+    return {
+        "title": job.title,
+        "career": job.career,
+        "employer": job.employer,
+        "salary": job.salary,
+        "pct": pct,
+    }
 
 
 def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:

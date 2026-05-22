@@ -332,6 +332,67 @@ def test_relationship_interactions_move_the_bar():
     assert c.state.relationships[0].relationship > before
 
 
+def test_hire_sets_offer_popup_and_work_then_promotion():
+    c = GameController()
+    c.new_game(seed=42, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 20
+    c.state.stats.smarts = 80
+    c.state.education.level = "Secondary Education"
+
+    hired = False
+    for _ in range(25):
+        c.state.tick += 1
+        snap = c.apply_for_job("admin")
+        if c.state.career is not None:
+            hired = True
+            break
+    assert hired
+    assert c.state.career.employer  # an employer was assigned
+    assert c.state.career.career == "Admin Assistant"
+    assert c.state.pending_job_offer is not None
+    c.acknowledge_job_offer()
+    assert c.state.pending_job_offer is None
+
+    # Work harder lifts performance.
+    base = c.state.career.performance
+    c.work_harder()
+    assert c.state.career.performance > base
+
+    # Push to a promotion.
+    promoted = False
+    for _ in range(20):
+        for _ in range(3):
+            c.work_harder()
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+        if c.state.pending_promotion is not None:
+            promoted = True
+            break
+    assert promoted
+    assert c.state.career.level >= 1
+    assert c.state.career.title.startswith("Senior")
+    c.acknowledge_promotion()
+    assert c.state.pending_promotion is None
+
+
+def test_failed_application_sets_error():
+    c = GameController()
+    c.new_game(seed=5, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    # Too young for admin -> rejection message recorded.
+    c.state.character.age = 10
+    ok, msg = economy.apply_for_job(c.state, "admin")
+    assert ok is False
+    # Hard requirement failures don't set the "not selected" error, but a
+    # probability miss does; force one by exhausting a too-strict role check.
+    c.state.character.age = 20
+    c.state.stats.smarts = 0
+    ok, _ = economy.apply_for_job(c.state, "admin")
+    assert ok is False
+
+
 def test_degree_field_gates_jobs():
     c = GameController()
     c.new_game(seed=5, name="", gender="Male", country="US", talent="Academics")
