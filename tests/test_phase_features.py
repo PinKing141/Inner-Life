@@ -252,6 +252,31 @@ def test_looks_bias_incidental_tie_formation():
     assert ties_formed(95) > ties_formed(15)
 
 
+def test_partner_forms_from_a_strong_tie():
+    from core.state import Relationship
+    formed = 0
+    for seed in range(40):
+        s = _new(seed=seed)
+        s.character.age = 25
+        s.stats.looks = 90
+        s.relationships.append(Relationship(npc_id=99, name="Sam Reed", kind="Friend",
+                                            relationship=70, alive=True))
+        agents.tick_partner(s, Rng(seed).fork(41))
+        if any(r.kind == "Partner" and r.alive for r in s.relationships):
+            formed += 1
+    assert formed > 0, "a sociable, attractive adult should sometimes pair up"
+
+
+def test_partner_tie_does_not_decay():
+    from core.state import Relationship
+    s = _new(seed=1)
+    s.relationships.append(Relationship(npc_id=99, name="Sam", kind="Partner",
+                                        relationship=80, alive=True))
+    relationships.annual_drift(s)
+    p = next(r for r in s.relationships if r.kind == "Partner")
+    assert p.relationship == 80
+
+
 def test_university_plan_major_and_dropout_flow():
     c = GameController()
     c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")

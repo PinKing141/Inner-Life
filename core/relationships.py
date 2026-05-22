@@ -54,7 +54,8 @@ def annual_drift(state: GameState) -> None:
     survivors = []
     for r in state.relationships:
         if r.alive:
-            r.relationship = max(0, r.relationship - 1)
+            if r.kind != "Partner":  # partnerships persist; they don't passively erode
+                r.relationship = max(0, r.relationship - 1)
             if r.relationship <= 0 and r.kind in WEAK_TIE_KINDS:
                 continue  # drifted apart
         survivors.append(r)

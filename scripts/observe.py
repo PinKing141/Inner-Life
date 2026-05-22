@@ -128,6 +128,8 @@ class LifeRecord:
     living_ties_at_death: int = 0  # all living relationships (incl. weak ties)
     avg_living_ties: float = 0.0
     looks: int = 0  # starting looks (social-magnetism axis)
+    ever_partnered: bool = False
+    partner_years: int = 0
 
 
 def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
@@ -182,6 +184,9 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
         happies.append(state.stats.happiness)
         healths.append(state.stats.health)
         tie_counts.append(sum(1 for r in state.relationships if r.alive))
+        if any(r.kind == "Partner" and r.alive for r in state.relationships):
+            rec.ever_partnered = True
+            rec.partner_years += 1
         rec.min_money = min(rec.min_money, state.money)
 
         now_bailouts = sum(1 for f in state.feed if f.entry_id.startswith("feed:help:"))
@@ -266,6 +271,19 @@ def report_cohort(name: str, records: list[LifeRecord]) -> None:
     print(f"  living close ties at death : {_mean([r.living_close_at_death for r in records]):.2f}")
     print(f"  all living ties at death   : {_mean([r.living_ties_at_death for r in records]):.2f}")
     print(f"  avg living ties (life)     : {_mean([r.avg_living_ties for r in records]):.2f}")
+
+    partnered = [r for r in records if r.ever_partnered]
+    single = [r for r in records if not r.ever_partnered]
+    print("Partnership (new life-type gate)")
+    print(f"  ever partnered         : {len(partnered)}/{n} ({100*len(partnered)/n:.0f}%)  "
+          f"avg partnered years {_mean([r.partner_years for r in records]):.1f}")
+    if partnered and single:
+        print(f"  isolation years: partnered {_mean([r.isolation_years for r in partnered]):.1f} "
+              f"vs single {_mean([r.isolation_years for r in single]):.1f}")
+        print(f"  avg support:    partnered {_mean([r.avg_support for r in partnered]):.1f} "
+              f"vs single {_mean([r.avg_support for r in single]):.1f}")
+        print(f"  final money:    partnered £{_mean([r.final_money for r in partnered]):,.0f} "
+              f"vs single £{_mean([r.final_money for r in single]):,.0f}")
 
     print("System interactions")
     print(_split_compare(records, lambda r: r.isolation_years, lambda r: r.final_money,

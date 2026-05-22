@@ -393,6 +393,62 @@ def form_incidental_ties(state: GameState, rng: Rng) -> str | None:
     return f"You became friendly with {agent.name}, {descr}."
 
 
+# --- Partner formation (producer for an already-consumed edge type) ---
+# `Partner` is consumed by support (CLOSE_KINDS) and generosity
+# (HELP_ELIGIBLE_KINDS) but nothing ever produced one. This closes that loop.
+# Partnerships are produced by deepening an existing strong tie — so socially
+# active / attractive people pair up and the isolated rarely do — and they
+# PERSIST (exempt from decay in relationships.annual_drift), ending only via a
+# small annual breakup chance or the partner's death.
+PARTNER_MIN_AGE = 18
+PARTNER_TIE_THRESHOLD = 40
+PARTNER_FORM_STRENGTH = (70, 85)
+PARTNER_BREAKUP_CHANCE = 0.04
+
+
+def tick_partner(state: GameState, rng: Rng) -> str | None:
+    if state.character is None or state.character.age < PARTNER_MIN_AGE:
+        return None
+    partner = next((r for r in state.relationships if r.kind == "Partner" and r.alive), None)
+    if partner is not None:
+        if rng.fork(1).chance(PARTNER_BREAKUP_CHANCE):
+            state.relationships = [r for r in state.relationships if r is not partner]
+            return f"You and {partner.name} broke up."
+        return None
+
+    looks_factor = 0.5 + state.stats.looks / 100.0
+    strong_ties = [
+        r for r in state.relationships
+        if r.alive and r.kind in ("Friend", "Coworker") and r.relationship >= PARTNER_TIE_THRESHOLD
+    ]
+    if strong_ties:
+        strong_ties.sort(key=lambda r: (-r.relationship, r.npc_id))
+        if rng.fork(2).chance(0.12 * looks_factor):
+            tie = strong_ties[0]
+            tie.kind = "Partner"
+            tie.relationship = rng.fork(3).randint(*PARTNER_FORM_STRENGTH)
+            agent = _find_agent(state, tie.npc_id)
+            if agent is not None:
+                agent.role = "Partner"  # keep agent/relationship truth aligned
+            return f"You and {tie.name} became a couple."
+        return None
+
+    # No close ties to deepen — small chance to meet someone new instead.
+    if rng.fork(4).chance(0.03 * looks_factor):
+        npc_id = max((a.npc_id for a in state.agents), default=0) + 1
+        gender = rng.fork(5).choice(["Male", "Female", "NonBinary"])
+        surname = names_mod.random_surname(state.character.country, rng.fork(6))
+        agent = _new_npc(npc_id, gender, "Partner", surname, state.character.country, state.character.city, rng.fork(7))
+        agent.age = max(18, state.character.age + rng.fork(8).randint(-5, 5))
+        state.agents.append(agent)
+        state.relationships.append(Relationship(
+            npc_id=npc_id, name=agent.name, kind="Partner",
+            relationship=rng.fork(9).randint(*PARTNER_FORM_STRENGTH), alive=True,
+        ))
+        return f"You met {agent.name} and became a couple."
+    return None
+
+
 def add_friend(state: GameState, rng: Rng, role: str = "Friend") -> Agent:
     """Mint a new friend agent the player just made and wire up the relationship."""
     if state.character is None:

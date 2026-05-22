@@ -261,6 +261,11 @@ def age_up(state: GameState) -> None:
     if tie_note:
         summary_parts.append(tie_note)
 
+    # --- Partnership: deepen a strong tie into a partner, or part ways ---
+    partner_note = agents.tick_partner(state, tick_rng.fork(41))
+    if partner_note:
+        summary_parts.append(partner_note)
+
     # --- Natural drift ---
     if age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)
