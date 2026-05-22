@@ -631,12 +631,21 @@ const App = {
     const entries = trimmed.slice().reverse();
     return `
       <p class="panel-heading">The record</p>
-      ${entries.map(e => `
+      ${entries.map(e => {
+        const tag = feedTag(e.kind);
+        return `
         <div class="feed-entry ${e.kind}">
           <div class="feed-age">${String(e.age).padStart(2, "0")}</div>
-          <div class="feed-text">${escapeHtml(e.text)}</div>
-        </div>
-      `).join("")}
+          <div class="feed-card">
+            <div class="feed-tag">
+              <i style="background:${tag.color}"></i>
+              <span style="color:${tag.color}">${tag.label}</span>
+              <span class="feed-tag-age">Age ${e.age}</span>
+            </div>
+            <div class="feed-text">${escapeHtml(e.text)}</div>
+          </div>
+        </div>`;
+      }).join("")}
       ${omitted > 0 ? `<p class="feed-truncated">${omitted} earlier entries kept in the record</p>` : ""}
     `;
   },
@@ -754,7 +763,8 @@ const App = {
         const kindLabel = r.alive ? r.kind : `${r.kind} (deceased)`;
         return `
           <button class="rel-row${r.alive ? "" : " deceased"}" data-action="profile" data-npc="${r.npc_id}">
-            <div>
+            <span class="rel-avatar" style="--c:${avatarColor(r.npc_id)}">${escapeHtml(avatarInitials(r.name))}</span>
+            <div class="rel-meta">
               <div class="rel-name">${escapeHtml(r.name)}</div>
               <div class="rel-kind">${escapeHtml(kindLabel)}</div>
             </div>
@@ -813,6 +823,7 @@ const App = {
 
     document.getElementById("relationship-body").innerHTML = `
       <div class="profile-header">
+        <span class="rel-avatar profile-avatar" style="--c:${avatarColor(rel.npc_id)}">${escapeHtml(avatarInitials(rel.name))}</span>
         <div class="profile-name">${escapeHtml(rel.name)}</div>
         <span class="profile-role">${escapeHtml(rel.kind)}</span>
       </div>
@@ -1120,6 +1131,29 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
+}
+
+// Record markers — a coloured dot + label per timeline entry, keyed off the
+// engine's feed `kind` (special | good | bad | neutral). Unknown kinds (e.g.
+// world_war_start) fall through to the neutral marker.
+const FEED_TAG = {
+  special: { label: "Milestone", color: "var(--gold-bright)" },
+  good:    { label: "Good turn", color: "var(--good)" },
+  bad:     { label: "Setback",   color: "var(--bad)" },
+  neutral: { label: "Life",      color: "var(--info)" },
+};
+function feedTag(kind) {
+  return FEED_TAG[kind] || FEED_TAG.neutral;
+}
+
+// Initials + a deterministic colour for relationship avatars.
+const AVATAR_COLORS = ["#cf9a86", "#9aaccf", "#cfa0c0", "#9ec5a8", "#c9b07f", "#b89cb8"];
+function avatarInitials(name) {
+  return String(name).trim().split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
+}
+function avatarColor(id) {
+  const n = Number.isFinite(id) ? Math.abs(id) : 0;
+  return AVATAR_COLORS[n % AVATAR_COLORS.length];
 }
 
 function buildCountryPicker() {
