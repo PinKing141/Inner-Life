@@ -118,6 +118,14 @@ class WebBridge(QObject):
         return _dumps(self._controller.work_harder())
 
     @Slot(result=str)
+    def requestRaise(self) -> str:
+        return _dumps(self._controller.request_raise())
+
+    @Slot(result=str)
+    def requestPromotion(self) -> str:
+        return _dumps(self._controller.request_promotion())
+
+    @Slot(result=str)
     def quitJob(self) -> str:
         return _dumps(self._controller.quit_job())
 

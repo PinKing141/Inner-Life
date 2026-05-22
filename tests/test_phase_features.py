@@ -466,6 +466,59 @@ def test_recession_pay_cut_keeps_the_job():
     assert cut
 
 
+def test_request_raise_cooldown_and_success():
+    from core import economy
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=11, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.career = Job(job_id="admin", title="Admin Assistant", salary=22000,
+                         employer="Acme", career="Admin Assistant", level=0, performance=100)
+    # Only one ask per year.
+    c.request_raise()
+    before = c.state.career.salary
+    ok, msg = economy.request_raise(c.state)
+    assert ok is False and "already" in msg.lower()
+    assert c.state.career.salary == before
+
+    # With max performance, raises land within a few years.
+    got_raise = False
+    base = c.state.career.salary
+    for _ in range(15):
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+        if c.state.career is None:
+            break
+        c.state.career.performance = 100
+        c.request_raise()
+        if c.state.career and c.state.career.salary > base:
+            got_raise = True
+            break
+    assert got_raise
+
+
+def test_request_promotion_can_succeed():
+    from core import economy
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=12, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    promoted = False
+    for t in range(40):
+        c.state.tick = t  # advance the cooldown clock
+        c.state.career = Job(job_id="solicitor", title="Solicitor", salary=52000,
+                             employer="Acme Law", career="Lawyer", level=0, performance=100)
+        ok, msg, promo = economy.request_promotion(c.state)
+        if ok:
+            promoted = True
+            assert promo is not None and promo["type"] == "promotion"
+            assert c.state.career.level == 1
+            assert c.state.career.title == "Senior Associate"
+            break
+    assert promoted
+
+
 def test_bespoke_ladder_titles():
     from core import economy
     spec = economy.find_job("solicitor")

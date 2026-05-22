@@ -89,6 +89,7 @@ class Job:
     career: str = ""  # the profession (Title may gain a rank prefix on promotion)
     level: int = 0  # promotion rank, 0 = entry
     performance: int = 50  # 0-100, raised by working harder, drives promotions
+    last_ask_tick: int = -1  # tick of the player's last raise/promotion request
 
 
 @dataclass
@@ -210,6 +211,7 @@ class GameState:
                     "career": self.career.career,
                     "level": self.career.level,
                     "performance": self.career.performance,
+                    "last_ask_tick": self.career.last_ask_tick,
                 }
             ),
             "education": {
@@ -324,6 +326,7 @@ class GameState:
                 career=career_d.get("career", ""),
                 level=career_d.get("level", 0),
                 performance=career_d.get("performance", 50),
+                last_ask_tick=career_d.get("last_ask_tick", -1),
             )
         )
 

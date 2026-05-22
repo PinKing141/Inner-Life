@@ -166,6 +166,16 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async requestRaise() {
+    const result = await this.bridge.requestRaise();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async requestPromotion() {
+    const result = await this.bridge.requestPromotion();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   async quitJob() {
     const result = await this.bridge.quitJob();
     if (typeof result === "string") this.state = JSON.parse(result);
@@ -541,6 +551,8 @@ const App = {
           </div>
           <div class="profile-actions" style="margin-top:12px">
             <button class="profile-action" data-action="work">Work harder</button>
+            <button class="profile-action" data-action="ask-raise">Ask for a raise</button>
+            <button class="profile-action" data-action="ask-promotion">Ask for a promotion</button>
             <button class="profile-action" data-action="quit">Quit job</button>
           </div>
         </div>
@@ -750,6 +762,12 @@ const App = {
     });
     root.querySelectorAll("[data-action='work']").forEach((btn) => {
       btn.addEventListener("click", () => this.workHarder());
+    });
+    root.querySelectorAll("[data-action='ask-raise']").forEach((btn) => {
+      btn.addEventListener("click", () => this.requestRaise());
+    });
+    root.querySelectorAll("[data-action='ask-promotion']").forEach((btn) => {
+      btn.addEventListener("click", () => this.requestPromotion());
     });
     root.querySelectorAll("[data-action='quit']").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1029,6 +1047,20 @@ const MockBridge = (() => {
         async activity() { broadcast(); return JSON.stringify(state); },
         async workHarder() {
           if (state.career) state.career.performance = Math.min(100, (state.career.performance || 0) + 8);
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async requestRaise() {
+          if (state.career) state.career.salary = Math.round(state.career.salary * 1.08);
+          broadcast();
+          return JSON.stringify(state);
+        },
+        async requestPromotion() {
+          if (state.career) {
+            state.career.level = (state.career.level || 0) + 1;
+            state.career.salary = Math.round(state.career.salary * 1.15);
+            state.pending_promotion = { title: state.career.title, career: state.career.career, employer: state.career.employer, salary: state.career.salary, pct: 15 };
+          }
           broadcast();
           return JSON.stringify(state);
         },

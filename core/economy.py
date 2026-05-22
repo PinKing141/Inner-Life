@@ -141,6 +141,58 @@ def quit_job(state: GameState) -> str:
     return f"You quit your job as a {title}."
 
 
+def request_raise(state: GameState) -> tuple[bool, str]:
+    """Ask the boss for a raise. One ask per year; refusal annoys the boss."""
+    job = state.career
+    if job is None:
+        return False, "You don't have a job."
+    if job.last_ask_tick == state.tick:
+        return False, "You've already spoken to your boss this year."
+    job.last_ask_tick = state.tick
+    rng = Rng(state.seed).fork(state.tick).fork(777)
+    chance = max(0.05, min(0.9, 0.2 + (job.performance - 50) / 100.0))
+    if rng.fork(1).chance(chance):
+        pct = rng.fork(2).randint(5, 12)
+        job.salary = int(job.salary * (1 + pct / 100.0))
+        return True, f"Your boss approved a {pct}% raise! You now earn £{job.salary:,}."
+    job.performance = max(0, job.performance - 5)
+    return False, "Your boss turned down your request for a raise."
+
+
+def request_promotion(state: GameState) -> tuple[bool, str, dict | None]:
+    """Ask the boss for a promotion. Needs decent performance; refusal stings."""
+    job = state.career
+    if job is None:
+        return False, "You don't have a job.", None
+    spec = find_job(job.job_id)
+    max_level = max_level_for(spec) if spec else MAX_LEVEL
+    if job.level >= max_level:
+        return False, "You're already at the top of your field.", None
+    if job.last_ask_tick == state.tick:
+        return False, "You've already spoken to your boss this year.", None
+    job.last_ask_tick = state.tick
+    rng = Rng(state.seed).fork(state.tick).fork(778)
+    chance = max(0.05, min(0.85, (job.performance - 55) / 60.0))
+    if rng.fork(1).chance(chance):
+        old_salary = job.salary
+        pct = rng.fork(2).randint(10, 20)
+        job.level += 1
+        job.salary = int(old_salary * (1 + pct / 100.0))
+        job.title = rung_title(spec, job.level) if spec else job.title
+        job.performance = 55
+        promo = {
+            "type": "promotion",
+            "title": job.title,
+            "career": job.career,
+            "employer": job.employer,
+            "salary": job.salary,
+            "pct": pct,
+        }
+        return True, f"You asked for a promotion — and got it!", promo
+    job.performance = max(0, job.performance - 5)
+    return False, "Your boss declined to promote you this time.", None
+
+
 def career_tick(state: GameState, rng: Rng) -> dict | None:
     """Run a year of career progression.
 

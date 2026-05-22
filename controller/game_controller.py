@@ -278,6 +278,24 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    def request_raise(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = economy.request_raise(self.state)
+        self._feed(msg, "good" if ok else "bad", "raise")
+        self._broadcast()
+        return self.snapshot()
+
+    def request_promotion(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg, promo = economy.request_promotion(self.state)
+        if promo is not None:
+            self.state.pending_promotion = promo
+        self._feed(msg, "good" if ok else "bad", "promo_request")
+        self._broadcast()
+        return self.snapshot()
+
     def quit_job(self) -> dict:
         if self.state is None or self.state.character is None:
             return self.snapshot()
