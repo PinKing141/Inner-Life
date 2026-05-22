@@ -340,6 +340,54 @@ def offer_financial_help(state: GameState, rng: Rng) -> bool:
     return True
 
 
+# --- Social renewal (counters graph entropy) ---
+# Decay + death only ever shrink the social graph; without formation it trends
+# mathematically toward zero. This is the missing counterforce: small, passive,
+# context-based weak-tie formation. Deliberately NOT dating/compatibility/AI —
+# just enough replenishment to keep the network from self-deleting.
+TIE_CAP = 8  # max living weak ties before formation pauses
+WEAK_TIE_STRENGTH = (28, 42)  # acquaintances, not close friends
+
+
+def form_incidental_ties(state: GameState, rng: Rng) -> str | None:
+    """Maybe form one weak tie this year, biased by current life context."""
+    if state.character is None:
+        return None
+    age = state.character.age
+    if age < 6:
+        return None
+    living_weak = [
+        r for r in state.relationships if r.alive and r.kind in ("Friend", "Coworker")
+    ]
+    if len(living_weak) >= TIE_CAP:
+        return None
+
+    if state.career is not None:
+        p, role, descr = 0.18, "Coworker", "a coworker"
+    elif state.education.in_school:
+        p, role, descr = 0.15, "Friend", "a classmate"
+    elif age < 18:
+        p, role, descr = 0.12, "Friend", "a friend"
+    else:
+        p, role, descr = 0.06, "Friend", "someone new"
+    if not rng.fork(1).chance(p):
+        return None
+
+    npc_id = max((a.npc_id for a in state.agents), default=0) + 1
+    gender = rng.fork(2).choice(["Male", "Female", "NonBinary"])
+    surname = names_mod.random_surname(state.character.country, rng.fork(3))
+    agent = _new_npc(npc_id, gender, role, surname, state.character.country, state.character.city, rng.fork(4))
+    # Classmates/young friends skew to the player's own age.
+    if role == "Friend" and age < 25:
+        agent.age = max(5, age + rng.fork(6).randint(-2, 2))
+    state.agents.append(agent)
+    state.relationships.append(Relationship(
+        npc_id=npc_id, name=agent.name, kind=role,
+        relationship=rng.fork(5).randint(*WEAK_TIE_STRENGTH), alive=True,
+    ))
+    return f"You became friendly with {agent.name}, {descr}."
+
+
 def add_friend(state: GameState, rng: Rng, role: str = "Friend") -> Agent:
     """Mint a new friend agent the player just made and wire up the relationship."""
     if state.character is None:

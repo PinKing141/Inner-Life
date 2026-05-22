@@ -40,12 +40,25 @@ def spend_time_with_family(state: GameState) -> None:
             r.relationship = min(100, r.relationship + 5)
 
 
+WEAK_TIE_KINDS = ("Friend", "Coworker")
+
+
 def annual_drift(state: GameState) -> None:
-    """Relationships decay slightly if not actively maintained."""
+    """Relationships decay slightly if not maintained.
+
+    Weak ties (friends, coworkers) that decay all the way to zero drift out of
+    the player's life entirely — pruned from the list — so the graph has a way
+    to lose members short of death, which the renewal mechanic then refills.
+    Family and partners never drift out this way (only death removes them).
+    """
+    survivors = []
     for r in state.relationships:
-        if not r.alive:
-            continue
-        r.relationship = max(0, r.relationship - 1)
+        if r.alive:
+            r.relationship = max(0, r.relationship - 1)
+            if r.relationship <= 0 and r.kind in WEAK_TIE_KINDS:
+                continue  # drifted apart
+        survivors.append(r)
+    state.relationships = survivors
 
 
 # --- Isolation consequence (decay vertical slice) ---

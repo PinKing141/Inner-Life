@@ -251,6 +251,11 @@ def age_up(state: GameState) -> None:
     if agents.offer_financial_help(state, tick_rng.fork(37)):
         summary_parts.append("A loved one helped you out financially.")
 
+    # --- Social renewal: maybe form a weak tie from work/school/life ---
+    tie_note = agents.form_incidental_ties(state, tick_rng.fork(39))
+    if tie_note:
+        summary_parts.append(tie_note)
+
     # --- Natural drift ---
     if age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)

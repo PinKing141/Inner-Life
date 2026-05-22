@@ -125,6 +125,8 @@ class LifeRecord:
     parent_min_money: int = 0
     parents_drained: int = 0  # parents ending at £0
     living_close_at_death: int = 0
+    living_ties_at_death: int = 0  # all living relationships (incl. weak ties)
+    avg_living_ties: float = 0.0
 
 
 def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
@@ -139,6 +141,7 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
     supports: list[int] = []
     happies: list[int] = []
     healths: list[int] = []
+    tie_counts: list[int] = []
     last_bailout_tick = -1
     solvent_after_bailout = False
 
@@ -176,6 +179,7 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
             rec.isolation_years += 1
         happies.append(state.stats.happiness)
         healths.append(state.stats.health)
+        tie_counts.append(sum(1 for r in state.relationships if r.alive))
         rec.min_money = min(rec.min_money, state.money)
 
         now_bailouts = sum(1 for f in state.feed if f.entry_id.startswith("feed:help:"))
@@ -198,6 +202,8 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
     rec.living_close_at_death = sum(
         1 for r in state.relationships if r.alive and r.kind in CLOSE_KINDS
     )
+    rec.living_ties_at_death = sum(1 for r in state.relationships if r.alive)
+    rec.avg_living_ties = statistics.mean(tie_counts) if tie_counts else 0.0
     return rec
 
 
@@ -256,6 +262,8 @@ def report_cohort(name: str, records: list[LifeRecord]) -> None:
     print(f"  isolation years        : {_mean([r.isolation_years for r in records]):.1f}")
     print(f"  avg support (life)     : {_mean([r.avg_support for r in records]):.1f}")
     print(f"  living close ties at death : {_mean([r.living_close_at_death for r in records]):.2f}")
+    print(f"  all living ties at death   : {_mean([r.living_ties_at_death for r in records]):.2f}")
+    print(f"  avg living ties (life)     : {_mean([r.avg_living_ties for r in records]):.2f}")
 
     print("System interactions")
     print(_split_compare(records, lambda r: r.isolation_years, lambda r: r.final_money,
