@@ -127,6 +127,7 @@ class LifeRecord:
     living_close_at_death: int = 0
     living_ties_at_death: int = 0  # all living relationships (incl. weak ties)
     avg_living_ties: float = 0.0
+    looks: int = 0  # starting looks (social-magnetism axis)
 
 
 def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
@@ -138,6 +139,7 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
 
     choice_rng = Rng(seed ^ 0x5EED)
     rec = LifeRecord(seed=seed)
+    rec.looks = state.stats.looks
     supports: list[int] = []
     happies: list[int] = []
     healths: list[int] = []
@@ -215,7 +217,7 @@ def _mean(xs):
     return statistics.mean(xs) if xs else 0.0
 
 
-def _split_compare(records, key_fn, value_fn, label):
+def _split_compare(records, key_fn, value_fn, label, fmt=",.0f"):
     """Split records at the median of key_fn, compare mean value_fn per half."""
     keyed = sorted(records, key=key_fn)
     if len(keyed) < 4:
@@ -224,7 +226,7 @@ def _split_compare(records, key_fn, value_fn, label):
     low, high = keyed[:mid], keyed[mid:]
     lo_k, hi_k = _mean([key_fn(r) for r in low]), _mean([key_fn(r) for r in high])
     lo_v, hi_v = _mean([value_fn(r) for r in low]), _mean([value_fn(r) for r in high])
-    return f"  {label}: low-group({lo_k:.1f})→{lo_v:,.0f}   high-group({hi_k:.1f})→{hi_v:,.0f}"
+    return f"  {label}: low-group({lo_k:.1f})→{lo_v:{fmt}}   high-group({hi_k:.1f})→{hi_v:{fmt}}"
 
 
 def report_cohort(name: str, records: list[LifeRecord]) -> None:
@@ -272,6 +274,10 @@ def report_cohort(name: str, records: list[LifeRecord]) -> None:
                          "unemployment -> isolation_years (does joblessness cascade?)"))
     print(_split_compare(records, lambda r: r.years_severe_debt, lambda r: float(r.bailouts),
                          "severe_debt_years -> bailouts (does hardship pull in help?)"))
+    print(_split_compare(records, lambda r: float(r.looks), lambda r: r.avg_living_ties,
+                         "looks -> avg_living_ties (does magnetism build networks?)", fmt=".2f"))
+    print(_split_compare(records, lambda r: float(r.looks), lambda r: float(r.final_money),
+                         "looks -> final_money (is the new axis money-independent?)"))
 
 
 def dump_trajectory(seed: int, active: bool) -> None:

@@ -370,6 +370,11 @@ def form_incidental_ties(state: GameState, rng: Rng) -> str | None:
         p, role, descr = 0.12, "Friend", "a friend"
     else:
         p, role, descr = 0.06, "Friend", "someone new"
+    # Looks act as social magnetism — a new, money-independent axis. A bounded
+    # multiplier (x0.5 .. x1.5), never a gate: everyone can still make ties, the
+    # attractive just do so more readily, producing socially-central vs sparse
+    # life types orthogonal to wealth.
+    p *= 0.5 + state.stats.looks / 100.0
     if not rng.fork(1).chance(p):
         return None
 

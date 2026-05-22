@@ -238,6 +238,20 @@ def test_getting_hired_lifts_happiness():
     raise AssertionError("expected at least one successful hire across seeds")
 
 
+def test_looks_bias_incidental_tie_formation():
+    def ties_formed(looks: int) -> int:
+        count = 0
+        for seed in range(40):
+            s = _new(seed=seed)
+            s.character.age = 20  # adult, jobless, not in school -> baseline rate
+            s.stats.looks = looks
+            if agents.form_incidental_ties(s, Rng(seed).fork(39)):
+                count += 1
+        return count
+
+    assert ties_formed(95) > ties_formed(15)
+
+
 def test_university_plan_major_and_dropout_flow():
     c = GameController()
     c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")
