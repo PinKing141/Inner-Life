@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, sim, social
+from core import agents, economy, education, sim, social
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -180,3 +180,481 @@ def test_secondary_graduation_skip_happens_at_18():
     age_18_entries = [f.text for f in c.state.feed if f.age == 18]
     assert any("You graduated secondary school." in t for t in age_18_entries)
     assert any("You chose not to attend university." in t for t in age_18_entries)
+
+
+def _age_to(c, target):
+    while c.state.character and c.state.character.age < target:
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+
+
+def _take_exam(c, correct=True):
+    while c.state.exam and not c.state.exam.get("finished"):
+        i = c.state.exam["index"]
+        q = c.state.exam["questions"][i]
+        ans = q["answer"] if correct else (q["answer"] + 1) % 3
+        c.answer_exam(ans)
+
+
+def test_final_exam_then_university_popup_and_degree():
+    c = GameController()
+    c.new_game(seed=99, name="Ada", gender="Female", country="US", talent="Academics")
+    assert c.state is not None
+    # Secondary graduation triggers the final exam, not the course picker yet.
+    _age_to(c, 18)
+    edu = c.state.education
+    assert edu.awaiting_exam is True
+    assert c.state.exam is not None and len(c.state.exam["questions"]) == 10
+    assert c.state.exam["questions"][0]["prompt"] == "What is your name?"
+
+    # Ace the exam -> top grade -> admitted with the course picker open.
+    _take_exam(c, correct=True)
+    edu = c.state.education
+    assert edu.exam_taken is True
+    assert edu.final_school_grade == "A"
+    assert edu.admitted_tier == "Prestigious"
+    assert edu.scholarship == "full"
+    assert edu.awaiting_university_choice is True
+
+    # Enrol in a science course.
+    c.set_university_plan(attend=True, major="Physics")
+    edu = c.state.education
+    assert edu.in_school is True and edu.level == "University"
+    assert edu.degree_field == "science"
+    assert edu.university_name
+
+    # Graduate after four years.
+    _age_to(c, 22)
+    edu = c.state.education
+    assert edu.degree_completed is True
+    assert edu.degree_award_pending is True
+    c.acknowledge_degree()
+    assert c.state.education.degree_award_pending is False
+
+
+def test_tuition_pushes_balance_negative_and_work_repays():
+    c = GameController()
+    c.new_game(seed=3, name="", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    edu = c.state.education
+    edu.admitted_tier = "Standard"
+    edu.scholarship = "none"
+    c.state.character.age = 18
+    education.enroll_program(c.state, "University", major="Physics")
+
+    start = c.state.money
+    _age_to(c, 19)
+    assert c.state.money < start  # tuition put us into the negatives
+    after_one = c.state.money
+    _age_to(c, 20)
+    assert c.state.money < after_one  # debt deepens each study year
+
+    _age_to(c, 22)
+    assert c.state.education.degree_completed is True
+
+    # A salary repays the negative balance over the working years.
+    c.state.stats.smarts = 95
+    for _ in range(30):
+        c.state.tick += 1
+        ok, _msg = economy.apply_for_job(c.state, "grocer")
+        if ok:
+            break
+    assert c.state.career is not None
+    low = c.state.money
+    _age_to(c, c.state.character.age + 12)
+    assert c.state.money > low
+
+
+def test_postgrad_master_then_doctorate():
+    c = GameController()
+    c.new_game(seed=8, name="", gender="Female", country="US", talent="Academics")
+    assert c.state is not None
+    edu = c.state.education
+    edu.degree_completed = True
+    edu.university_major = "Physics"
+    edu.degree_field = "science"
+    c.state.character.age = 22
+
+    c.enroll_postgrad("Master's Degree")
+    assert c.state.education.level == "Master's Degree"
+    assert c.state.education.in_school is True
+    _age_to(c, 24)
+    assert c.state.education.masters_completed is True
+
+    c.acknowledge_degree()
+    c.enroll_postgrad("Doctorate")
+    assert c.state.education.level == "Doctorate"
+    _age_to(c, 27)
+    assert c.state.education.doctorate_completed is True
+
+
+def test_cheating_reveals_answer_or_ends_exam():
+    c = GameController()
+    c.new_game(seed=2, name="Bo", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    _age_to(c, 18)
+    assert c.state.exam is not None
+    c.cheat_exam()
+    ex = c.state.exam
+    if ex.get("caught"):
+        assert ex.get("finished") is True
+        assert c.state.education.final_school_grade == "F"
+    else:
+        assert ex.get("revealed") is not None
+
+
+def test_relationship_interactions_move_the_bar():
+    c = GameController()
+    c.new_game(seed=42, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    nid = c.state.relationships[0].npc_id
+    base = c.state.relationships[0].relationship
+
+    c.relationship_action(nid, "argue")
+    after_argue = c.state.relationships[0].relationship
+    assert after_argue < base
+
+    c.relationship_action(nid, "compliment")
+    assert c.state.relationships[0].relationship > after_argue
+
+    # A gift you can't afford is rejected and changes nothing.
+    c.state.money = 0
+    before = c.state.relationships[0].relationship
+    c.relationship_action(nid, "gift")
+    assert c.state.relationships[0].relationship == before
+    assert "afford" in c.state.feed[-1].text
+
+    # With cash, the gift lands and costs money.
+    c.state.money = 500
+    c.relationship_action(nid, "gift")
+    assert c.state.money == 450
+    assert c.state.relationships[0].relationship > before
+
+
+def test_hire_sets_offer_popup_and_work_then_promotion():
+    c = GameController()
+    c.new_game(seed=42, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 20
+    c.state.stats.smarts = 80
+    c.state.education.level = "Secondary Education"
+
+    hired = False
+    for _ in range(25):
+        c.state.tick += 1
+        snap = c.apply_for_job("admin")
+        if c.state.career is not None:
+            hired = True
+            break
+    assert hired
+    assert c.state.career.employer  # an employer was assigned
+    assert c.state.career.career == "Admin Assistant"
+    assert c.state.pending_job_offer is not None
+    c.acknowledge_job_offer()
+    assert c.state.pending_job_offer is None
+
+    # Work harder lifts performance.
+    base = c.state.career.performance
+    c.work_harder()
+    assert c.state.career.performance > base
+
+    # Push to a promotion.
+    promoted = False
+    for _ in range(20):
+        for _ in range(3):
+            c.work_harder()
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+        if c.state.pending_promotion is not None:
+            promoted = True
+            break
+    assert promoted
+    assert c.state.career.level >= 1
+    assert c.state.career.title.startswith("Senior")
+    c.acknowledge_promotion()
+    assert c.state.pending_promotion is None
+
+
+def test_quit_job_clears_career():
+    c = GameController()
+    c.new_game(seed=1, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 20
+    c.state.stats.smarts = 80
+    c.state.education.level = "Secondary Education"
+    for _ in range(25):
+        c.state.tick += 1
+        c.apply_for_job("admin")
+        if c.state.career is not None:
+            break
+    assert c.state.career is not None
+    c.quit_job()
+    assert c.state.career is None
+    assert "quit" in c.state.feed[-1].text.lower()
+
+
+def test_recession_can_lay_you_off():
+    from core import economy
+    from core.rng import Rng
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=4, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.career = Job(job_id="admin", title="Admin Assistant", salary=22000,
+                         employer="Acme", career="Admin Assistant", level=0, performance=10)
+    c.state.world.recession = True
+    c.state.world.unemployment_rate = 0.2
+    laid_off = False
+    for t in range(50):
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t))
+        if outcome and outcome["type"] == "layoff":
+            laid_off = True
+            assert c.state.career is None
+            break
+        if c.state.career is None:
+            break
+    assert laid_off
+
+
+def _fresh_career(state, **kw):
+    from core.state import Job
+    defaults = dict(job_id="solicitor", title="Partner", salary=80000,
+                    employer="Acme Law", career="Lawyer", level=2, performance=30)
+    defaults.update(kw)
+    state.career = Job(**defaults)
+
+
+def test_demotion_drops_a_rank_without_firing():
+    from core import economy
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=6, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    demoted = False
+    for t in range(80):
+        _fresh_career(c.state)  # reset each sample so outcomes are independent
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t + 100))
+        if outcome and outcome["type"] == "demotion":
+            demoted = True
+            assert c.state.career is not None  # still employed
+            assert c.state.career.level == 1
+            assert c.state.career.salary < 80000
+            break
+    assert demoted
+
+
+def test_recession_pay_cut_keeps_the_job():
+    from core import economy
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=9, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.world.recession = True
+    cut = False
+    for t in range(120):
+        # Healthy performance (no demotion/promotion) at entry level, level 0.
+        _fresh_career(c.state, job_id="admin", title="Admin Assistant", salary=22000,
+                      employer="Acme", career="Admin Assistant", level=0, performance=60)
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t + 200))
+        if outcome and outcome["type"] == "paycut":
+            cut = True
+            assert c.state.career is not None
+            assert c.state.career.salary < 22000
+            break
+    assert cut
+
+
+def test_request_raise_cooldown_and_success():
+    from core import economy
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=11, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.career = Job(job_id="admin", title="Admin Assistant", salary=22000,
+                         employer="Acme", career="Admin Assistant", level=0, performance=100)
+    # Only one ask per year.
+    c.request_raise()
+    before = c.state.career.salary
+    ok, msg = economy.request_raise(c.state)
+    assert ok is False and "already" in msg.lower()
+    assert c.state.career.salary == before
+
+    # With max performance, raises land within a few years.
+    got_raise = False
+    base = c.state.career.salary
+    for _ in range(15):
+        c.age_up()
+        if c.state.pending_event_id is not None:
+            c.choose(0)
+        if c.state.career is None:
+            break
+        c.state.career.performance = 100
+        c.request_raise()
+        if c.state.career and c.state.career.salary > base:
+            got_raise = True
+            break
+    assert got_raise
+
+
+def test_request_promotion_can_succeed():
+    from core import economy
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=12, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    promoted = False
+    for t in range(40):
+        c.state.tick = t  # advance the cooldown clock
+        c.state.career = Job(job_id="solicitor", title="Solicitor", salary=52000,
+                             employer="Acme Law", career="Lawyer", level=0, performance=100)
+        ok, msg, promo = economy.request_promotion(c.state)
+        if ok:
+            promoted = True
+            assert promo is not None and promo["type"] == "promotion"
+            assert c.state.career.level == 1
+            assert c.state.career.title == "Senior Associate"
+            break
+    assert promoted
+
+
+def test_buy_rent_sell_home_and_net_worth():
+    from core import housing
+    c = GameController()
+    c.new_game(seed=21, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 30
+    c.state.money = 1_000_000
+    market = housing.list_market(c.state)
+    assert market and all("price" in m and "rent" in m for m in market)
+
+    listing = market[0]
+    before = c.state.money
+    c.buy_home(listing["id"])
+    assert len(c.state.properties) == 1
+    assert c.state.money == before - listing["price"]
+    # Property counts toward net worth even though cash dropped.
+    assert housing.net_worth(c.state) == c.state.money + c.state.properties[0]["value"]
+
+    # Renting adds a recurring expense reflected in cashflow.
+    rent_listing = market[1]
+    c.rent_home(rent_listing["id"])
+    assert c.state.rental is not None
+    from core.economy import annual_cashflow
+    from core.rng import Rng
+    _, living, _ = annual_cashflow(c.state, Rng(1).fork(1))
+    assert living >= rent_listing["rent"]
+
+    c.stop_renting()
+    assert c.state.rental is None
+
+    # Selling returns the value to the bank.
+    pid = c.state.properties[0]["id"]
+    cash_before = c.state.money
+    c.sell_home(pid)
+    assert c.state.properties == []
+    assert c.state.money > cash_before
+
+
+def test_mortgage_deposit_payments_and_payoff():
+    from core import housing
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=31, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 30
+    listing = housing.list_market(c.state)[2]
+    price = listing["price"]
+
+    # Can't mortgage without the deposit.
+    c.state.money = 0
+    ok, msg = housing.buy_home_mortgage(c.state, listing["id"])
+    assert ok is False and "deposit" in msg.lower()
+
+    # With the deposit, only the deposit leaves the bank now.
+    c.state.money = price  # plenty
+    c.buy_home_mortgage(listing["id"])
+    assert len(c.state.properties) == 1
+    prop = c.state.properties[0]
+    assert prop["mortgage_balance"] > 0
+    deposit = int(price * housing.MORTGAGE_DOWN_PCT)
+    assert c.state.money == price - deposit  # not the full price
+
+    # Net worth nets off the outstanding mortgage.
+    assert housing.net_worth(c.state) == c.state.money + prop["value"] - prop["mortgage_balance"]
+
+    # Paying for many years clears the balance and stops the payment.
+    start_balance = prop["mortgage_balance"]
+    for t in range(MORTGAGE_YEARS := 40):
+        housing.annual_update(c.state, Rng(c.state.seed).fork(t))
+        if c.state.properties[0]["mortgage_balance"] <= 0:
+            break
+    assert c.state.properties[0]["mortgage_balance"] == 0
+    assert c.state.properties[0]["mortgage_payment"] == 0
+    assert start_balance > 0
+
+
+def test_cannot_buy_home_as_a_child():
+    from core import housing
+    c = GameController()
+    c.new_game(seed=22, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 8
+    c.state.money = 1_000_000
+    listing = housing.list_market(c.state)[0]
+    ok, msg = housing.buy_home(c.state, listing["id"])
+    assert ok is False
+    assert c.state.properties == []
+
+
+def test_bespoke_ladder_titles():
+    from core import economy
+    spec = economy.find_job("solicitor")
+    assert economy.profession_for(spec) == "Lawyer"
+    assert economy.rung_title(spec, 0) == "Solicitor"
+    assert "Partner" in spec.ladder
+
+
+def test_failed_application_sets_error():
+    c = GameController()
+    c.new_game(seed=5, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    # Too young for admin -> rejection message recorded.
+    c.state.character.age = 10
+    ok, msg = economy.apply_for_job(c.state, "admin")
+    assert ok is False
+    # Hard requirement failures don't set the "not selected" error, but a
+    # probability miss does; force one by exhausting a too-strict role check.
+    c.state.character.age = 20
+    c.state.stats.smarts = 0
+    ok, _ = economy.apply_for_job(c.state, "admin")
+    assert ok is False
+
+
+def test_degree_field_gates_jobs():
+    c = GameController()
+    c.new_game(seed=5, name="", gender="Male", country="US", talent="Academics")
+    assert c.state is not None
+    # Force a completed Fine Art degree and adult age with high smarts.
+    edu = c.state.education
+    edu.level = "University"
+    edu.degree_completed = True
+    edu.degree_field = "arts"
+    c.state.character.age = 30
+    c.state.stats.smarts = 95
+
+    # Scientist needs a science degree -> hard reject for a Fine Art graduate.
+    ok, msg = economy.apply_for_job(c.state, "scientist")
+    assert ok is False
+    assert "require" in msg.lower()
+
+    # A no-degree job should accept (probability is generous; both forks succeed).
+    hired = False
+    for _ in range(20):
+        c.state.tick += 1
+        ok, _msg = economy.apply_for_job(c.state, "grocer")
+        if ok:
+            hired = True
+            break
+    assert hired is True

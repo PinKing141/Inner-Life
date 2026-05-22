@@ -58,12 +58,6 @@
           <select id="cre-city"></select>
         </label>
 
-        <label class="field">
-          <span class="field-label">Talent</span>
-          <select id="cre-talent"></select>
-          <p class="field-hint">Talents grant a hidden bias to starting stats.</p>
-        </label>
-
         <button type="submit" class="btn btn-primary">Begin life</button>
       </form>
     </section>
@@ -95,23 +89,19 @@
       </button>
 
       <nav class="tabs">
-        <button class="tab" data-tab="feed">
-          <span class="tab-icon" data-icon="list"></span>
-          <span>Life</span>
-        </button>
         <button class="tab" data-tab="career">
           <span class="tab-icon" data-icon="briefcase"></span>
           <span>Career</span>
         </button>
         <button class="tab" data-tab="relationships">
-          <span class="tab-icon" data-icon="link"></span>
-          <span>Ties</span>
+          <span class="tab-icon" data-icon="heart"></span>
+          <span>Relations</span>
         </button>
         <button class="tab" data-tab="activities">
-          <span class="tab-icon" data-icon="pulse"></span>
-          <span>Acts</span>
+          <span class="tab-icon" data-icon="ellipsis"></span>
+          <span>Activities</span>
         </button>
-        <button class="tab hidden" data-tab="assets">
+        <button class="tab" data-tab="assets">
           <span class="tab-icon" data-icon="briefcase"></span>
           <span>Assets</span>
         </button>
@@ -140,6 +130,78 @@
         <h3 id="event-text"></h3>
         <div id="event-choices" class="event-choices"></div>
       </div>
+    </div>
+
+    <!-- Final school exam -->
+    <div id="exam-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow" id="exam-progress">Final exam</p>
+        <h3 id="exam-question"></h3>
+        <div id="exam-options" class="event-choices"></div>
+        <button id="btn-cheat" class="exam-cheat">cheat</button>
+      </div>
+    </div>
+
+    <!-- University course picker -->
+    <div id="university-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow">University</p>
+        <h3 id="university-text">Will you go to university?</h3>
+        <p id="university-admit" class="university-admit"></p>
+        <label class="field">
+          <span class="field-label">Course</span>
+          <select id="university-course"></select>
+          <p class="field-hint">Your degree's field decides which careers will accept you.</p>
+        </label>
+        <div class="event-choices">
+          <button id="btn-uni-enroll" class="event-choice">Enrol at university</button>
+          <button id="btn-uni-skip" class="event-choice">Don't go to university</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Relationship profile -->
+    <div id="relationship-modal" class="modal hidden">
+      <div class="modal-card profile-card">
+        <button class="modal-close" id="btn-rel-close" aria-label="Close">&times;</button>
+        <div id="relationship-body"></div>
+      </div>
+    </div>
+
+    <!-- Degree award -->
+    <div id="degree-modal" class="modal hidden">
+      <div class="modal-card">
+        <p class="modal-eyebrow">Congratulations</p>
+        <h3 id="degree-text"></h3>
+        <div class="event-choices">
+          <button id="btn-degree-ok" class="event-choice">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job application -->
+    <div id="job-apply-modal" class="modal hidden">
+      <div class="modal-card" id="job-apply-body"></div>
+    </div>
+
+    <!-- Job offer (you got the job) -->
+    <div id="job-offer-modal" class="modal hidden">
+      <div class="modal-card popup-card" id="job-offer-body"></div>
+    </div>
+
+    <!-- Promotion -->
+    <div id="promotion-modal" class="modal hidden">
+      <div class="modal-card popup-card" id="promotion-body"></div>
+    </div>
+
+    <!-- Job loss (fired / laid off) -->
+    <div id="job-loss-modal" class="modal hidden">
+      <div class="modal-card popup-card" id="job-loss-body"></div>
+    </div>
+
+    <!-- Career setback (demotion / pay cut) -->
+    <div id="setback-modal" class="modal hidden">
+      <div class="modal-card popup-card" id="setback-body"></div>
     </div>
   </main>
 

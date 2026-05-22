@@ -516,9 +516,19 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 0;
+  gap: 12px;
+  padding: 14px 4px;
+  border: none;
   border-bottom: 1px solid var(--hairline);
+  width: 100%;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
 }
+.rel-row:hover { background: var(--surface-2); }
 .rel-row:last-child { border-bottom: none; }
 .rel-name { font-family: var(--font-display); font-size: 18px; font-weight: 500; }
 .rel-kind {
@@ -539,27 +549,50 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
 .rel-bar-fill { height: 100%; transition: width 0.4s; }
 
 /* Activities */
+.panel-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px 12px 6px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.panel-back:hover { border-color: var(--accent-dim); color: var(--ink); }
+.panel-back svg { width: 16px; height: 16px; stroke: currentColor; }
+
 .activities {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .activity {
-  padding: 24px 16px;
+  padding: 16px;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   cursor: pointer;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  text-align: center;
+  gap: 14px;
+  text-align: left;
   transition: border-color 0.12s, background 0.12s;
   color: var(--ink);
   font-family: var(--font-body);
 }
 .activity:hover { border-color: var(--accent-dim); background: var(--surface-3); }
+.activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
 .activity-name { font-family: var(--font-display); font-size: 16px; font-weight: 500; }
 .activity-cost {
   font-family: var(--font-mono);
@@ -567,7 +600,8 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   color: var(--ink-mute);
   letter-spacing: 0.1em;
 }
-.activity svg { width: 24px; height: 24px; stroke: var(--accent); }
+.activity-icon svg { width: 24px; height: 24px; stroke: var(--accent); }
+.activity-chevron svg { width: 18px; height: 18px; stroke: var(--ink-mute); }
 
 /* ==========================================================================
    Age up + tabs
@@ -698,6 +732,147 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   transition: border-color 0.12s, background 0.12s;
 }
 .event-choice:hover { border-color: var(--accent-dim); background: var(--surface-3); }
+.event-choice.revealed { border-color: var(--good); background: rgba(120, 180, 120, 0.12); }
+
+.exam-cheat {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: none;
+  color: #d9534f;
+  text-decoration: underline;
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+.exam-cheat:hover { color: #ff6b66; }
+
+.university-admit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--info);
+  margin-bottom: 16px;
+}
+
+/* ---- Relationship profile ---- */
+.profile-card { padding-top: 40px; }
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--ink-mute);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-close:hover { color: var(--ink); }
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.profile-name { font-family: var(--font-display); font-size: 22px; font-weight: 500; }
+.profile-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #1a1612;
+  background: var(--accent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.profile-fields {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  margin-bottom: 18px;
+}
+.profile-field {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+.profile-field:last-child { border-bottom: none; }
+.profile-field span:first-child { color: var(--ink-mute); }
+.profile-bars { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+.profile-bar-row { display: flex; align-items: center; gap: 12px; }
+.profile-bar-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  width: 92px;
+  flex-shrink: 0;
+}
+.profile-bar { flex: 1; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.profile-bar-fill { height: 100%; transition: width 0.4s; }
+.profile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.profile-action {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  padding: 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.profile-action:hover { border-color: var(--accent-dim); background: var(--surface-3); }
+
+/* ---- Job / promotion popups ---- */
+.job-apply-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.job-apply-sub {
+  text-align: center;
+  color: var(--ink-mute);
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.job-apply-error {
+  color: var(--bad);
+  font-size: 13px;
+  text-align: center;
+  margin: 14px 0;
+}
+.popup-card { text-align: center; cursor: pointer; }
+.popup-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.market-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.market-actions .profile-action,
+.job-row .profile-action { padding: 8px 12px; font-size: 13px; }
+.popup-title-bad { color: var(--bad); }
+.popup-sub { color: var(--ink-soft); margin-bottom: 18px; }
+.popup-card .profile-fields { text-align: left; }
+.popup-continue {
+  margin-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
 
 /* ==========================================================================
    Death

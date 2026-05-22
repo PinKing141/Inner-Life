@@ -109,6 +109,94 @@ class WebBridge(QObject):
     def applyForJob(self, job_id: str) -> str:
         return _dumps(self._controller.apply_for_job(job_id))
 
+    @Slot(int, str, result=str)
+    def relationshipAction(self, npc_id: int, action: str) -> str:
+        return _dumps(self._controller.relationship_action(npc_id, action))
+
+    @Slot(str, result=str)
+    def buyHome(self, listing_id: str) -> str:
+        return _dumps(self._controller.buy_home(listing_id))
+
+    @Slot(str, result=str)
+    def buyHomeMortgage(self, listing_id: str) -> str:
+        return _dumps(self._controller.buy_home_mortgage(listing_id))
+
+    @Slot(str, result=str)
+    def rentHome(self, listing_id: str) -> str:
+        return _dumps(self._controller.rent_home(listing_id))
+
+    @Slot(str, result=str)
+    def sellHome(self, property_id: str) -> str:
+        return _dumps(self._controller.sell_home(property_id))
+
+    @Slot(result=str)
+    def stopRenting(self) -> str:
+        return _dumps(self._controller.stop_renting())
+
+    @Slot(result=str)
+    def workHarder(self) -> str:
+        return _dumps(self._controller.work_harder())
+
+    @Slot(result=str)
+    def requestRaise(self) -> str:
+        return _dumps(self._controller.request_raise())
+
+    @Slot(result=str)
+    def requestPromotion(self) -> str:
+        return _dumps(self._controller.request_promotion())
+
+    @Slot(result=str)
+    def quitJob(self) -> str:
+        return _dumps(self._controller.quit_job())
+
+    @Slot(result=str)
+    def acknowledgeJobOffer(self) -> str:
+        return _dumps(self._controller.acknowledge_job_offer())
+
+    @Slot(result=str)
+    def acknowledgeJobLoss(self) -> str:
+        return _dumps(self._controller.acknowledge_job_loss())
+
+    @Slot(result=str)
+    def acknowledgeCareerSetback(self) -> str:
+        return _dumps(self._controller.acknowledge_career_setback())
+
+    @Slot(result=str)
+    def acknowledgePromotion(self) -> str:
+        return _dumps(self._controller.acknowledge_promotion())
+
+    @Slot(result=str)
+    def clearApplicationError(self) -> str:
+        return _dumps(self._controller.clear_application_error())
+
+    @Slot(bool, str, result=str)
+    def setUniversityPlan(self, attend: bool, major: str) -> str:
+        return _dumps(self._controller.set_university_plan(attend, major))
+
+    @Slot(result=str)
+    def acknowledgeDegree(self) -> str:
+        return _dumps(self._controller.acknowledge_degree())
+
+    @Slot(result=str)
+    def dropOutUniversity(self) -> str:
+        return _dumps(self._controller.drop_out_university())
+
+    @Slot(int, result=str)
+    def answerExam(self, choice_index: int) -> str:
+        return _dumps(self._controller.answer_exam(choice_index))
+
+    @Slot(result=str)
+    def cheatExam(self) -> str:
+        return _dumps(self._controller.cheat_exam())
+
+    @Slot(result=str)
+    def applyUniversity(self) -> str:
+        return _dumps(self._controller.apply_university_now())
+
+    @Slot(str, result=str)
+    def enrollPostgrad(self, program: str) -> str:
+        return _dumps(self._controller.enroll_postgrad(program))
+
     @Slot(str, result=str)
     def activity(self, kind: str) -> str:
         return _dumps(self._controller.activity(kind))

@@ -36,8 +36,11 @@ class Agent:
     happiness: int = 70
     smarts: int = 50
     looks: int = 50
+    generosity: int = 50
     money: int = 0
     job_title: Optional[str] = None
+    marital_status: str = "Single"
+    education: str = "None"
     alive: bool = True
 
     @property
@@ -58,8 +61,11 @@ class Agent:
             "happiness": self.happiness,
             "smarts": self.smarts,
             "looks": self.looks,
+            "generosity": self.generosity,
             "money": self.money,
             "job_title": self.job_title,
+            "marital_status": self.marital_status,
+            "education": self.education,
             "alive": self.alive,
         }
 
@@ -78,8 +84,11 @@ class Agent:
             happiness=d.get("happiness", 70),
             smarts=d.get("smarts", 50),
             looks=d.get("looks", 50),
+            generosity=d.get("generosity", 50),
             money=d.get("money", 0),
             job_title=d.get("job_title"),
+            marital_status=d.get("marital_status", "Single"),
+            education=d.get("education", "None"),
             alive=d.get("alive", True),
         )
 
@@ -144,6 +153,18 @@ def _new_npc(
         age = rng.randint(0, 18)
     else:
         age = 18 + rng.randint(0, 50)
+    # Profile flavour. Forked RNG so we don't disturb the draws above.
+    if role in ("Mother", "Father"):
+        marital = "Married"
+    elif age < 18:
+        marital = "Single"
+    else:
+        marital = rng.fork(22).choice(["Single", "Married", "Divorced", "Widowed"])
+    if age < 18:
+        education = "In school"
+    else:
+        education = rng.fork(23).choice(["None", "Secondary Education", "University"])
+
     return Agent(
         npc_id=npc_id,
         first_name=forename,
@@ -157,8 +178,11 @@ def _new_npc(
         happiness=50 + rng.randint(0, 40),
         smarts=40 + rng.randint(0, 40),
         looks=40 + rng.randint(0, 40),
+        generosity=rng.fork(21).randint(0, 100),
         money=rng.choice([0, 500, 2_000, 5_000, 15_000]),
         job_title=rng.choice(_NPC_JOBS) if age >= 18 else None,
+        marital_status=marital,
+        education=education,
         alive=True,
     )
 

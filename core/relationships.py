@@ -46,3 +46,39 @@ def annual_drift(state: GameState) -> None:
         if not r.alive:
             continue
         r.relationship = max(0, r.relationship - 1)
+
+
+GIFT_COST = 50
+
+INTERACTIONS = ("talk", "compliment", "argue", "gift")
+
+
+def interact(state: GameState, npc_id: int, action: str) -> tuple[bool, str]:
+    """Player-initiated interaction with a known NPC. Returns (ok, message).
+
+    State is only mutated on success. Effects are deterministic for now."""
+    rel = next((r for r in state.relationships if r.npc_id == npc_id), None)
+    if rel is None:
+        return False, "You don't know that person."
+    name = rel.name
+    if not rel.alive:
+        return False, f"{name} has passed away."
+
+    if action == "talk":
+        rel.relationship = min(100, rel.relationship + 3)
+        state.stats.happiness = min(100, state.stats.happiness + 1)
+        return True, f"You had a nice chat with {name}."
+    if action == "compliment":
+        rel.relationship = min(100, rel.relationship + 5)
+        return True, f"You complimented {name}. They appreciated it."
+    if action == "argue":
+        rel.relationship = max(0, rel.relationship - 8)
+        state.stats.happiness = max(0, state.stats.happiness - 3)
+        return True, f"You got into an argument with {name}."
+    if action == "gift":
+        if state.money < GIFT_COST:
+            return False, f"You can't afford a gift for {name}."
+        state.money -= GIFT_COST
+        rel.relationship = min(100, rel.relationship + 10)
+        return True, f"You gave {name} a gift. It cost £{GIFT_COST}."
+    return False, "You can't do that."
