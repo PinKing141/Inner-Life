@@ -72,6 +72,35 @@ def _support(state: GameState) -> int:
     return max(close, default=0)
 
 
+# Self-care magnitudes MIRROR controller.GameController.activity — kept in sync
+# by hand (this is a throwaway diagnostic, not production logic). If those
+# numbers change, update here. spend_time_with_family is the real core fn.
+from core import relationships  # noqa: E402
+
+DOCTOR_COST, DOCTOR_HEALTH = 100, 15
+GYM_COST, GYM_HEALTH = 30, 3
+STUDY_SMARTS = 2
+
+
+def _self_care(state: GameState) -> None:
+    """Policy: a character actively trying to maintain themselves each year.
+
+    Healthcare is paywalled — the whole point of the mitigation-only cohort is
+    to see whether someone with no income can use it at all.
+    """
+    s = state.stats
+    if s.health < 90 and state.money >= DOCTOR_COST:
+        state.money -= DOCTOR_COST
+        s.health = min(100, s.health + DOCTOR_HEALTH)
+    elif s.health < 90 and state.money >= GYM_COST:
+        state.money -= GYM_COST
+        s.health = min(100, s.health + GYM_HEALTH)
+    if state.character.age < 25:
+        s.smarts = min(100, s.smarts + STUDY_SMARTS)
+    relationships.spend_time_with_family(state)
+    s.happiness = min(100, s.happiness + 5)
+
+
 # --------------------------------------------------------------------------
 # Per-life record
 # --------------------------------------------------------------------------
@@ -98,7 +127,7 @@ class LifeRecord:
     living_close_at_death: int = 0
 
 
-def run_life(seed: int, *, active: bool) -> LifeRecord:
+def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
     talent = TALENTS[seed % len(TALENTS)]
     country = COUNTRIES[(seed // len(TALENTS)) % len(COUNTRIES)]
     gender = ("Male", "Female", "NonBinary")[seed % 3]
@@ -125,6 +154,8 @@ def run_life(seed: int, *, active: bool) -> LifeRecord:
             job = _best_eligible_job(state)
             if job is not None:
                 economy.apply_for_job(state, job.job_id)
+        if self_care and state.character.age >= 5:
+            _self_care(state)
 
         prev_bailouts = sum(1 for f in state.feed if f.entry_id.startswith("feed:help:"))
         sim.age_up(state)
@@ -274,10 +305,15 @@ def main() -> None:
         dump_trajectory(args.trajectory, active=not args.passive_trajectory)
         return
 
-    passive = [run_life(s, active=False) for s in range(args.lives)]
-    active = [run_life(s, active=True) for s in range(args.lives)]
-    report_cohort("PASSIVE (never works)", passive)
-    report_cohort("ACTIVE (seeks best eligible job)", active)
+    n = args.lives
+    report_cohort("PASSIVE (never works)",
+                  [run_life(s, active=False) for s in range(n)])
+    report_cohort("ACTIVE (seeks best eligible job)",
+                  [run_life(s, active=True) for s in range(n)])
+    report_cohort("ACTIVE + SELF-CARE (job + healthcare/study/family)",
+                  [run_life(s, active=True, self_care=True) for s in range(n)])
+    report_cohort("MITIGATION-ONLY (no job, but tries to self-care)",
+                  [run_life(s, active=False, self_care=True) for s in range(n)])
 
 
 if __name__ == "__main__":
