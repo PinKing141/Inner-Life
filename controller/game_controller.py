@@ -52,6 +52,7 @@ class GameController:
             {
                 "job_id": j.job_id, "title": j.title, "min_age": j.min_age,
                 "min_smarts": j.min_smarts, "salary": j.salary,
+                "min_education": getattr(j, "min_education", "None"),
                 "track": getattr(j, "track", "general"),
                 "required_field": getattr(j, "required_field", ""),
                 "employer": economy.employer_for(self.state, j.job_id),

@@ -93,6 +93,10 @@
           <span class="tab-icon" data-icon="briefcase"></span>
           <span>Career</span>
         </button>
+        <button class="tab" data-tab="assets">
+          <span class="tab-icon" data-icon="building"></span>
+          <span>Assets</span>
+        </button>
         <button class="tab" data-tab="relationships">
           <span class="tab-icon" data-icon="heart"></span>
           <span>Relations</span>
@@ -100,10 +104,6 @@
         <button class="tab" data-tab="activities">
           <span class="tab-icon" data-icon="ellipsis"></span>
           <span>Activities</span>
-        </button>
-        <button class="tab" data-tab="assets">
-          <span class="tab-icon" data-icon="briefcase"></span>
-          <span>Assets</span>
         </button>
       </nav>
     </section>
@@ -202,6 +202,27 @@
     <!-- Career setback (demotion / pay cut) -->
     <div id="setback-modal" class="modal hidden">
       <div class="modal-card popup-card" id="setback-body"></div>
+    </div>
+
+    <!-- Job application rejected -->
+    <div id="rejection-modal" class="modal hidden">
+      <div class="modal-card popup-card" id="rejection-body"></div>
+    </div>
+
+    <!-- House purchase / rent options -->
+    <div id="house-modal" class="modal hidden">
+      <div class="modal-card" id="house-body"></div>
+    </div>
+
+    <!-- Generic in-game confirmation -->
+    <div id="confirm-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3 id="confirm-text" class="popup-sub"></h3>
+        <div class="event-choices">
+          <button id="btn-confirm-yes" class="event-choice">Yes</button>
+          <button id="btn-confirm-no" class="event-choice">No</button>
+        </div>
+      </div>
     </div>
   </main>
 
