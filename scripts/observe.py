@@ -298,6 +298,116 @@ def report_cohort(name: str, records: list[LifeRecord]) -> None:
                          "looks -> final_money (is the new axis money-independent?)"))
 
 
+def _hist(records, value_fn, edges, labels) -> None:
+    counts = [0] * (len(edges) - 1)
+    for r in records:
+        v = value_fn(r)
+        for i in range(len(edges) - 1):
+            if edges[i] <= v < edges[i + 1]:
+                counts[i] += 1
+                break
+    total = max(1, len(records))
+    for lab, c in zip(labels, counts):
+        bar = "#" * round(40 * c / total)
+        print(f"    {lab:<22} {c:>4} ({100*c/total:4.1f}%) {bar}")
+
+
+def _econ_archetype(r) -> str:
+    if r.age_at_death < 65:
+        return "early-decline"
+    if r.years_in_debt > 15:
+        return "chronic-debt"
+    if r.final_money > 600_000:
+        return "upwardly-mobile"
+    if 50_000 <= r.final_money <= 600_000 and r.years_in_debt <= 6:
+        return "stable-middle"
+    return "volatile-worker"
+
+
+def _social_archetype(r) -> str:
+    if r.avg_support < 25 or r.isolation_years > 40:
+        return "isolated"
+    if r.ever_partnered and r.partner_years >= 20:
+        return "partnered-stable"
+    if r.avg_living_ties >= 4.0 and r.avg_support < 45:
+        return "networked-but-poor"
+    return "sparse-but-supported"
+
+
+def _stdev(xs):
+    return statistics.pstdev(xs) if len(xs) > 1 else 0.0
+
+
+def deep_dive(name: str, records: list[LifeRecord]) -> None:
+    n = len(records)
+    print(f"\n{'#'*70}\nDEEP DIVE — {name}  (n={n})\n{'#'*70}")
+
+    print("\nDistributions (variance, not means)")
+    print("  final wealth:")
+    _hist(records, lambda r: r.final_money,
+          [-10**9, 0, 100_000, 400_000, 800_000, 10**9],
+          ["debt (<£0)", "£0–100k", "£100–400k", "£400–800k", "£800k+"])
+    print("  age at death:")
+    _hist(records, lambda r: r.age_at_death, [0, 65, 75, 85, 95, 200],
+          ["<65", "65–74", "75–84", "85–94", "95+"])
+    print("  years in debt:")
+    _hist(records, lambda r: r.years_in_debt, [0, 1, 6, 15, 30, 200],
+          ["0", "1–5", "6–14", "15–29", "30+"])
+    print("  partnered years:")
+    _hist(records, lambda r: r.partner_years, [0, 1, 10, 25, 40, 200],
+          ["0 (never)", "1–9", "10–24", "25–39", "40+"])
+
+    print("\nArchetypes (rule-based clusters)")
+    econ = {}
+    soc = {}
+    for r in records:
+        econ[_econ_archetype(r)] = econ.get(_econ_archetype(r), 0) + 1
+        soc[_social_archetype(r)] = soc.get(_social_archetype(r), 0) + 1
+    print("  economic:")
+    for k, c in sorted(econ.items(), key=lambda kv: -kv[1]):
+        print(f"    {k:<20} {c:>4} ({100*c/n:4.1f}%)")
+    print("  social:")
+    for k, c in sorted(soc.items(), key=lambda kv: -kv[1]):
+        print(f"    {k:<20} {c:>4} ({100*c/n:4.1f}%)")
+
+    print("\nCross-axis resilience")
+    partnered = [r for r in records if r.ever_partnered]
+    single = [r for r in records if not r.ever_partnered]
+    if partnered and single:
+        print(f"  partnership vs debt-years : partnered {_mean([r.years_in_debt for r in partnered]):.1f} "
+              f"vs single {_mean([r.years_in_debt for r in single]):.1f}")
+    # Among those who hit real joblessness, does a partner buffer the fallout?
+    jobless = [r for r in records if r.unemployed_adult_years >= 5]
+    jp = [r for r in jobless if r.ever_partnered]
+    js = [r for r in jobless if not r.ever_partnered]
+    if jp and js:
+        print(f"  after >=5 jobless yrs, debt-years : partnered {_mean([r.years_in_debt for r in jp]):.1f} "
+              f"vs single {_mean([r.years_in_debt for r in js]):.1f}")
+        print(f"  after >=5 jobless yrs, bailouts   : partnered {_mean([float(r.bailouts) for r in jp]):.2f} "
+              f"vs single {_mean([float(r.bailouts) for r in js]):.2f}")
+    # Social centrality terciles vs economic resilience.
+    by_ties = sorted(records, key=lambda r: r.avg_living_ties)
+    t = len(by_ties) // 3
+    low_c, high_c = by_ties[:t], by_ties[-t:]
+    if low_c and high_c:
+        print(f"  low social-centrality  : debt-years {_mean([r.years_in_debt for r in low_c]):.1f}, "
+              f"unemployed-years {_mean([r.unemployed_adult_years for r in low_c]):.1f}, "
+              f"final £{_mean([r.final_money for r in low_c]):,.0f}")
+        print(f"  high social-centrality : debt-years {_mean([r.years_in_debt for r in high_c]):.1f}, "
+              f"unemployed-years {_mean([r.unemployed_adult_years for r in high_c]):.1f}, "
+              f"final £{_mean([r.final_money for r in high_c]):,.0f}")
+
+    print("\nDivergence under similar starts (same talent)")
+    for talent in TALENTS:
+        grp = [r for r in records if TALENTS[r.seed % len(TALENTS)] == talent]
+        if len(grp) < 4:
+            continue
+        wealth = [r.final_money for r in grp]
+        ages = [r.age_at_death for r in grp]
+        print(f"  {talent:<10}: final £ mean {_mean(wealth):>10,.0f}  sd {_stdev(wealth):>10,.0f}  "
+              f"| death age {_mean(ages):.0f}±{_stdev(ages):.0f}  (range {min(ages)}–{max(ages)})")
+
+
 def dump_trajectory(seed: int, active: bool) -> None:
     talent = TALENTS[seed % len(TALENTS)]
     country = COUNTRIES[(seed // len(TALENTS)) % len(COUNTRIES)]
@@ -331,6 +441,8 @@ def main() -> None:
                     help="dump one life's full feed instead of running cohorts")
     ap.add_argument("--passive-trajectory", action="store_true",
                     help="with --trajectory, use the passive policy")
+    ap.add_argument("--deep", action="store_true",
+                    help="archetype/variance deep-dive on the active cohort")
     args = ap.parse_args()
 
     if args.trajectory is not None:
@@ -338,10 +450,13 @@ def main() -> None:
         return
 
     n = args.lives
+    active_records = [run_life(s, active=True) for s in range(n)]
+    if args.deep:
+        deep_dive("ACTIVE (seeks best eligible job)", active_records)
+        return
     report_cohort("PASSIVE (never works)",
                   [run_life(s, active=False) for s in range(n)])
-    report_cohort("ACTIVE (seeks best eligible job)",
-                  [run_life(s, active=True) for s in range(n)])
+    report_cohort("ACTIVE (seeks best eligible job)", active_records)
     report_cohort("ACTIVE + SELF-CARE (job + healthcare/study/family)",
                   [run_life(s, active=True, self_care=True) for s in range(n)])
     report_cohort("MITIGATION-ONLY (no job, but tries to self-care)",
