@@ -118,8 +118,16 @@ class WebBridge(QObject):
         return _dumps(self._controller.work_harder())
 
     @Slot(result=str)
+    def quitJob(self) -> str:
+        return _dumps(self._controller.quit_job())
+
+    @Slot(result=str)
     def acknowledgeJobOffer(self) -> str:
         return _dumps(self._controller.acknowledge_job_offer())
+
+    @Slot(result=str)
+    def acknowledgeJobLoss(self) -> str:
+        return _dumps(self._controller.acknowledge_job_loss())
 
     @Slot(result=str)
     def acknowledgePromotion(self) -> str:

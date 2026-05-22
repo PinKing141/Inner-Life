@@ -53,9 +53,20 @@ def employer_for(state: GameState, job_id: str) -> str:
     return rng.choice(_EMPLOYER_PATTERNS).format(city=city, noun=noun)
 
 
-def title_for(career: str, level: int) -> str:
+def profession_for(spec: JobSpec) -> str:
+    return spec.career or spec.title
+
+
+def max_level_for(spec: JobSpec) -> int:
+    return (len(spec.ladder) - 1) if spec.ladder else MAX_LEVEL
+
+
+def rung_title(spec: JobSpec, level: int) -> str:
+    if spec.ladder:
+        level = max(0, min(len(spec.ladder) - 1, level))
+        return spec.ladder[level]
     level = max(0, min(MAX_LEVEL, level))
-    return f"{RANK_PREFIX[level]}{career}".strip()
+    return f"{RANK_PREFIX[level]}{profession_for(spec)}".strip()
 
 
 def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
@@ -91,23 +102,25 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
         return False, msg
 
     employer = employer_for(state, job_id)
+    profession = profession_for(spec)
+    title = rung_title(spec, 0)
     state.career = Job(
         job_id=spec.job_id,
-        title=spec.title,
+        title=title,
         salary=spec.salary,
         employer=employer,
-        career=spec.title,
+        career=profession,
         level=0,
         performance=50,
     )
     state.job_application_error = None
     state.pending_job_offer = {
-        "title": spec.title,
-        "career": spec.title,
+        "title": title,
+        "career": profession,
         "employer": employer,
         "salary": spec.salary,
     }
-    return True, f"You were hired as a {spec.title} at {employer}. Your salary is £{spec.salary:,}."
+    return True, f"You were hired as a {title} at {employer}. Your salary is £{spec.salary:,}."
 
 
 def work_harder(state: GameState) -> str:
@@ -119,14 +132,57 @@ def work_harder(state: GameState) -> str:
     return "You put in extra hours at work. Your performance improved."
 
 
+def quit_job(state: GameState) -> str:
+    """Player resigns. Clears the career."""
+    if state.career is None:
+        return "You don't have a job to quit."
+    title = state.career.title
+    state.career = None
+    return f"You quit your job as a {title}."
+
+
 def career_tick(state: GameState, rng: Rng) -> dict | None:
-    """Run a year of career progression. Returns promotion details if promoted."""
+    """Run a year of career progression.
+
+    Returns an outcome dict — {"type": "promotion"|"layoff"} — or None.
+    A layoff/firing clears the career; the caller surfaces the popup.
+    """
     job = state.career
     if job is None or state.character is None:
         return None
+    spec = find_job(job.job_id)
+    world = state.world.clamped()
+
     # Performance drifts down if you coast.
     job.performance = max(0, job.performance - rng.fork(1).randint(0, 4))
-    if job.level >= MAX_LEVEL or job.performance < 70:
+
+    # --- Job loss check (recession layoffs + poor performance) ---
+    stability = JOB_FAMILY_STABILITY.get(job.job_id, 0.0)
+    layoff_risk = 0.0
+    reason = ""
+    if world.recession:
+        layoff_risk += 0.06 + max(0.0, world.unemployment_rate - 0.05) * 0.6
+        reason = "company downsizing during the recession"
+    layoff_risk = max(0.0, layoff_risk - stability * 0.1)
+    fired_for_performance = job.performance < 25
+    if fired_for_performance:
+        layoff_risk += 0.20
+        reason = "poor performance"
+    if layoff_risk > 0 and rng.fork(4).chance(layoff_risk):
+        former = {
+            "type": "layoff",
+            "title": job.title,
+            "career": job.career,
+            "employer": job.employer,
+            "reason": reason or "redundancy",
+            "fired": fired_for_performance,
+        }
+        state.career = None
+        return former
+
+    # --- Promotion check ---
+    max_level = max_level_for(spec) if spec else MAX_LEVEL
+    if job.level >= max_level or job.performance < 70:
         return None
     promote_chance = (job.performance - 60) / 100.0
     if not rng.fork(2).chance(promote_chance):
@@ -136,9 +192,10 @@ def career_tick(state: GameState, rng: Rng) -> dict | None:
     pct = rng.fork(3).randint(10, 20)
     job.level += 1
     job.salary = int(old_salary * (1 + pct / 100.0))
-    job.title = title_for(job.career, job.level)
+    job.title = rung_title(spec, job.level) if spec else job.title
     job.performance = 55
     return {
+        "type": "promotion",
         "title": job.title,
         "career": job.career,
         "employer": job.employer,

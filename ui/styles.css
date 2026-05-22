@@ -859,6 +859,7 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   color: var(--accent);
   margin-bottom: 8px;
 }
+.popup-title-bad { color: var(--bad); }
 .popup-sub { color: var(--ink-soft); margin-bottom: 18px; }
 .popup-card .profile-fields { text-align: left; }
 .popup-continue {

@@ -213,12 +213,18 @@ def age_up(state: GameState) -> None:
         if not state.career:
             state.stats.happiness -= 5
 
-    # --- Career progression (promotions) ---
-    promotion = economy.career_tick(state, tick_rng.fork(8))
-    if promotion is not None:
-        state.pending_promotion = promotion
+    # --- Career progression (promotions, layoffs, firing) ---
+    outcome = economy.career_tick(state, tick_rng.fork(8))
+    if outcome is not None and outcome.get("type") == "promotion":
+        state.pending_promotion = outcome
         summary_parts.append(
-            f"You were promoted to {promotion['title']} (+{promotion['pct']}%)."
+            f"You were promoted to {outcome['title']} (+{outcome['pct']}%)."
+        )
+    elif outcome is not None and outcome.get("type") == "layoff":
+        state.pending_job_loss = outcome
+        verb = "fired" if outcome.get("fired") else "let go"
+        summary_parts.append(
+            f"You were {verb} from {outcome['employer']} ({outcome['reason']})."
         )
 
     # --- Natural drift ---

@@ -278,9 +278,23 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    def quit_job(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        msg = economy.quit_job(self.state)
+        self._feed(msg, "neutral", "quit")
+        self._broadcast()
+        return self.snapshot()
+
     def acknowledge_job_offer(self) -> dict:
         if self.state is not None:
             self.state.pending_job_offer = None
+            self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_job_loss(self) -> dict:
+        if self.state is not None:
+            self.state.pending_job_loss = None
             self._broadcast()
         return self.snapshot()
 

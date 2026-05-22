@@ -152,6 +152,7 @@ class GameState:
     exam: dict | None = None  # active/finished final school exam (interactive)
     pending_job_offer: dict | None = None  # "you got the job" popup
     pending_promotion: dict | None = None  # "you got promoted" popup
+    pending_job_loss: dict | None = None  # "you were laid off / fired" popup
     job_application_error: str | None = None  # last rejected application message
 
     # --- Serialization (for save/load and JS bridge) ---
@@ -248,6 +249,7 @@ class GameState:
             "exam": self.exam,
             "pending_job_offer": self.pending_job_offer,
             "pending_promotion": self.pending_promotion,
+            "pending_job_loss": self.pending_job_loss,
             "job_application_error": self.job_application_error,
         }
 
@@ -381,6 +383,7 @@ class GameState:
             exam=data.get("exam"),
             pending_job_offer=data.get("pending_job_offer"),
             pending_promotion=data.get("pending_promotion"),
+            pending_job_loss=data.get("pending_job_loss"),
             job_application_error=data.get("job_application_error"),
         )
 

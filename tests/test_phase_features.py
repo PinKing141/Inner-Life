@@ -377,6 +377,55 @@ def test_hire_sets_offer_popup_and_work_then_promotion():
     assert c.state.pending_promotion is None
 
 
+def test_quit_job_clears_career():
+    c = GameController()
+    c.new_game(seed=1, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 20
+    c.state.stats.smarts = 80
+    c.state.education.level = "Secondary Education"
+    for _ in range(25):
+        c.state.tick += 1
+        c.apply_for_job("admin")
+        if c.state.career is not None:
+            break
+    assert c.state.career is not None
+    c.quit_job()
+    assert c.state.career is None
+    assert "quit" in c.state.feed[-1].text.lower()
+
+
+def test_recession_can_lay_you_off():
+    from core import economy
+    from core.rng import Rng
+    from core.state import Job
+    c = GameController()
+    c.new_game(seed=4, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.career = Job(job_id="admin", title="Admin Assistant", salary=22000,
+                         employer="Acme", career="Admin Assistant", level=0, performance=10)
+    c.state.world.recession = True
+    c.state.world.unemployment_rate = 0.2
+    laid_off = False
+    for t in range(50):
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t))
+        if outcome and outcome["type"] == "layoff":
+            laid_off = True
+            assert c.state.career is None
+            break
+        if c.state.career is None:
+            break
+    assert laid_off
+
+
+def test_bespoke_ladder_titles():
+    from core import economy
+    spec = economy.find_job("solicitor")
+    assert economy.profession_for(spec) == "Lawyer"
+    assert economy.rung_title(spec, 0) == "Solicitor"
+    assert "Partner" in spec.ladder
+
+
 def test_failed_application_sets_error():
     c = GameController()
     c.new_game(seed=5, name="", gender="Male", country="US", talent="")
