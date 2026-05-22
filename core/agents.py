@@ -111,6 +111,10 @@ def seed_world(state: GameState, rng: Rng) -> None:
     surname = state.character.last_name
     country = state.character.country
     city = state.character.city
+    # parent_details (set in sim.new_game) is the single source of truth for a
+    # parent's age and job — the birth-story feed reads the same record, so the
+    # agent panel must not roll its own conflicting numbers.
+    parent_by_role = {d.get("role"): d for d in (state.character.parent_details or [])}
 
     for rel in state.relationships:
         existing = _find_agent(state, rel.npc_id)
@@ -122,6 +126,12 @@ def seed_world(state: GameState, rng: Rng) -> None:
             agent = _new_npc(rel.npc_id, "Male", "Father", surname, country, city, rng.fork(rel.npc_id + 1), parent_age=True)
         else:
             agent = _new_npc(rel.npc_id, "NonBinary", rel.kind, surname, country, city, rng.fork(rel.npc_id + 2))
+        # A parent's age/job come from the birth record, not a fresh roll.
+        detail = parent_by_role.get(rel.kind)
+        if detail is not None:
+            agent.age = detail.get("age_at_birth", agent.age)
+            if detail.get("job"):
+                agent.job_title = detail["job"]
         # Honour any pre-existing display name on the relationship.
         if rel.name and rel.name not in (agent.first_name, agent.name):
             # Treat the relationship name as the agent's full display name.

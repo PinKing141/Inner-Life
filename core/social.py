@@ -3,7 +3,6 @@
 Lightweight v1 system:
 - graph edges between NPC agents with constrained relationship types
 - motif-driven archetype events (triangle, isolation, nepotism)
-- rumor packets that propagate with attenuation/TTL
 """
 from __future__ import annotations
 
@@ -47,43 +46,6 @@ class SocialEdge:
             strength=d.get("strength", 50),
             trust=d.get("trust", 50),
             contact_rate=d.get("contact_rate", 0.25),
-        )
-
-
-@dataclass
-class Rumour:
-    topic: str
-    stance: Literal["positive", "negative", "neutral"]
-    origin_id: int
-    current_id: int
-    credibility: float = 0.8
-    intensity: float = 1.0
-    ttl: int = 4
-    seen_by: list[int] | None = None
-
-    def to_dict(self) -> dict:
-        return {
-            "topic": self.topic,
-            "stance": self.stance,
-            "origin_id": self.origin_id,
-            "current_id": self.current_id,
-            "credibility": self.credibility,
-            "intensity": self.intensity,
-            "ttl": self.ttl,
-            "seen_by": list(self.seen_by or []),
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> "Rumour":
-        return cls(
-            topic=d.get("topic", ""),
-            stance=d.get("stance", "neutral"),
-            origin_id=d.get("origin_id", 0),
-            current_id=d.get("current_id", 0),
-            credibility=d.get("credibility", 0.8),
-            intensity=d.get("intensity", 1.0),
-            ttl=d.get("ttl", 0),
-            seen_by=list(d.get("seen_by", [])),
         )
 
 
@@ -133,36 +95,6 @@ def _has_triangle(state: GameState, a: int, b: int, c: int) -> bool:
     )
 
 
-def _tick_rumours(state: GameState, rng: Rng) -> None:
-    new_packets: list[Rumour] = []
-    for packet in state.rumours:
-        if packet.ttl <= 0 or packet.intensity <= 0.1:
-            continue
-        hops = _neighbors(state, packet.current_id)
-        seen = set(packet.seen_by or [])
-        seen.add(packet.current_id)
-        for edge in hops:
-            if edge.target_id in seen:
-                continue
-            spread_chance = min(0.95, edge.contact_rate * packet.intensity * (edge.trust / 100))
-            if not rng.fork(packet.current_id * 31 + edge.target_id).chance(spread_chance):
-                continue
-            credibility = max(0.05, packet.credibility - rng.fork(edge.target_id).randint(3, 12) / 100)
-            intensity = packet.intensity * 0.75
-            new_packets.append(Rumour(
-                topic=packet.topic,
-                stance=packet.stance,
-                origin_id=packet.origin_id,
-                current_id=edge.target_id,
-                credibility=credibility,
-                intensity=intensity,
-                ttl=packet.ttl - 1,
-                seen_by=list(seen),
-            ))
-    state.rumours = [r for r in state.rumours if r.ttl > 0 and r.intensity > 0.1]
-    state.rumours.extend(new_packets)
-
-
 def _emit_graph_events(state: GameState, rng: Rng) -> None:
     if state.character is None:
         return
@@ -200,4 +132,3 @@ def tick_social(state: GameState, rng: Rng) -> None:
     if not state.social_edges:
         seed_social_graph(state, rng.fork(5))
     _emit_graph_events(state, rng.fork(11))
-    _tick_rumours(state, rng.fork(13))

@@ -113,26 +113,16 @@ def test_social_graph_seeded_with_allowed_relationship_types():
     assert all(e.relation_type in ("friend", "family", "enemy", "coworker") for e in state.social_edges)
 
 
-def test_rumour_propagation_attenuates():
+def test_parent_agent_age_and_job_match_birth_record():
+    """The agent record for a parent must reuse the age/job baked into the
+    birth-story feed (parent_details), not roll its own conflicting values."""
     state = _new()
-    social.seed_social_graph(state, Rng(state.seed).fork(999))
-    if not state.social_edges:
-        return
-    first = state.social_edges[0]
-    first.contact_rate = 1.0
-    first.trust = 100
-    state.rumours.append(social.Rumour(
-        topic="test_rumour",
-        stance="negative",
-        origin_id=first.source_id,
-        current_id=first.source_id,
-        intensity=1.0,
-        credibility=0.9,
-        ttl=3,
-        seen_by=[],
-    ))
-    social.tick_social(state, Rng(state.seed).fork(1001))
-    assert any(r.intensity < 1.0 for r in state.rumours if r.topic == "test_rumour")
+    by_role = {d["role"]: d for d in state.character.parent_details}
+    for role in ("Mother", "Father"):
+        rel = next(r for r in state.relationships if r.kind == role)
+        agent = next(a for a in state.agents if a.npc_id == rel.npc_id)
+        assert agent.age == by_role[role]["age_at_birth"]
+        assert agent.job_title == by_role[role]["job"]
 
 
 def test_university_plan_major_and_dropout_flow():
