@@ -34,6 +34,8 @@ const Icons = (() => {
     people: wrap(`<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="10" r="2.5"/><path d="M14 20c0-2 1.7-4 4-4s3 1 3 3"/>`),
     hourglass: wrap(`<path d="M6 3h12M6 21h12M7 3v3c0 2 5 3 5 6s-5 4-5 6v3"/><path d="M17 3v3c0 2-5 3-5 6s5 4 5 6v3"/>`),
     building: wrap(`<rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="7" x2="10" y2="7"/><line x1="14" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="16" y2="11"/><path d="M10 21v-4h4v4"/>`),
+    dummy: wrap(`<circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="14" r="6"/><circle cx="12" cy="14" r="2"/><path d="M6.7 11.5 4 10.5M17.3 11.5 20 10.5"/>`),
+    students: wrap(`<path d="M3 8l9-3.5L21 8l-9 3.5z"/><path d="M7 10v3.5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V10"/><circle cx="12" cy="18.5" r="1.6"/><path d="M9 22c0-1.4 1.3-2.5 3-2.5s3 1.1 3 2.5"/>`),
   };
 
   function hydrate(root = document) {

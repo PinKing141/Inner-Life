@@ -30,7 +30,7 @@ const FALLBACK_NAMES = {
   NonBinary: ["Alex","Jordan","Charlie","Sam","Taylor","Morgan","Casey","Riley","Quinn","Rowan"],
 };
 const FALLBACK_SURNAMES = ["Smith","Johnson","Brown","Taylor","Wilson","Davies","Evans","Thomas","Roberts","Walker"];
-const STAGE_ICONS = { Infant: "infant", School: "school", Teenager: "school", Career: "briefcase" };
+const STAGE_ICONS = { Infant: "dummy", School: "students", Teenager: "students", Career: "briefcase" };
 const DATA_BASE = "flags-svg";
 
 // How many recent feed entries to render. 100 years of play used to be one
