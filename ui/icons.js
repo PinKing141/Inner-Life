@@ -33,6 +33,7 @@ const Icons = (() => {
     stethoscope: wrap(`<path d="M5 4v6a4 4 0 0 0 8 0V4"/><line x1="5" y1="4" x2="5" y2="3"/><line x1="13" y1="4" x2="13" y2="3"/><path d="M9 14v2a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4v-2"/><circle cx="17" cy="11" r="2"/>`),
     people: wrap(`<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="10" r="2.5"/><path d="M14 20c0-2 1.7-4 4-4s3 1 3 3"/>`),
     hourglass: wrap(`<path d="M6 3h12M6 21h12M7 3v3c0 2 5 3 5 6s-5 4-5 6v3"/><path d="M17 3v3c0 2-5 3-5 6s5 4 5 6v3"/>`),
+    building: wrap(`<rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="7" x2="10" y2="7"/><line x1="14" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="16" y2="11"/><path d="M10 21v-4h4v4"/>`),
   };
 
   function hydrate(root = document) {

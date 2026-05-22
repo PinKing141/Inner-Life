@@ -41,8 +41,12 @@ const App = {
   bridge: null,
   state: null,
   activeTab: "feed",
+  careerView: null,   // null | "jobs" — sub-page inside the Career tab
+  assetsView: null,   // null | "houses" — sub-page inside the Assets tab
   selectedNpcId: null,
   selectedJobId: null,
+  selectedListingId: null, // open house in the buy/rent options popup
+  pendingConfirm: null,    // { text, onYes } for the in-game confirm popup
   countries: [], // populated from snapshot.countries — [{code,name,flag,currency,cities}]
 
   async ensureQtWebChannel() {
@@ -106,6 +110,11 @@ const App = {
     this.render();
   },
   async ageUp() {
+    // Aging up always returns the player to the main hub (the record feed),
+    // no matter which tab they were on.
+    this.activeTab = "feed";
+    this.careerView = null;
+    this.assetsView = null;
     const result = await this.bridge.ageUp();
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
@@ -118,7 +127,11 @@ const App = {
   async applyForJob(jobId) {
     const result = await this.bridge.applyForJob(jobId);
     if (typeof result === "string") this.state = JSON.parse(result);
-    if (this.state.pending_job_offer) this.selectedJobId = null;
+    // Either way the apply card is done: an offer or a rejection popup takes
+    // over from here.
+    if (this.state.pending_job_offer || this.state.job_application_error) {
+      this.selectedJobId = null;
+    }
     this.render();
   },
   async activity(kind) {
@@ -253,6 +266,86 @@ const App = {
     this.renderPromotionModal();
     this.renderJobLossModal();
     this.renderCareerSetbackModal();
+    this.renderRejectionModal();
+    this.renderHouseModal();
+    this.renderConfirmModal();
+  },
+
+  renderRejectionModal() {
+    const modal = document.getElementById("rejection-modal");
+    if (!modal) return;
+    const err = this.state.job_application_error;
+    // The apply card may still be open behind it; the rejection takes priority.
+    const show = this.state.mode === "PLAYING" && !!err && !this.selectedJobId;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    document.getElementById("rejection-body").innerHTML = `
+      <h2 class="popup-title popup-title-bad">Application rejected</h2>
+      <p class="popup-sub">${escapeHtml(err)}</p>
+      <p class="popup-continue">tap anywhere to continue</p>
+    `;
+  },
+
+  renderHouseModal() {
+    const modal = document.getElementById("house-modal");
+    if (!modal) return;
+    const id = this.selectedListingId;
+    const market = this.state.housing_market || [];
+    const listing = id == null ? null : market.find(m => m.id === id);
+    const show = this.state.mode === "PLAYING" && !!listing;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+
+    const age = this.state.character.age;
+    const tooYoung = age < 18;
+    const deposit = Math.round(listing.price * 0.1);
+    const disabled = tooYoung ? "disabled" : "";
+    const note = tooYoung ? `<p class="job-apply-error">You must be 18 to buy or rent a home.</p>` : "";
+
+    document.getElementById("house-body").innerHTML = `
+      <button class="modal-close" data-house-close aria-label="Close">&times;</button>
+      <h3 class="job-apply-title">${escapeHtml(listing.name)}</h3>
+      <p class="job-apply-sub">What would you like to do?</p>
+      <div class="profile-fields">
+        <div class="profile-field"><span>Price</span><span>£${listing.price.toLocaleString()}</span></div>
+        <div class="profile-field"><span>Rent</span><span>£${listing.rent.toLocaleString()} / yr</span></div>
+      </div>
+      ${note}
+      <div class="event-choices">
+        <button class="event-choice" data-house-act="buy" ${disabled}>Buy outright — £${listing.price.toLocaleString()}</button>
+        <button class="event-choice" data-house-act="mortgage" ${disabled}>Buy with mortgage — £${deposit.toLocaleString()} deposit</button>
+        <button class="event-choice" data-house-act="rent" ${disabled}>Rent — £${listing.rent.toLocaleString()} / yr</button>
+      </div>
+    `;
+    document.querySelector("#house-body [data-house-close]").addEventListener("click", () => {
+      this.selectedListingId = null;
+      this.render();
+    });
+    document.querySelectorAll("#house-body [data-house-act]").forEach((btn) => {
+      if (btn.disabled) return;
+      btn.addEventListener("click", () => {
+        const act = btn.dataset.houseAct;
+        this.selectedListingId = null;
+        if (act === "buy") this.buyHome(id);
+        else if (act === "mortgage") this.buyHomeMortgage(id);
+        else if (act === "rent") this.rentHome(id);
+      });
+    });
+  },
+
+  renderConfirmModal() {
+    const modal = document.getElementById("confirm-modal");
+    if (!modal) return;
+    const c = this.pendingConfirm;
+    const show = !!c;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    document.getElementById("confirm-text").textContent = c.text;
+  },
+
+  confirm(text, onYes) {
+    this.pendingConfirm = { text, onYes };
+    this.render();
   },
 
   renderCareerSetbackModal() {
@@ -310,29 +403,40 @@ const App = {
     if (!modal) return;
     const id = this.selectedJobId;
     const job = id == null ? null : (this.state.jobs || []).find(j => j.job_id === id);
-    // The offer/error popups take over once a decision is made.
-    const show = this.state.mode === "PLAYING" && !!job && !this.state.pending_job_offer;
+    // The offer/rejection popups take over once a decision is made.
+    const show = this.state.mode === "PLAYING" && !!job
+      && !this.state.pending_job_offer && !this.state.job_application_error;
     modal.classList.toggle("hidden", !show);
     if (!show) return;
 
-    const err = this.state.job_application_error;
+    // Requirements live here, in the job's detail view — and we deliberately
+    // never reveal the smarts bar; players work that out themselves.
+    const reqs = [`<div class="profile-field"><span>Minimum age</span><span>${job.min_age}</span></div>`];
+    if (job.min_education && job.min_education !== "None") {
+      reqs.push(`<div class="profile-field"><span>Education</span><span>${escapeHtml(job.min_education)}</span></div>`);
+    }
+    if (job.required_field) {
+      reqs.push(`<div class="profile-field"><span>Degree</span><span>${escapeHtml(job.required_field.replace(/_/g, " "))}</span></div>`);
+    }
+
     document.getElementById("job-apply-body").innerHTML = `
       <button class="modal-close" data-job-close aria-label="Close">&times;</button>
       <h3 class="job-apply-title">${escapeHtml(job.title)}</h3>
       <p class="job-apply-sub">Apply for this open position today!</p>
       <div class="profile-fields">
-        <div class="profile-field"><span>Title</span><span>${escapeHtml(job.title)}</span></div>
-        <div class="profile-field"><span>Career</span><span>${escapeHtml(job.title)}</span></div>
         <div class="profile-field"><span>Employer</span><span>${escapeHtml(job.employer || "—")}</span></div>
         <div class="profile-field"><span>Salary</span><span>£${job.salary.toLocaleString()}</span></div>
       </div>
-      ${err ? `<p class="job-apply-error">${escapeHtml(err)}</p>` : ""}
+      <p class="modal-eyebrow">Requirements</p>
+      <div class="profile-fields">
+        ${reqs.join("")}
+      </div>
       <button class="btn btn-primary" data-job-apply style="width:100%">Apply for this position</button>
     `;
     document.querySelector("#job-apply-body [data-job-apply]").addEventListener("click", () => this.applyForJob(id));
     document.querySelector("#job-apply-body [data-job-close]").addEventListener("click", () => {
       this.selectedJobId = null;
-      if (this.state.job_application_error) { this.clearApplicationError(); } else { this.render(); }
+      this.render();
     });
   },
 
@@ -418,7 +522,7 @@ const App = {
     if (sel && !sel.dataset.populated) {
       const courses = this.state.courses || [];
       sel.innerHTML = "";
-      courses.forEach((c) => sel.add(new Option(`${c.major} (${c.field.replace(/_/g, " ")})`, c.major)));
+      courses.forEach((c) => sel.add(new Option(c.major, c.major)));
       sel.dataset.populated = "1";
     }
   },
@@ -585,12 +689,36 @@ const App = {
         <p class="unemployed">No present occupation.</p>
       `}
 
+      ${this.renderJobsSection(jobs)}
+    `;
+  },
+
+  renderJobsSection(jobs) {
+    const age = this.state.character.age;
+    const minJobAge = jobs.length ? Math.min(...jobs.map(j => j.min_age)) : 16;
+    const canWork = age >= minJobAge;
+
+    // Browsing the open roles is a sub-page behind a "Jobs" menu button. The
+    // button is greyed out until the player is old enough to work at all.
+    if (this.careerView !== "jobs") {
+      return `
+        <p class="panel-heading">Jobs</p>
+        <button class="job-row${canWork ? "" : " disabled"}" data-action="open-jobs" ${canWork ? "" : "disabled"}>
+          <div>
+            <div class="job-row-title">Jobs</div>
+            <div class="job-row-req">${canWork ? "Browse open positions" : "You're too young to work"}</div>
+          </div>
+          <span class="job-row-chevron" data-icon="chevron"></span>
+        </button>
+      `;
+    }
+
+    return `
       <p class="panel-heading">Open roles</p>
       ${jobs.map(j => `
         <button class="job-row" data-action="apply" data-job="${j.job_id}">
           <div>
-            <div class="job-row-title">${escapeHtml(j.title)}${j.track && j.track !== "general" ? ` <span class="job-track">(${j.track})</span>` : ""}</div>
-            <div class="job-row-req">Req age ${j.min_age} · smarts ${j.min_smarts}${j.required_field ? ` · ${escapeHtml(j.required_field.replace(/_/g, " "))} degree` : ""}</div>
+            <div class="job-row-title">${escapeHtml(j.title)}</div>
           </div>
           <div class="job-row-salary">£${(j.salary / 1000).toFixed(0)}k</div>
         </button>
@@ -742,6 +870,21 @@ const App = {
     const money_str = `${money < 0 ? "-" : ""}£${Math.abs(money).toLocaleString()}`;
     const nw_str = `${netWorth < 0 ? "-" : ""}£${Math.abs(netWorth).toLocaleString()}`;
 
+    // The property market is a sub-page behind a "Houses" menu button.
+    if (this.assetsView === "houses") {
+      return `
+        <p class="panel-heading">Houses</p>
+        ${market.map(m => `
+          <button class="job-row" data-action="house-detail" data-listing="${escapeHtml(m.id)}">
+            <div>
+              <div class="job-row-title">${escapeHtml(m.name)}</div>
+              <div class="job-row-req">£${m.price.toLocaleString()}</div>
+            </div>
+            <span class="job-row-chevron" data-icon="chevron"></span>
+          </button>`).join("")}
+      `;
+    }
+
     return `
       <p class="panel-heading">Assets</p>
       <div class="education-card">
@@ -781,19 +924,14 @@ const App = {
         </div>`).join("")}
       ${!s.rental && properties.length === 0 ? `<p class="unemployed">You have no home of your own.</p>` : ""}
 
-      <p class="panel-heading">Property market</p>
-      ${market.map(m => `
-        <div class="job-row">
-          <div>
-            <div class="job-row-title">${escapeHtml(m.name)}</div>
-            <div class="job-row-req">Buy £${m.price.toLocaleString()} · Rent £${m.rent.toLocaleString()}/yr</div>
-          </div>
-          <div class="market-actions">
-            <button class="profile-action" data-action="rent-home" data-listing="${escapeHtml(m.id)}">Rent</button>
-            <button class="profile-action" data-action="mortgage-home" data-listing="${escapeHtml(m.id)}">Mortgage</button>
-            <button class="profile-action" data-action="buy-home" data-listing="${escapeHtml(m.id)}">Buy</button>
-          </div>
-        </div>`).join("")}
+      <p class="panel-heading">Market</p>
+      <button class="job-row" data-action="open-houses">
+        <div>
+          <div class="job-row-title">Houses</div>
+          <div class="job-row-req">Browse the property market</div>
+        </div>
+        <span class="job-row-chevron" data-icon="chevron"></span>
+      </button>
     `;
   },
 
@@ -826,7 +964,22 @@ const App = {
 
   bindPanel(root) {
     root.querySelectorAll("[data-action='back']").forEach((btn) => {
-      btn.addEventListener("click", () => { this.activeTab = "feed"; this.render(); });
+      btn.addEventListener("click", () => {
+        // Back steps out of a tab sub-page first, then to the record feed.
+        if (this.activeTab === "career" && this.careerView) { this.careerView = null; }
+        else if (this.activeTab === "assets" && this.assetsView) { this.assetsView = null; }
+        else { this.activeTab = "feed"; }
+        this.render();
+      });
+    });
+    root.querySelectorAll("[data-action='open-jobs']").forEach((btn) => {
+      btn.addEventListener("click", () => { this.careerView = "jobs"; this.render(); });
+    });
+    root.querySelectorAll("[data-action='open-houses']").forEach((btn) => {
+      btn.addEventListener("click", () => { this.assetsView = "houses"; this.render(); });
+    });
+    root.querySelectorAll("[data-action='house-detail']").forEach((btn) => {
+      btn.addEventListener("click", () => { this.selectedListingId = btn.dataset.listing; this.render(); });
     });
     root.querySelectorAll("[data-action='apply']").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -845,7 +998,7 @@ const App = {
     });
     root.querySelectorAll("[data-action='quit']").forEach((btn) => {
       btn.addEventListener("click", () => {
-        if (window.confirm("Are you sure you want to quit your job?")) this.quitJob();
+        this.confirm("Are you sure you want to quit your job?", () => this.quitJob());
       });
     });
     root.querySelectorAll("[data-action='activity']").forEach((btn) => {
@@ -1104,8 +1257,8 @@ const MockBridge = (() => {
             currency: cn.currency,
             countries: MOCK_COUNTRIES,
             jobs: [
-              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, salary: 15000, track: "general", employer: "City Holdings" },
-              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, salary: 16000, track: "general", employer: "Solutions Group" },
+              { job_id: "retail",  title: "Retail Assistant", min_age: 16, min_smarts: 0, min_education: "None", required_field: "", salary: 15000, track: "general", employer: "City Holdings" },
+              { job_id: "barista", title: "Barista",          min_age: 16, min_smarts: 0, min_education: "None", required_field: "", salary: 16000, track: "general", employer: "Solutions Group" },
             ],
             pending_job_offer: null,
             pending_promotion: null,
@@ -1294,9 +1447,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btn-uni-skip").addEventListener("click", () => App.setUniversityPlan(false, ""));
   document.getElementById("btn-degree-ok").addEventListener("click", () => App.acknowledgeDegree());
   document.getElementById("btn-cheat").addEventListener("click", () => {
-    if (window.confirm("Are you sure you want to cheat? If you get caught you'll be thrown out of the exam.")) {
-      App.cheatExam();
-    }
+    App.confirm("Are you sure you want to cheat? If you get caught you'll be thrown out of the exam.", () => App.cheatExam());
+  });
+
+  // In-game confirmation popup (replaces native window.confirm everywhere).
+  document.getElementById("btn-confirm-yes").addEventListener("click", () => {
+    const c = App.pendingConfirm;
+    App.pendingConfirm = null;
+    if (c && c.onYes) c.onYes();
+    App.render();
+  });
+  document.getElementById("btn-confirm-no").addEventListener("click", () => {
+    App.pendingConfirm = null;
+    App.render();
+  });
+
+  // Rejection popup — tap anywhere to dismiss.
+  document.getElementById("rejection-modal").addEventListener("click", () => App.clearApplicationError());
+
+  // House options — tap the backdrop to dismiss.
+  document.getElementById("house-modal").addEventListener("click", (e) => {
+    if (e.target.id === "house-modal") { App.selectedListingId = null; App.render(); }
   });
 
   const closeProfile = () => { App.selectedNpcId = null; App.render(); };
@@ -1313,8 +1484,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {
-      // Tapping the active tab again returns to the records page.
+      // Tapping the active tab again returns to the records page. Switching
+      // tabs always resets any open sub-page.
       App.activeTab = App.activeTab === el.dataset.tab ? "feed" : el.dataset.tab;
+      App.careerView = null;
+      App.assetsView = null;
       App.render();
     });
   });

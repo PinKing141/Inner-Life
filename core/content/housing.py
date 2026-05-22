@@ -36,7 +36,7 @@ def list_market(seed: int, city: str) -> list[dict]:
         market.append({
             "id": f"{t['key']}-{salt}",
             "key": t["key"],
-            "name": f"{t['name']} in {city}",
+            "name": t["name"],
             "price": price,
             "rent": rent,
         })

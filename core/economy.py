@@ -70,24 +70,32 @@ def rung_title(spec: JobSpec, level: int) -> str:
 
 
 def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
-    """Returns (hired, message). State is mutated only on success."""
+    """Returns (hired, message). State is mutated only on success.
+
+    Every rejection sets ``state.job_application_error`` so the UI can surface
+    a dedicated "you were rejected" popup with the reason.
+    """
+    def reject(msg: str) -> tuple[bool, str]:
+        state.job_application_error = msg
+        return False, msg
+
     if state.character is None:
         return False, "No character."
     spec = find_job(job_id)
     if spec is None:
         return False, "That job does not exist."
     if state.character.age < spec.min_age:
-        return False, f"You are too young to be a {spec.title}."
+        return reject(f"You are too young to be a {spec.title}.")
     if state.stats.smarts < spec.min_smarts:
-        return False, f"You failed the interview for {spec.title}. You need to be smarter."
+        return reject(f"You failed the interview for {spec.title}. You need to be smarter.")
     if not education_meets(state.education.level, spec.min_education):
-        return False, f"You need at least {spec.min_education} to be a {spec.title}."
+        return reject(f"You need at least {spec.min_education} to be a {spec.title}.")
 
     # Degree-gated professions hard-reject anyone without the right field.
     if spec.required_field:
         edu = state.education
         if not edu.degree_completed or edu.degree_field != spec.required_field:
-            return False, (
+            return reject(
                 f"Your application to be a {spec.title} was rejected — "
                 f"they require a degree in {spec.required_field.replace('_', ' ')}."
             )
@@ -97,9 +105,7 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
     rng = Rng(state.seed).fork(state.tick).fork(salt)
     hire_chance = 0.9 if spec.required_field else 0.85
     if not rng.chance(hire_chance):
-        msg = f"You interviewed for {spec.title} but weren't offered the role this time."
-        state.job_application_error = msg
-        return False, msg
+        return reject(f"You interviewed for {spec.title} but weren't offered the role this time.")
 
     employer = employer_for(state, job_id)
     profession = profession_for(spec)

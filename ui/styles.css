@@ -496,6 +496,15 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   color: var(--ink);
 }
 .job-row:hover { border-color: var(--hairline-strong); background: var(--surface-2); }
+.job-row.disabled,
+.job-row:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.job-row.disabled:hover,
+.job-row:disabled:hover { border-color: var(--hairline); background: transparent; }
+.job-row-chevron { color: var(--ink-mute); display: inline-flex; }
+.job-row-chevron svg { width: 18px; height: 18px; stroke: var(--ink-mute); }
 .job-row-title { font-weight: 500; }
 .job-row-req {
   font-family: var(--font-mono);
@@ -733,6 +742,8 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
 }
 .event-choice:hover { border-color: var(--accent-dim); background: var(--surface-3); }
 .event-choice.revealed { border-color: var(--good); background: rgba(120, 180, 120, 0.12); }
+.event-choice:disabled { opacity: 0.4; cursor: not-allowed; }
+.event-choice:disabled:hover { border-color: var(--hairline); background: var(--surface-2); }
 
 .exam-cheat {
   display: block;
