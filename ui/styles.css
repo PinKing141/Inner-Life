@@ -504,11 +504,38 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   color: var(--ink-mute);
   padding: 0;
 }
-.feed-text {
+.feed-card {
   background: var(--bg-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   padding: 12px 15px;
+}
+.feed-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.feed-tag i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+}
+.feed-tag span {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.feed-tag-age {
+  margin-left: auto;
+  color: var(--ink-faint) !important;
+  letter-spacing: 0.1em !important;
+}
+.feed-text {
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.58;
@@ -520,7 +547,7 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   color: var(--gold-bright);
   box-shadow: 0 0 0 4px rgba(217, 184, 120, .1);
 }
-.feed-entry:first-of-type .feed-text {
+.feed-entry:first-of-type .feed-card {
   border-color: var(--line);
   background: linear-gradient(160deg, #241d12, var(--bg-2));
 }
@@ -662,6 +689,24 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
 }
 .rel-row:hover { border-color: var(--line); transform: translateY(-1px); }
 .rel-row.deceased { opacity: 0.55; }
+.rel-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a140a;
+  background: var(--c, var(--gold));
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--c, var(--gold)) 90%, #fff),
+    color-mix(in srgb, var(--c, var(--gold)) 65%, #000));
+}
+.rel-meta { flex: 1; min-width: 0; }
 .rel-name { font-family: var(--font-display); font-size: 16.5px; font-weight: 500; color: var(--ink); }
 .rel-kind {
   font-family: var(--font-sans);
@@ -951,7 +996,8 @@ select:focus, input[type="text"]:focus { border-color: var(--gold-deep); }
   gap: 12px;
   margin-bottom: 20px;
 }
-.profile-name { font-family: var(--font-display); font-size: 23px; font-weight: 500; color: var(--ink); }
+.profile-avatar { width: 46px; height: 46px; border-radius: 14px; font-size: 19px; }
+.profile-name { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 23px; font-weight: 500; color: var(--ink); }
 .profile-role {
   font-family: var(--font-sans);
   font-size: 9px;
