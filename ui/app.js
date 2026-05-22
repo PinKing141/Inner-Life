@@ -1296,6 +1296,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("btn-age-up").addEventListener("click", () => App.ageUp());
   document.getElementById("btn-restart").addEventListener("click", () => location.reload());
+  document.getElementById("btn-save").addEventListener("click", () => App.save());
+  document.getElementById("btn-load").addEventListener("click", () => App.load());
 
   document.getElementById("btn-uni-enroll").addEventListener("click", () => {
     const major = document.getElementById("university-course").value;

@@ -168,6 +168,14 @@ html, body {
 }
 .btn-ghost:hover { background: var(--bg-2); color: var(--ink); }
 
+.save-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.save-controls .btn { flex: 1; }
+
 /* ==========================================================================
    Creation screen
    ========================================================================== */
