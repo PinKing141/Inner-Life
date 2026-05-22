@@ -130,6 +130,10 @@ class WebBridge(QObject):
         return _dumps(self._controller.acknowledge_job_loss())
 
     @Slot(result=str)
+    def acknowledgeCareerSetback(self) -> str:
+        return _dumps(self._controller.acknowledge_career_setback())
+
+    @Slot(result=str)
     def acknowledgePromotion(self) -> str:
         return _dumps(self._controller.acknowledge_promotion())
 

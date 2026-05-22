@@ -298,6 +298,12 @@ class GameController:
             self._broadcast()
         return self.snapshot()
 
+    def acknowledge_career_setback(self) -> dict:
+        if self.state is not None:
+            self.state.pending_career_setback = None
+            self._broadcast()
+        return self.snapshot()
+
     def acknowledge_promotion(self) -> dict:
         if self.state is not None:
             self.state.pending_promotion = None

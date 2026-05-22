@@ -180,6 +180,42 @@ def career_tick(state: GameState, rng: Rng) -> dict | None:
         state.career = None
         return former
 
+    # --- Demotion: weak (but not catastrophic) performance costs a rank ---
+    if job.level > 0 and job.performance < 45:
+        if rng.fork(5).chance((45 - job.performance) / 100.0):
+            old_salary = job.salary
+            job.level -= 1
+            job.title = rung_title(spec, job.level) if spec else job.title
+            pct = rng.fork(6).randint(8, 18)
+            job.salary = int(old_salary * (1 - pct / 100.0))
+            job.performance = 50
+            return {
+                "type": "demotion",
+                "title": job.title,
+                "career": job.career,
+                "employer": job.employer,
+                "old_salary": old_salary,
+                "salary": job.salary,
+                "pct": pct,
+                "reason": "poor performance",
+            }
+
+    # --- Pay cut: recessions squeeze salaries without costing the role ---
+    if world.recession and rng.fork(7).chance(0.08):
+        old_salary = job.salary
+        pct = rng.fork(8).randint(5, 12)
+        job.salary = int(old_salary * (1 - pct / 100.0))
+        return {
+            "type": "paycut",
+            "title": job.title,
+            "career": job.career,
+            "employer": job.employer,
+            "old_salary": old_salary,
+            "salary": job.salary,
+            "pct": pct,
+            "reason": "salary cut during the recession",
+        }
+
     # --- Promotion check ---
     max_level = max_level_for(spec) if spec else MAX_LEVEL
     if job.level >= max_level or job.performance < 70:

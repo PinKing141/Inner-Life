@@ -226,6 +226,12 @@ def age_up(state: GameState) -> None:
         summary_parts.append(
             f"You were {verb} from {outcome['employer']} ({outcome['reason']})."
         )
+    elif outcome is not None and outcome.get("type") in ("demotion", "paycut"):
+        state.pending_career_setback = outcome
+        if outcome["type"] == "demotion":
+            summary_parts.append(f"You were demoted to {outcome['title']} (-{outcome['pct']}%).")
+        else:
+            summary_parts.append(f"Your salary was cut by {outcome['pct']}% ({outcome['reason']}).")
 
     # --- Natural drift ---
     if age > 50:

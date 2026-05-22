@@ -153,6 +153,7 @@ class GameState:
     pending_job_offer: dict | None = None  # "you got the job" popup
     pending_promotion: dict | None = None  # "you got promoted" popup
     pending_job_loss: dict | None = None  # "you were laid off / fired" popup
+    pending_career_setback: dict | None = None  # demotion / pay-cut popup
     job_application_error: str | None = None  # last rejected application message
 
     # --- Serialization (for save/load and JS bridge) ---
@@ -250,6 +251,7 @@ class GameState:
             "pending_job_offer": self.pending_job_offer,
             "pending_promotion": self.pending_promotion,
             "pending_job_loss": self.pending_job_loss,
+            "pending_career_setback": self.pending_career_setback,
             "job_application_error": self.job_application_error,
         }
 
@@ -384,6 +386,7 @@ class GameState:
             pending_job_offer=data.get("pending_job_offer"),
             pending_promotion=data.get("pending_promotion"),
             pending_job_loss=data.get("pending_job_loss"),
+            pending_career_setback=data.get("pending_career_setback"),
             job_application_error=data.get("job_application_error"),
         )
 

@@ -181,6 +181,11 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async acknowledgeCareerSetback() {
+    const result = await this.bridge.acknowledgeCareerSetback();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   async acknowledgePromotion() {
     const result = await this.bridge.acknowledgePromotion();
     if (typeof result === "string") this.state = JSON.parse(result);
@@ -212,6 +217,31 @@ const App = {
     this.renderJobOfferModal();
     this.renderPromotionModal();
     this.renderJobLossModal();
+    this.renderCareerSetbackModal();
+  },
+
+  renderCareerSetbackModal() {
+    const modal = document.getElementById("setback-modal");
+    if (!modal) return;
+    const s = this.state.pending_career_setback;
+    const show = this.state.mode === "PLAYING" && !!s;
+    modal.classList.toggle("hidden", !show);
+    if (!show) return;
+    const heading = s.type === "demotion" ? "Demoted" : "Pay cut";
+    const sub = s.type === "demotion"
+      ? `You were demoted to ${escapeHtml(s.title)}.`
+      : `Your pay was cut at ${escapeHtml(s.employer)}.`;
+    document.getElementById("setback-body").innerHTML = `
+      <h2 class="popup-title popup-title-bad">${heading}</h2>
+      <p class="popup-sub">${sub}</p>
+      <div class="profile-fields">
+        ${s.type === "demotion" ? `<div class="profile-field"><span>New Title</span><span>${escapeHtml(s.title)}</span></div>` : ""}
+        <div class="profile-field"><span>Old Salary</span><span>£${(s.old_salary || 0).toLocaleString()}</span></div>
+        <div class="profile-field"><span>New Salary</span><span>£${s.salary.toLocaleString()} (-${s.pct}%)</span></div>
+        <div class="profile-field"><span>Reason</span><span>${escapeHtml(s.reason)}</span></div>
+      </div>
+      <p class="popup-continue">tap anywhere to continue</p>
+    `;
   },
 
   renderJobLossModal() {
@@ -230,8 +260,14 @@ const App = {
         <div class="profile-field"><span>Employer</span><span>${escapeHtml(loss.employer)}</span></div>
         <div class="profile-field"><span>Reason</span><span>${escapeHtml(loss.reason)}</span></div>
       </div>
-      <p class="popup-continue">tap anywhere to continue</p>
+      <button class="btn btn-primary" data-job-search style="width:100%;margin-top:8px">Look for a new job</button>
+      <p class="popup-continue">or tap anywhere to continue</p>
     `;
+    document.querySelector("#job-loss-body [data-job-search]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.activeTab = "career";
+      this.acknowledgeJobLoss();
+    });
   },
 
   renderJobApplyModal() {
@@ -439,7 +475,8 @@ const App = {
 
     const examActive = !!(s.exam && s.exam.current && !s.exam.finished);
     document.getElementById("btn-age-up").disabled =
-      !!s.pending_event || examActive || !!s.pending_job_offer || !!s.pending_promotion || !!s.pending_job_loss ||
+      !!s.pending_event || examActive || !!s.pending_job_offer || !!s.pending_promotion ||
+      !!s.pending_job_loss || !!s.pending_career_setback ||
       !!(s.education && (s.education.awaiting_exam || s.education.awaiting_university_choice || s.education.degree_award_pending));
 
     if (this.activeTab === "feed") {
@@ -966,6 +1003,7 @@ const MockBridge = (() => {
             pending_job_offer: null,
             pending_promotion: null,
             pending_job_loss: null,
+            pending_career_setback: null,
             job_application_error: null,
           };
           broadcast();
@@ -998,6 +1036,7 @@ const MockBridge = (() => {
         async acknowledgeJobOffer() { state.pending_job_offer = null; broadcast(); return JSON.stringify(state); },
         async acknowledgePromotion() { state.pending_promotion = null; broadcast(); return JSON.stringify(state); },
         async acknowledgeJobLoss() { state.pending_job_loss = null; broadcast(); return JSON.stringify(state); },
+        async acknowledgeCareerSetback() { state.pending_career_setback = null; broadcast(); return JSON.stringify(state); },
         async clearApplicationError() { state.job_application_error = null; broadcast(); return JSON.stringify(state); },
         async setUniversityPlan(attend, major) {
           const edu = state.education;
@@ -1109,6 +1148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("job-offer-modal").addEventListener("click", () => App.acknowledgeJobOffer());
   document.getElementById("promotion-modal").addEventListener("click", () => App.acknowledgePromotion());
   document.getElementById("job-loss-modal").addEventListener("click", () => App.acknowledgeJobLoss());
+  document.getElementById("setback-modal").addEventListener("click", () => App.acknowledgeCareerSetback());
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", () => {

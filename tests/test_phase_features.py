@@ -418,6 +418,54 @@ def test_recession_can_lay_you_off():
     assert laid_off
 
 
+def _fresh_career(state, **kw):
+    from core.state import Job
+    defaults = dict(job_id="solicitor", title="Partner", salary=80000,
+                    employer="Acme Law", career="Lawyer", level=2, performance=30)
+    defaults.update(kw)
+    state.career = Job(**defaults)
+
+
+def test_demotion_drops_a_rank_without_firing():
+    from core import economy
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=6, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    demoted = False
+    for t in range(80):
+        _fresh_career(c.state)  # reset each sample so outcomes are independent
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t + 100))
+        if outcome and outcome["type"] == "demotion":
+            demoted = True
+            assert c.state.career is not None  # still employed
+            assert c.state.career.level == 1
+            assert c.state.career.salary < 80000
+            break
+    assert demoted
+
+
+def test_recession_pay_cut_keeps_the_job():
+    from core import economy
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=9, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.world.recession = True
+    cut = False
+    for t in range(120):
+        # Healthy performance (no demotion/promotion) at entry level, level 0.
+        _fresh_career(c.state, job_id="admin", title="Admin Assistant", salary=22000,
+                      employer="Acme", career="Admin Assistant", level=0, performance=60)
+        outcome = economy.career_tick(c.state, Rng(c.state.seed).fork(t + 200))
+        if outcome and outcome["type"] == "paycut":
+            cut = True
+            assert c.state.career is not None
+            assert c.state.career.salary < 22000
+            break
+    assert cut
+
+
 def test_bespoke_ladder_titles():
     from core import economy
     spec = economy.find_job("solicitor")
