@@ -120,6 +120,7 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
         performance=50,
     )
     state.job_application_error = None
+    state.stats.happiness = min(100, state.stats.happiness + 5)
     state.pending_job_offer = {
         "title": title,
         "career": profession,
@@ -214,15 +215,13 @@ def career_tick(state: GameState, rng: Rng) -> dict | None:
     # Performance drifts down if you coast.
     job.performance = max(0, job.performance - rng.fork(1).randint(0, 4))
 
-    # Morale has authority over work: misery erodes performance, contentment
-    # protects it. This is the output side of happiness — until now it was a
-    # pure sink (debt, loneliness and joblessness fed in, nothing read it out).
-    # It closes a cross-layer loop into the promotion/demotion/layoff machinery.
-    mood = state.stats.happiness
-    if mood < 30:
-        job.performance = max(0, job.performance - rng.fork(9).randint(1, 3))
-    elif mood > 70:
-        job.performance = min(100, job.performance + 1)
+    # Morale has authority over work, as a CONTINUOUS gradient around a neutral
+    # 50 rather than a switch — so mid-range mood matters too and there are no
+    # stepwise cliffs. Kept deliberately small (~±2/yr) so happiness refines
+    # career trajectories without becoming a second master variable.
+    mood_bias = (state.stats.happiness - 50) / 25.0  # ~ -2 .. +2
+    jitter = rng.fork(9).uniform(-0.5, 0.5)
+    job.performance = max(0, min(100, job.performance + round(mood_bias + jitter)))
 
     # --- Job loss check (recession layoffs + poor performance) ---
     stability = JOB_FAMILY_STABILITY.get(job.job_id, 0.0)

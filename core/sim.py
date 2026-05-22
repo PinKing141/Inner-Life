@@ -229,19 +229,24 @@ def age_up(state: GameState) -> None:
 
     # --- Career progression (promotions, layoffs, firing) ---
     outcome = economy.career_tick(state, tick_rng.fork(8))
+    # Career outcomes feed back into happiness — the return arrow that makes the
+    # morale<->work loop symmetric (success lifts mood, failure dents it).
     if outcome is not None and outcome.get("type") == "promotion":
         state.pending_promotion = outcome
+        state.stats.happiness = min(100, state.stats.happiness + 6)
         summary_parts.append(
             f"You were promoted to {outcome['title']} (+{outcome['pct']}%)."
         )
     elif outcome is not None and outcome.get("type") == "layoff":
         state.pending_job_loss = outcome
+        state.stats.happiness = max(0, state.stats.happiness - 12)
         verb = "fired" if outcome.get("fired") else "let go"
         summary_parts.append(
             f"You were {verb} from {outcome['employer']} ({outcome['reason']})."
         )
     elif outcome is not None and outcome.get("type") in ("demotion", "paycut"):
         state.pending_career_setback = outcome
+        state.stats.happiness = max(0, state.stats.happiness - 6)
         if outcome["type"] == "demotion":
             summary_parts.append(f"You were demoted to {outcome['title']} (-{outcome['pct']}%).")
         else:

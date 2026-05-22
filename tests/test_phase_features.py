@@ -226,6 +226,18 @@ def test_low_happiness_erodes_job_performance_faster():
     assert perf_after(10) < perf_after(90)
 
 
+def test_getting_hired_lifts_happiness():
+    for seed in range(20):
+        s = _new(seed=seed)
+        s.character.age = 18
+        s.stats.happiness = 50
+        ok, _ = economy.apply_for_job(s, "retail")
+        if ok:
+            assert s.stats.happiness > 50
+            return
+    raise AssertionError("expected at least one successful hire across seeds")
+
+
 def test_university_plan_major_and_dropout_flow():
     c = GameController()
     c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")
