@@ -118,6 +118,10 @@ class WebBridge(QObject):
         return _dumps(self._controller.buy_home(listing_id))
 
     @Slot(str, result=str)
+    def buyHomeMortgage(self, listing_id: str) -> str:
+        return _dumps(self._controller.buy_home_mortgage(listing_id))
+
+    @Slot(str, result=str)
     def rentHome(self, listing_id: str) -> str:
         return _dumps(self._controller.rent_home(listing_id))
 

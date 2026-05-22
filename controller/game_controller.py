@@ -380,6 +380,14 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    def buy_home_mortgage(self, listing_id: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = housing.buy_home_mortgage(self.state, listing_id)
+        self._feed(msg, "good" if ok else "bad", "mortgage")
+        self._broadcast()
+        return self.snapshot()
+
     def rent_home(self, listing_id: str) -> dict:
         if self.state is None or self.state.character is None:
             return self.snapshot()

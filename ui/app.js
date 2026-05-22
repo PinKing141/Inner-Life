@@ -166,6 +166,11 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async buyHomeMortgage(id) {
+    const result = await this.bridge.buyHomeMortgage(id);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   async rentHome(id) {
     const result = await this.bridge.rentHome(id);
     if (typeof result === "string") this.state = JSON.parse(result);
@@ -726,7 +731,9 @@ const App = {
     if (edu.level === "University" && edu.scholarship === "full") tuition = 0;
     else if (edu.level === "University" && edu.scholarship === "partial") tuition = Math.floor(tuition / 2);
     const rent = s.rental ? (s.rental.rent || 0) : 0;
-    const expenses = tuition + rent;
+    const properties0 = s.properties || [];
+    const mortgageOut = properties0.reduce((a, p) => a + ((p.mortgage_balance > 0) ? (p.mortgage_payment || 0) : 0), 0);
+    const expenses = tuition + rent + mortgageOut;
     const money = s.money || 0;
     const netWorth = typeof s.net_worth === "number" ? s.net_worth : money;
     const properties = s.properties || [];
@@ -768,7 +775,7 @@ const App = {
         <div class="job-row">
           <div>
             <div class="job-row-title">${escapeHtml(p.name)}</div>
-            <div class="job-row-req">Owned · worth £${(p.value || 0).toLocaleString()}</div>
+            <div class="job-row-req">Worth £${(p.value || 0).toLocaleString()}${p.mortgage_balance > 0 ? ` · mortgage £${p.mortgage_balance.toLocaleString()} (£${Math.round((p.mortgage_payment || 0) / 12).toLocaleString()}/mo)` : " · owned outright"}</div>
           </div>
           <button class="profile-action" data-action="sell-home" data-prop="${escapeHtml(p.id)}">Sell</button>
         </div>`).join("")}
@@ -783,6 +790,7 @@ const App = {
           </div>
           <div class="market-actions">
             <button class="profile-action" data-action="rent-home" data-listing="${escapeHtml(m.id)}">Rent</button>
+            <button class="profile-action" data-action="mortgage-home" data-listing="${escapeHtml(m.id)}">Mortgage</button>
             <button class="profile-action" data-action="buy-home" data-listing="${escapeHtml(m.id)}">Buy</button>
           </div>
         </div>`).join("")}
@@ -857,6 +865,9 @@ const App = {
     });
     root.querySelectorAll("[data-action='buy-home']").forEach((btn) => {
       btn.addEventListener("click", () => this.buyHome(btn.dataset.listing));
+    });
+    root.querySelectorAll("[data-action='mortgage-home']").forEach((btn) => {
+      btn.addEventListener("click", () => this.buyHomeMortgage(btn.dataset.listing));
     });
     root.querySelectorAll("[data-action='rent-home']").forEach((btn) => {
       btn.addEventListener("click", () => this.rentHome(btn.dataset.listing));
@@ -1162,6 +1173,18 @@ const MockBridge = (() => {
             state.money -= m.price;
             state.properties.push({ id: m.id, name: m.name, value: m.price, purchase_price: m.price });
             state.net_worth = state.money + state.properties.reduce((a, p) => a + p.value, 0);
+          }
+          broadcast(); return JSON.stringify(state);
+        },
+        async buyHomeMortgage(id) {
+          const m = (state.housing_market || []).find(x => x.id === id);
+          if (m && !(state.properties || []).some(p => p.id === id)) {
+            const deposit = Math.round(m.price * 0.1);
+            const principal = m.price - deposit;
+            const payment = Math.round(principal * 0.07);
+            state.money -= deposit;
+            state.properties.push({ id: m.id, name: m.name, value: m.price, purchase_price: m.price, mortgage_balance: principal, mortgage_payment: payment, mortgage_rate: 0.05, mortgage_term_left: 25 });
+            state.net_worth = state.money + state.properties.reduce((a, p) => a + p.value - (p.mortgage_balance || 0), 0);
           }
           broadcast(); return JSON.stringify(state);
         },

@@ -557,6 +557,44 @@ def test_buy_rent_sell_home_and_net_worth():
     assert c.state.money > cash_before
 
 
+def test_mortgage_deposit_payments_and_payoff():
+    from core import housing
+    from core.rng import Rng
+    c = GameController()
+    c.new_game(seed=31, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 30
+    listing = housing.list_market(c.state)[2]
+    price = listing["price"]
+
+    # Can't mortgage without the deposit.
+    c.state.money = 0
+    ok, msg = housing.buy_home_mortgage(c.state, listing["id"])
+    assert ok is False and "deposit" in msg.lower()
+
+    # With the deposit, only the deposit leaves the bank now.
+    c.state.money = price  # plenty
+    c.buy_home_mortgage(listing["id"])
+    assert len(c.state.properties) == 1
+    prop = c.state.properties[0]
+    assert prop["mortgage_balance"] > 0
+    deposit = int(price * housing.MORTGAGE_DOWN_PCT)
+    assert c.state.money == price - deposit  # not the full price
+
+    # Net worth nets off the outstanding mortgage.
+    assert housing.net_worth(c.state) == c.state.money + prop["value"] - prop["mortgage_balance"]
+
+    # Paying for many years clears the balance and stops the payment.
+    start_balance = prop["mortgage_balance"]
+    for t in range(MORTGAGE_YEARS := 40):
+        housing.annual_update(c.state, Rng(c.state.seed).fork(t))
+        if c.state.properties[0]["mortgage_balance"] <= 0:
+            break
+    assert c.state.properties[0]["mortgage_balance"] == 0
+    assert c.state.properties[0]["mortgage_payment"] == 0
+    assert start_balance > 0
+
+
 def test_cannot_buy_home_as_a_child():
     from core import housing
     c = GameController()
