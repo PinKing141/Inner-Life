@@ -245,6 +245,9 @@ def age_up(state: GameState) -> None:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)
     state.stats.happiness -= tick_rng.fork(13).randint(0, 3)
     relationships.annual_drift(state)
+    lonely_note = relationships.loneliness_tick(state)
+    if lonely_note:
+        summary_parts.append(lonely_note)
     state.stats = state.stats.clamped()
 
     # --- Feed entry for the year ---

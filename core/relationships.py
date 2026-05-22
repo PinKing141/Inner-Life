@@ -48,6 +48,34 @@ def annual_drift(state: GameState) -> None:
         r.relationship = max(0, r.relationship - 1)
 
 
+# --- Isolation consequence (decay vertical slice) ---
+# Decay already nibbles relationships every year; this gives that decay teeth.
+# When the player has no remaining strong tie, isolation costs happiness — so
+# letting the social graph rot is now a real pressure, not just a number going
+# down. The narrative line is rate-limited (via tick) so it doesn't spam.
+LONELY_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
+LONELY_THRESHOLD = 25
+LONELY_PENALTY = 2
+
+
+def loneliness_tick(state: GameState) -> str | None:
+    """Apply a happiness penalty when the player is socially isolated.
+
+    Returns a feed-worthy note on the years it surfaces, else None. The
+    penalty itself applies every isolated year regardless of the note.
+    """
+    if state.character is None:
+        return None
+    close = [r for r in state.relationships if r.alive and r.kind in LONELY_KINDS]
+    support = max((r.relationship for r in close), default=0)
+    if support >= LONELY_THRESHOLD:
+        return None
+    state.stats.happiness = max(0, state.stats.happiness - LONELY_PENALTY)
+    if state.tick % 5 == 0:
+        return "You feel increasingly lonely and disconnected from those around you."
+    return None
+
+
 GIFT_COST = 50
 
 INTERACTIONS = ("talk", "compliment", "argue", "gift")

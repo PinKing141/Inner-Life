@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, economy, education, sim, social
+from core import agents, economy, education, relationships, sim, social
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -196,6 +196,22 @@ def test_bailout_respects_cooldown():
     for seed in range(20):
         assert agents.offer_financial_help(state, Rng(seed).fork(37)) is False
     assert state.money == -5000
+
+
+def test_isolation_costs_happiness():
+    state = _new(seed=1)
+    for r in state.relationships:
+        r.relationship = 0  # sever every close tie
+    before = state.stats.happiness
+    relationships.loneliness_tick(state)
+    assert state.stats.happiness < before
+
+
+def test_strong_tie_prevents_loneliness_penalty():
+    state = _new(seed=1)
+    before = state.stats.happiness  # parents start at 90, well above threshold
+    assert relationships.loneliness_tick(state) is None
+    assert state.stats.happiness == before
 
 
 def test_university_plan_major_and_dropout_flow():

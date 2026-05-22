@@ -242,6 +242,13 @@ def tick_world(state: GameState, rng: Rng) -> None:
         if agent.job_title and a_rng.fork(7).chance(0.02):
             agent.job_title = None
 
+        # Neglected elders decline faster — a weak player tie now has stakes
+        # on the NPC side too, so isolation cuts both ways.
+        if agent.age >= 70:
+            rel = _find_relationship(state, agent.npc_id)
+            if rel is not None and rel.relationship < 30:
+                agent.health -= a_rng.fork(8).randint(0, 3)
+
         # Clamp
         agent.health = max(0, min(100, agent.health))
         agent.happiness = max(0, min(100, agent.happiness))
