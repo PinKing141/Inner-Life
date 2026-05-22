@@ -214,6 +214,16 @@ def career_tick(state: GameState, rng: Rng) -> dict | None:
     # Performance drifts down if you coast.
     job.performance = max(0, job.performance - rng.fork(1).randint(0, 4))
 
+    # Morale has authority over work: misery erodes performance, contentment
+    # protects it. This is the output side of happiness — until now it was a
+    # pure sink (debt, loneliness and joblessness fed in, nothing read it out).
+    # It closes a cross-layer loop into the promotion/demotion/layoff machinery.
+    mood = state.stats.happiness
+    if mood < 30:
+        job.performance = max(0, job.performance - rng.fork(9).randint(1, 3))
+    elif mood > 70:
+        job.performance = min(100, job.performance + 1)
+
     # --- Job loss check (recession layoffs + poor performance) ---
     stability = JOB_FAMILY_STABILITY.get(job.job_id, 0.0)
     layoff_risk = 0.0

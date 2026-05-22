@@ -214,6 +214,18 @@ def test_strong_tie_prevents_loneliness_penalty():
     assert state.stats.happiness == before
 
 
+def test_low_happiness_erodes_job_performance_faster():
+    def perf_after(happiness: int) -> int:
+        s = _new(seed=5)
+        s.stats.happiness = happiness
+        s.career = Job(job_id="retail", title="Retail Assistant", salary=15_000,
+                       career="Retail", level=0, performance=60)
+        economy.career_tick(s, Rng(s.seed).fork(8))
+        return s.career.performance if s.career else 0
+
+    assert perf_after(10) < perf_after(90)
+
+
 def test_university_plan_major_and_dropout_flow():
     c = GameController()
     c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")
