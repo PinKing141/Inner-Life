@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import economy, education, housing, relationships, sim
+from core import activities, economy, education, housing, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -439,39 +439,12 @@ class GameController:
         if self.state is None or self.state.character is None:
             return self.snapshot()
         s = self.state
-        age = s.character.age
-        log: str
-        ok = True
-        if kind == "study":
-            s.stats.smarts = min(100, s.stats.smarts + 2)
-            s.stats.happiness = max(0, s.stats.happiness - 2)
-            log = "You studied hard. You feel smarter, but a bit bored."
-        elif kind == "gym":
-            if s.money < 30:
-                ok = False
-                log = "You cannot afford the gym."
-            else:
-                s.money -= 30
-                s.stats.health = min(100, s.stats.health + 3)
-                s.stats.looks = min(100, s.stats.looks + 1)
-                log = "You went to the gym. It cost £30."
-        elif kind == "doctor":
-            if s.money < 100:
-                ok = False
-                log = "You cannot afford a private doctor."
-            else:
-                s.money -= 100
-                s.stats.health = min(100, s.stats.health + 15)
-                log = "You visited a private doctor. It cost £100 but you feel much better."
-        elif kind == "spend_time":
-            relationships.spend_time_with_family(s)
-            s.stats.happiness = min(100, s.stats.happiness + 5)
-            log = "You spent quality time with your family."
-        else:
+        fn = activities.BY_KIND.get(kind)
+        if fn is None:
             return self.snapshot()
-
+        ok, log = fn(s)
         s.feed.append(FeedEntry(
-            age=age, text=log, kind="good" if ok else "bad",
+            age=s.character.age, text=log, kind="good" if ok else "bad",
             entry_id=f"feed:act:{s.tick}:{kind}",
         ))
         self._broadcast()

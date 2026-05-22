@@ -31,9 +31,9 @@ import statistics
 from dataclasses import dataclass, field
 
 from core import economy, sim
-from core.content.jobs import JOBS, education_meets
 from core.rng import Rng
 from core.state import GameState
+from scripts.autoplay import apply_self_care, best_eligible_job
 
 TALENTS = ["Academics", "Acting", "Sports"]
 COUNTRIES = ["UK", "US", "JP", "NG", "BR"]
@@ -42,63 +42,13 @@ LONELY_THRESHOLD = 25  # mirrors relationships.LONELY_THRESHOLD
 CLOSE_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
 
 
-# --------------------------------------------------------------------------
-# Auto-play policy
-# --------------------------------------------------------------------------
-
-def _best_eligible_job(state: GameState):
-    elig = []
-    for j in JOBS:
-        if j.track == "criminal":
-            continue
-        if state.character.age < j.min_age:
-            continue
-        if state.stats.smarts < j.min_smarts:
-            continue
-        if not education_meets(state.education.level, j.min_education):
-            continue
-        if j.required_field and (
-            not state.education.degree_completed
-            or state.education.degree_field != j.required_field
-        ):
-            continue
-        elig.append(j)
-    return max(elig, key=lambda j: j.salary) if elig else None
-
+# Auto-play policy (best_eligible_job, self_care) is shared with the snapshot
+# generator and consumes canonical core rules — see scripts/autoplay.py.
 
 def _support(state: GameState) -> int:
     """Strongest surviving close tie (0 if fully isolated)."""
     close = [r.relationship for r in state.relationships if r.alive and r.kind in CLOSE_KINDS]
     return max(close, default=0)
-
-
-# Self-care magnitudes MIRROR controller.GameController.activity — kept in sync
-# by hand (this is a throwaway diagnostic, not production logic). If those
-# numbers change, update here. spend_time_with_family is the real core fn.
-from core import relationships  # noqa: E402
-
-DOCTOR_COST, DOCTOR_HEALTH = 100, 15
-GYM_COST, GYM_HEALTH = 30, 3
-STUDY_SMARTS = 2
-
-
-def _self_care(state: GameState) -> None:
-    """Policy: a character actively trying to maintain themselves each year.
-
-    Healthcare is paywalled — the whole point of the mitigation-only cohort is
-    to see whether someone with no income can use it at all.
-    """
-    s = state.stats
-    if s.health < 90 and state.money >= DOCTOR_COST:
-        state.money -= DOCTOR_COST
-        s.health = min(100, s.health + DOCTOR_HEALTH)
-    elif s.health < 90 and state.money >= GYM_COST:
-        state.money -= GYM_COST
-        s.health = min(100, s.health + GYM_HEALTH)
-    if state.character.age < 25:
-        s.smarts = min(100, s.smarts + STUDY_SMARTS)
-    relationships.spend_time_with_family(state)
-    s.happiness = min(100, s.happiness + 5)
 
 
 # --------------------------------------------------------------------------
@@ -158,11 +108,11 @@ def run_life(seed: int, *, active: bool, self_care: bool = False) -> LifeRecord:
             sim.resolve_choice(state, choice_rng.randint(0, max(0, n - 1)))
             continue
         if active and state.career is None and state.character.age >= 16:
-            job = _best_eligible_job(state)
+            job = best_eligible_job(state)
             if job is not None:
                 economy.apply_for_job(state, job.job_id)
         if self_care and state.character.age >= 5:
-            _self_care(state)
+            apply_self_care(state)
 
         prev_bailouts = sum(1 for f in state.feed if f.entry_id.startswith("feed:help:"))
         sim.age_up(state)
@@ -424,7 +374,7 @@ def dump_trajectory(seed: int, active: bool) -> None:
             sim.resolve_choice(state, choice_rng.randint(0, max(0, n - 1)))
             continue
         if active and state.career is None and state.character.age >= 16:
-            job = _best_eligible_job(state)
+            job = best_eligible_job(state)
             if job is not None:
                 economy.apply_for_job(state, job.job_id)
         sim.age_up(state)

@@ -15,21 +15,8 @@ from pathlib import Path
 
 from controller.game_controller import GameController
 from core import economy, sim
-from core.content.jobs import JOBS, education_meets
 from core.rng import Rng
-
-
-def _best_job(state):
-    elig = [
-        j for j in JOBS
-        if j.track != "criminal"
-        and state.character.age >= j.min_age
-        and state.stats.smarts >= j.min_smarts
-        and education_meets(state.education.level, j.min_education)
-        and not (j.required_field and (not state.education.degree_completed
-                                       or state.education.degree_field != j.required_field))
-    ]
-    return max(elig, key=lambda j: j.salary) if elig else None
+from scripts.autoplay import best_eligible_job
 
 
 def main() -> None:
@@ -46,7 +33,7 @@ def main() -> None:
             c.choose(choice_rng.randint(0, max(0, n - 1)))
             continue
         if c.state.career is None and c.state.character.age >= 18:
-            job = _best_job(c.state)
+            job = best_eligible_job(c.state)
             if job is not None:
                 economy.apply_for_job(c.state, job.job_id)
         c.age_up()
