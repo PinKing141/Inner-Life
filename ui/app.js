@@ -161,6 +161,26 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async buyHome(id) {
+    const result = await this.bridge.buyHome(id);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async rentHome(id) {
+    const result = await this.bridge.rentHome(id);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async sellHome(id) {
+    const result = await this.bridge.sellHome(id);
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async stopRenting() {
+    const result = await this.bridge.stopRenting();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   async workHarder() {
     const result = await this.bridge.workHarder();
     if (typeof result === "string") this.state = JSON.parse(result);
@@ -697,20 +717,34 @@ const App = {
 
 
   renderAssets() {
-    const career = this.state.career;
-    const edu = this.state.education || {};
+    const s = this.state;
+    const career = s.career;
+    const edu = s.education || {};
     const income = career ? career.salary : 0;
     const TUITION = { "University": 9250, "Master's Degree": 11000, "Doctorate": 4500 };
     let tuition = (edu.in_school && TUITION[edu.level]) || 0;
     if (edu.level === "University" && edu.scholarship === "full") tuition = 0;
     else if (edu.level === "University" && edu.scholarship === "partial") tuition = Math.floor(tuition / 2);
-    const money = this.state.money || 0;
+    const rent = s.rental ? (s.rental.rent || 0) : 0;
+    const expenses = tuition + rent;
+    const money = s.money || 0;
+    const netWorth = typeof s.net_worth === "number" ? s.net_worth : money;
+    const properties = s.properties || [];
+    const market = s.housing_market || [];
+
+    const money_str = `${money < 0 ? "-" : ""}£${Math.abs(money).toLocaleString()}`;
+    const nw_str = `${netWorth < 0 ? "-" : ""}£${Math.abs(netWorth).toLocaleString()}`;
+
     return `
       <p class="panel-heading">Assets</p>
       <div class="education-card">
+        <div class="education-card-label">Net worth</div>
+        <div class="education-card-value">${nw_str}</div>
+      </div>
+      <div class="education-card">
         <div class="education-card-label">Bank balance</div>
-        <div class="education-card-value">${money < 0 ? "-" : ""}£${Math.abs(money).toLocaleString()}</div>
-        ${money < 0 ? `<div class="education-card-state">In the negatives — a job will pay this back</div>` : ""}
+        <div class="education-card-value">${money_str}</div>
+        ${money < 0 ? `<div class="education-card-state">In the negatives — income will pay this back</div>` : ""}
       </div>
       <div class="education-card">
         <div class="education-card-label">Income</div>
@@ -718,8 +752,40 @@ const App = {
       </div>
       <div class="education-card">
         <div class="education-card-label">Expenses</div>
-        <div class="education-card-value">£${tuition.toLocaleString()} / yr${tuition > 0 ? " tuition" : ""}</div>
+        <div class="education-card-value">£${expenses.toLocaleString()} / yr${rent > 0 ? " (incl. rent)" : ""}</div>
       </div>
+
+      <p class="panel-heading">Property</p>
+      ${s.rental ? `
+        <div class="job-row">
+          <div>
+            <div class="job-row-title">${escapeHtml(s.rental.name)}</div>
+            <div class="job-row-req">Renting · £${(s.rental.rent || 0).toLocaleString()}/yr</div>
+          </div>
+          <button class="profile-action" data-action="stop-rent">Move out</button>
+        </div>` : ""}
+      ${properties.map(p => `
+        <div class="job-row">
+          <div>
+            <div class="job-row-title">${escapeHtml(p.name)}</div>
+            <div class="job-row-req">Owned · worth £${(p.value || 0).toLocaleString()}</div>
+          </div>
+          <button class="profile-action" data-action="sell-home" data-prop="${escapeHtml(p.id)}">Sell</button>
+        </div>`).join("")}
+      ${!s.rental && properties.length === 0 ? `<p class="unemployed">You have no home of your own.</p>` : ""}
+
+      <p class="panel-heading">Property market</p>
+      ${market.map(m => `
+        <div class="job-row">
+          <div>
+            <div class="job-row-title">${escapeHtml(m.name)}</div>
+            <div class="job-row-req">Buy £${m.price.toLocaleString()} · Rent £${m.rent.toLocaleString()}/yr</div>
+          </div>
+          <div class="market-actions">
+            <button class="profile-action" data-action="rent-home" data-listing="${escapeHtml(m.id)}">Rent</button>
+            <button class="profile-action" data-action="buy-home" data-listing="${escapeHtml(m.id)}">Buy</button>
+          </div>
+        </div>`).join("")}
     `;
   },
 
@@ -788,6 +854,18 @@ const App = {
         this.selectedNpcId = parseInt(btn.dataset.npc, 10);
         this.render();
       });
+    });
+    root.querySelectorAll("[data-action='buy-home']").forEach((btn) => {
+      btn.addEventListener("click", () => this.buyHome(btn.dataset.listing));
+    });
+    root.querySelectorAll("[data-action='rent-home']").forEach((btn) => {
+      btn.addEventListener("click", () => this.rentHome(btn.dataset.listing));
+    });
+    root.querySelectorAll("[data-action='sell-home']").forEach((btn) => {
+      btn.addEventListener("click", () => this.sellHome(btn.dataset.prop));
+    });
+    root.querySelectorAll("[data-action='stop-rent']").forEach((btn) => {
+      btn.addEventListener("click", () => this.stopRenting());
     });
   },
 };
@@ -1023,6 +1101,14 @@ const MockBridge = (() => {
             pending_job_loss: null,
             pending_career_setback: null,
             job_application_error: null,
+            properties: [],
+            rental: null,
+            net_worth: 0,
+            housing_market: [
+              { id: "studio-1", name: "Studio Flat", price: 85000, rent: 7200 },
+              { id: "terrace-1", name: "Terraced House", price: 240000, rent: 13200 },
+              { id: "detached-1", name: "Detached House", price: 520000, rent: 22800 },
+            ],
           };
           broadcast();
           return JSON.stringify(state);
@@ -1070,6 +1156,26 @@ const MockBridge = (() => {
         async acknowledgeJobLoss() { state.pending_job_loss = null; broadcast(); return JSON.stringify(state); },
         async acknowledgeCareerSetback() { state.pending_career_setback = null; broadcast(); return JSON.stringify(state); },
         async clearApplicationError() { state.job_application_error = null; broadcast(); return JSON.stringify(state); },
+        async buyHome(id) {
+          const m = (state.housing_market || []).find(x => x.id === id);
+          if (m && !(state.properties || []).some(p => p.id === id)) {
+            state.money -= m.price;
+            state.properties.push({ id: m.id, name: m.name, value: m.price, purchase_price: m.price });
+            state.net_worth = state.money + state.properties.reduce((a, p) => a + p.value, 0);
+          }
+          broadcast(); return JSON.stringify(state);
+        },
+        async rentHome(id) {
+          const m = (state.housing_market || []).find(x => x.id === id);
+          if (m) state.rental = { id: m.id, name: m.name, rent: m.rent };
+          broadcast(); return JSON.stringify(state);
+        },
+        async sellHome(id) {
+          const p = (state.properties || []).find(x => x.id === id);
+          if (p) { state.money += p.value; state.properties = state.properties.filter(x => x.id !== id); state.net_worth = state.money + state.properties.reduce((a, q) => a + q.value, 0); }
+          broadcast(); return JSON.stringify(state);
+        },
+        async stopRenting() { state.rental = null; broadcast(); return JSON.stringify(state); },
         async setUniversityPlan(attend, major) {
           const edu = state.education;
           edu.university_intent = attend ? "attend" : "skip";

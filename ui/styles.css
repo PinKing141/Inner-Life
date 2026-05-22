@@ -859,6 +859,9 @@ select:focus, input[type="text"]:focus { border-color: var(--accent-dim); }
   color: var(--accent);
   margin-bottom: 8px;
 }
+.market-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.market-actions .profile-action,
+.job-row .profile-action { padding: 8px 12px; font-size: 13px; }
 .popup-title-bad { color: var(--bad); }
 .popup-sub { color: var(--ink-soft); margin-bottom: 18px; }
 .popup-card .profile-fields { text-align: left; }

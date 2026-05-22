@@ -113,6 +113,22 @@ class WebBridge(QObject):
     def relationshipAction(self, npc_id: int, action: str) -> str:
         return _dumps(self._controller.relationship_action(npc_id, action))
 
+    @Slot(str, result=str)
+    def buyHome(self, listing_id: str) -> str:
+        return _dumps(self._controller.buy_home(listing_id))
+
+    @Slot(str, result=str)
+    def rentHome(self, listing_id: str) -> str:
+        return _dumps(self._controller.rent_home(listing_id))
+
+    @Slot(str, result=str)
+    def sellHome(self, property_id: str) -> str:
+        return _dumps(self._controller.sell_home(property_id))
+
+    @Slot(result=str)
+    def stopRenting(self) -> str:
+        return _dumps(self._controller.stop_renting())
+
     @Slot(result=str)
     def workHarder(self) -> str:
         return _dumps(self._controller.work_harder())

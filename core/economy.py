@@ -302,6 +302,8 @@ def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
     base_living = 5_000 + rng.randint(0, 2_000)
     recession_penalty = 600 if world.recession else 0
     living_cost = int((base_living + recession_penalty) * inflation)
+    if state.rental:
+        living_cost += state.rental.get("rent", 0)
 
     if state.career:
         stability = JOB_FAMILY_STABILITY.get(state.career.job_id, 0.0)

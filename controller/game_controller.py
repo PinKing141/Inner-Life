@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import economy, education, relationships, sim
+from core import economy, education, housing, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -60,6 +60,8 @@ class GameController:
         ]
         snap["courses"] = courses_mod.list_courses_for_ui()
         snap["exam"] = self._exam_for_ui()
+        snap["housing_market"] = housing.list_market(self.state)
+        snap["net_worth"] = housing.net_worth(self.state)
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -367,6 +369,38 @@ class GameController:
             kind="bad",
             entry_id=f"feed:edu_dropout:{s.tick}",
         ))
+        self._broadcast()
+        return self.snapshot()
+
+    def buy_home(self, listing_id: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = housing.buy_home(self.state, listing_id)
+        self._feed(msg, "good" if ok else "bad", "buy_home")
+        self._broadcast()
+        return self.snapshot()
+
+    def rent_home(self, listing_id: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = housing.rent_home(self.state, listing_id)
+        self._feed(msg, "good" if ok else "bad", "rent_home")
+        self._broadcast()
+        return self.snapshot()
+
+    def sell_home(self, property_id: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = housing.sell_home(self.state, property_id)
+        self._feed(msg, "good" if ok else "bad", "sell_home")
+        self._broadcast()
+        return self.snapshot()
+
+    def stop_renting(self) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = housing.stop_renting(self.state)
+        self._feed(msg, "neutral" if ok else "bad", "stop_rent")
         self._broadcast()
         return self.snapshot()
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, economy, education, events, relationships, social, world
+from core import agents, economy, education, events, housing, relationships, social, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -212,6 +212,9 @@ def age_up(state: GameState) -> None:
             state.stats.health -= 5
         if not state.career:
             state.stats.happiness -= 5
+
+    # --- Housing (property values drift) ---
+    housing.annual_update(state, tick_rng.fork(9))
 
     # --- Career progression (promotions, layoffs, firing) ---
     outcome = economy.career_tick(state, tick_rng.fork(8))

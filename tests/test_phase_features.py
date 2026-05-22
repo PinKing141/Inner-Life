@@ -519,6 +519,57 @@ def test_request_promotion_can_succeed():
     assert promoted
 
 
+def test_buy_rent_sell_home_and_net_worth():
+    from core import housing
+    c = GameController()
+    c.new_game(seed=21, name="", gender="Female", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 30
+    c.state.money = 1_000_000
+    market = housing.list_market(c.state)
+    assert market and all("price" in m and "rent" in m for m in market)
+
+    listing = market[0]
+    before = c.state.money
+    c.buy_home(listing["id"])
+    assert len(c.state.properties) == 1
+    assert c.state.money == before - listing["price"]
+    # Property counts toward net worth even though cash dropped.
+    assert housing.net_worth(c.state) == c.state.money + c.state.properties[0]["value"]
+
+    # Renting adds a recurring expense reflected in cashflow.
+    rent_listing = market[1]
+    c.rent_home(rent_listing["id"])
+    assert c.state.rental is not None
+    from core.economy import annual_cashflow
+    from core.rng import Rng
+    _, living, _ = annual_cashflow(c.state, Rng(1).fork(1))
+    assert living >= rent_listing["rent"]
+
+    c.stop_renting()
+    assert c.state.rental is None
+
+    # Selling returns the value to the bank.
+    pid = c.state.properties[0]["id"]
+    cash_before = c.state.money
+    c.sell_home(pid)
+    assert c.state.properties == []
+    assert c.state.money > cash_before
+
+
+def test_cannot_buy_home_as_a_child():
+    from core import housing
+    c = GameController()
+    c.new_game(seed=22, name="", gender="Male", country="US", talent="")
+    assert c.state is not None
+    c.state.character.age = 8
+    c.state.money = 1_000_000
+    listing = housing.list_market(c.state)[0]
+    ok, msg = housing.buy_home(c.state, listing["id"])
+    assert ok is False
+    assert c.state.properties == []
+
+
 def test_bespoke_ladder_titles():
     from core import economy
     spec = economy.find_job("solicitor")
