@@ -139,6 +139,18 @@ const App = {
     if (typeof result === "string") this.state = JSON.parse(result);
     this.render();
   },
+  async save() {
+    if (!this.bridge.save) return;
+    const result = await this.bridge.save();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
+  async load() {
+    if (!this.bridge.load) return;
+    const result = await this.bridge.load();
+    if (typeof result === "string") this.state = JSON.parse(result);
+    this.render();
+  },
   async setUniversityPlan(attend, major) {
     const result = await this.bridge.setUniversityPlan(attend, major || "");
     if (typeof result === "string") this.state = JSON.parse(result);
@@ -1221,6 +1233,7 @@ const MockBridge = (() => {
     "buyHome", "buyHomeMortgage", "rentHome", "sellHome", "stopRenting",
     "setUniversityPlan", "acknowledgeDegree", "dropOutUniversity", "answerExam",
     "cheatExam", "relationshipAction", "applyUniversity", "enrollPostgrad",
+    "save", "load",
   ];
 
   return {
@@ -1229,6 +1242,7 @@ const MockBridge = (() => {
       pushTo = onChange;
       const api = {
         async snapshot() { return emit(); },
+        async hasSave() { return false; },
         async newGame() { return api.newGameFull(); },
         async newGameFull() {
           if (PLAYING) state = PLAYING;

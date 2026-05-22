@@ -482,14 +482,16 @@ class GameController:
     def save(self, path: Path) -> None:
         if self.state is None:
             return
-        path.write_text(json.dumps(self.snapshot(), indent=2, default=str))
+        # Persist the CANONICAL state, not snapshot() — the snapshot is
+        # UI-decorated and reshapes fields (e.g. exam is stripped to a UI view),
+        # which would corrupt round-trips. to_dict() is the serialization
+        # contract that from_dict() inverts exactly.
+        path.write_text(json.dumps(self.state.to_dict(), indent=2, default=str))
 
     def load(self, path: Path) -> dict:
-        """Phase 7 — rebuild a full GameState from a JSON snapshot on disk."""
+        """Rebuild a full GameState from a canonical state dict on disk."""
         raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
-        # Snapshots from `save()` are decorated with UI fields (jobs, pending_event,
-        # countries, …); GameState.from_dict ignores the extras.
         self.state = GameState.from_dict(data)
         self._broadcast()
         return self.snapshot()
