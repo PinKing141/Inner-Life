@@ -17,6 +17,10 @@ from core.content import names as names_mod
 from core.rng import Rng
 from core.state import Character, FeedEntry, GameState, Stats
 
+# Debt below this depth can begin to erode health (stochastically). Shallower
+# debt is stress only — see age_up's economy block.
+DEBT_HEALTH_THRESHOLD = -8_000
+
 CONCEPTION_STORIES = [
     "an unplanned pregnancy after a late-night party",
     "a honeymoon surprise",
@@ -208,8 +212,15 @@ def age_up(state: GameState) -> None:
         state.money += earnings - living_cost
         if state.money < 0:
             summary_parts.append("You are in debt.")
-            state.stats.happiness -= 10
-            state.stats.health -= 5
+            # Debt is stress first. Health only erodes under DEEP debt, and even
+            # then only stochastically with a depth-scaled chance — so poverty
+            # is an unstable, survivable state rather than a guaranteed death
+            # clock. This deliberately leaves money able to recover.
+            state.stats.happiness -= 6
+            if state.money < DEBT_HEALTH_THRESHOLD:
+                depth = min(1.0, (DEBT_HEALTH_THRESHOLD - state.money) / 40_000)
+                if tick_rng.fork(19).chance(0.15 + 0.40 * depth):
+                    state.stats.health -= tick_rng.fork(21).randint(1, 4)
         if not state.career:
             state.stats.happiness -= 5
 
