@@ -236,6 +236,10 @@ def age_up(state: GameState) -> None:
         else:
             summary_parts.append(f"Your salary was cut by {outcome['pct']}% ({outcome['reason']}).")
 
+    # --- Generosity: a close, generous NPC may bail the player out of debt ---
+    if agents.offer_financial_help(state, tick_rng.fork(37)):
+        summary_parts.append("A loved one helped you out financially.")
+
     # --- Natural drift ---
     if age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)

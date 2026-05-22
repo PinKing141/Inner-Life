@@ -125,6 +125,50 @@ def test_parent_agent_age_and_job_match_birth_record():
         assert agent.job_title == by_role[role]["job"]
 
 
+def test_generous_relative_bails_out_player_in_debt():
+    # Across a fixed seed range, a close + generous + wealthy parent should
+    # sometimes help an in-debt player. When it fires, money is conserved
+    # (the helper's funds drop by exactly what the player gained).
+    fired = 0
+    for seed in range(60):
+        state = _new(seed=seed)
+        state.money = -2000
+        mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+        mom_rel.relationship = 95
+        mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+        mom.generosity = 100
+        mom.money = 10000
+        before_player, before_mom = state.money, mom.money
+        if agents.offer_financial_help(state, Rng(seed).fork(37)):
+            fired += 1
+            delta = state.money - before_player
+            assert delta > 0
+            assert mom.money == before_mom - delta
+            assert state.money <= 0  # never overpays past the shortfall
+    assert fired > 0, "a generous, wealthy, close relative should sometimes help"
+
+
+def test_no_help_when_relatives_are_not_generous():
+    state = _new(seed=1)
+    state.money = -2000
+    for a in state.agents:
+        a.generosity = 0
+    assert agents.offer_financial_help(state, Rng(1).fork(37)) is False
+    assert state.money == -2000
+
+
+def test_no_help_when_player_is_not_in_debt():
+    state = _new(seed=1)
+    state.money = 500
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 10000
+    assert agents.offer_financial_help(state, Rng(1).fork(37)) is False
+    assert state.money == 500
+
+
 def test_university_plan_major_and_dropout_flow():
     c = GameController()
     c.new_game(seed=42, name="", gender="Female", country="US", talent="Sports")

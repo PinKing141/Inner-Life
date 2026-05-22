@@ -262,6 +262,69 @@ def tick_world(state: GameState, rng: Rng) -> None:
             continue
 
 
+# --- Generosity consequence (first vertical slice) ---
+# A close, generous relative or friend may bail the player out of debt. This is
+# the first place an Agent's `generosity` trait and `money` actually do
+# something: until now both were decorative. Connects four previously-isolated
+# things — player money, relationship strength, generosity, and agent money.
+HELP_MIN_RELATIONSHIP = 60
+HELP_MIN_GENEROSITY = 60
+HELP_ELIGIBLE_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
+
+
+def _help_chance(generosity: int, relationship: int) -> float:
+    raw = (generosity - 50) / 120 + (relationship - 50) / 200
+    return max(0.05, min(0.6, raw))
+
+
+def offer_financial_help(state: GameState, rng: Rng) -> bool:
+    """If the player is in debt, a close & generous NPC may give them money.
+
+    Picks the most generous eligible helper (deterministic tie-break by id),
+    rolls a generosity-weighted chance, then transfers up to half the helper's
+    cash to cover the shortfall. Returns True if help was actually given.
+    """
+    if state.character is None or state.money >= 0:
+        return False
+    need = -state.money
+
+    candidates: list[tuple[Relationship, Agent]] = []
+    for rel in state.relationships:
+        if rel.kind not in HELP_ELIGIBLE_KINDS or not rel.alive:
+            continue
+        if rel.relationship < HELP_MIN_RELATIONSHIP:
+            continue
+        agent = _find_agent(state, rel.npc_id)
+        if agent is None or not agent.alive:
+            continue
+        if agent.generosity < HELP_MIN_GENEROSITY or agent.money <= 0:
+            continue
+        candidates.append((rel, agent))
+    if not candidates:
+        return False
+    candidates.sort(key=lambda ra: (-ra[1].generosity, ra[0].npc_id))
+    rel, agent = candidates[0]
+
+    if not rng.fork(rel.npc_id).chance(_help_chance(agent.generosity, rel.relationship)):
+        return False
+
+    gift = min(need, agent.money // 2)
+    if gift <= 0:
+        return False
+
+    state.money += gift
+    agent.money -= gift
+    rel.relationship = min(100, rel.relationship + 5)
+    state.stats.happiness = min(100, state.stats.happiness + 5)
+    state.feed.append(FeedEntry(
+        age=state.character.age,
+        text=f"{agent.name} ({agent.role}) saw you were struggling and gave you £{gift:,}.",
+        kind="good",
+        entry_id=f"feed:help:{state.tick}:{agent.npc_id}",
+    ))
+    return True
+
+
 def add_friend(state: GameState, rng: Rng, role: str = "Friend") -> Agent:
     """Mint a new friend agent the player just made and wire up the relationship."""
     if state.character is None:
