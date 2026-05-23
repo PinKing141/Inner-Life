@@ -764,7 +764,7 @@ const App = {
   },
 
   renderRelationships() {
-    const rels = this.state.relationships || [];
+    const rels = (this.state.relationships || []).slice().sort(relSort);
     return `
       <p class="panel-heading">Relations</p>
       ${rels.length === 0 ? `<p class="unemployed">No-one of note.</p>` : ""}
@@ -1156,6 +1156,21 @@ const FEED_TAG = {
 };
 function feedTag(kind) {
   return FEED_TAG[kind] || FEED_TAG.neutral;
+}
+
+// Relationship sort order: surface the highest-value ties first so the player
+// sees Partner / parents at a glance. Living comes before deceased within each
+// tier; weak ties (friends/coworkers) trail; ties at equal priority sort by
+// id so the order is stable across renders.
+const REL_PRIORITY = {
+  Partner: 0, Mother: 1, Father: 1, Sibling: 2, Friend: 3, Coworker: 4,
+};
+function relSort(a, b) {
+  if (a.alive !== b.alive) return a.alive ? -1 : 1;
+  const pa = REL_PRIORITY[a.kind] ?? 9;
+  const pb = REL_PRIORITY[b.kind] ?? 9;
+  if (pa !== pb) return pa - pb;
+  return (a.npc_id || 0) - (b.npc_id || 0);
 }
 
 // Initials + a deterministic colour for relationship avatars.
