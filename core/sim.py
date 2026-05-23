@@ -11,15 +11,11 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, economy, education, events, housing, relationships, world
+from core import agents, balance, economy, education, events, housing, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
 from core.state import Character, FeedEntry, GameState, Stats
-
-# Debt below this depth can begin to erode health (stochastically). Shallower
-# debt is stress only — see age_up's economy block.
-DEBT_HEALTH_THRESHOLD = -8_000
 
 CONCEPTION_STORIES = [
     "an unplanned pregnancy after a late-night party",
@@ -215,13 +211,13 @@ def age_up(state: GameState) -> None:
             # then only stochastically with a depth-scaled chance — so poverty
             # is an unstable, survivable state rather than a guaranteed death
             # clock. This deliberately leaves money able to recover.
-            state.stats.happiness -= 6
-            if state.money < DEBT_HEALTH_THRESHOLD:
-                depth = min(1.0, (DEBT_HEALTH_THRESHOLD - state.money) / 40_000)
-                if tick_rng.fork(19).chance(0.15 + 0.40 * depth):
+            state.stats.happiness += balance.HAPPY_DEBT_DELTA
+            if state.money < balance.DEBT_HEALTH_THRESHOLD:
+                depth = min(1.0, (balance.DEBT_HEALTH_THRESHOLD - state.money) / balance.DEBT_HEALTH_DEPTH_DIVISOR)
+                if tick_rng.fork(19).chance(balance.DEBT_HEALTH_BASE_CHANCE + balance.DEBT_HEALTH_DEPTH_BONUS * depth):
                     state.stats.health -= tick_rng.fork(21).randint(1, 4)
         if not state.career:
-            state.stats.happiness -= 5
+            state.stats.happiness += balance.HAPPY_NO_JOB_DELTA
 
     # --- Housing (property values drift) ---
     housing.annual_update(state, tick_rng.fork(9))
@@ -232,20 +228,20 @@ def age_up(state: GameState) -> None:
     # morale<->work loop symmetric (success lifts mood, failure dents it).
     if outcome is not None and outcome.get("type") == "promotion":
         state.pending_promotion = outcome
-        state.stats.happiness = min(100, state.stats.happiness + 6)
+        state.stats.happiness = min(100, state.stats.happiness + balance.HAPPY_PROMOTION_DELTA)
         summary_parts.append(
             f"You were promoted to {outcome['title']} (+{outcome['pct']}%)."
         )
     elif outcome is not None and outcome.get("type") == "layoff":
         state.pending_job_loss = outcome
-        state.stats.happiness = max(0, state.stats.happiness - 12)
+        state.stats.happiness = max(0, state.stats.happiness + balance.HAPPY_LAYOFF_DELTA)
         verb = "fired" if outcome.get("fired") else "let go"
         summary_parts.append(
             f"You were {verb} from {outcome['employer']} ({outcome['reason']})."
         )
     elif outcome is not None and outcome.get("type") in ("demotion", "paycut"):
         state.pending_career_setback = outcome
-        state.stats.happiness = max(0, state.stats.happiness - 6)
+        state.stats.happiness = max(0, state.stats.happiness + balance.HAPPY_SETBACK_DELTA)
         if outcome["type"] == "demotion":
             summary_parts.append(f"You were demoted to {outcome['title']} (-{outcome['pct']}%).")
         else:
@@ -268,7 +264,7 @@ def age_up(state: GameState) -> None:
     # --- Natural drift ---
     if age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)
-    state.stats.happiness -= tick_rng.fork(13).randint(0, 3)
+    state.stats.happiness -= tick_rng.fork(13).randint(0, balance.HAPPY_ANNUAL_DRIFT_MAX)
     relationships.annual_drift(state)
     lonely_note = relationships.loneliness_tick(state)
     if lonely_note:

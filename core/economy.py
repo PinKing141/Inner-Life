@@ -6,13 +6,10 @@ looks like.
 """
 from __future__ import annotations
 
+from core import balance
 from core.content.jobs import JOBS, JobSpec, education_meets
 from core.rng import Rng
 from core.state import GameState, Job
-
-# Fraction of disposable income consumed by lifestyle as you earn more — the
-# friction that stops wealth being a one-direction accumulation funnel.
-LIFESTYLE_CREEP = 0.80
 
 JOB_FAMILY_STABILITY: dict[str, float] = {
     "doctor": 0.35,
@@ -124,7 +121,7 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
         performance=50,
     )
     state.job_application_error = None
-    state.stats.happiness = min(100, state.stats.happiness + 5)
+    state.stats.happiness = min(100, state.stats.happiness + balance.HAPPY_HIRE_DELTA)
     state.pending_job_offer = {
         "title": title,
         "career": profession,
@@ -335,7 +332,7 @@ def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
         # band, and high earners who are far less infinitely-cushioned. It does
         # NOT equalise: the rich still save more in absolute terms.
         disposable = max(0, earnings - subsistence)
-        living_cost = subsistence + int(LIFESTYLE_CREEP * disposable)
+        living_cost = subsistence + int(balance.LIFESTYLE_CREEP * disposable)
         note = f"You earned £{earnings:,} from your job in a {'recession' if world.recession else 'volatile'} economy."
     else:
         pressure = int(400 * inflation) + (500 if world.recession else 0)
