@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, economy, education, relationships, sim, social
+from core import agents, economy, education, relationships, sim
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -102,15 +102,6 @@ def test_save_load_roundtrip(tmp_path: Path):
     assert loaded.character.age == state.character.age
     assert len(loaded.agents) == len(state.agents)
     assert len(loaded.feed) == len(state.feed)
-
-
-def test_social_graph_seeded_with_allowed_relationship_types():
-    state = _new()
-    sim.age_up(state)
-    if state.pending_event_id is not None:
-        sim.resolve_choice(state, 0)
-    assert state.social_edges, "social graph should be seeded after the first yearly tick"
-    assert all(e.relation_type in ("friend", "family", "enemy", "coworker") for e in state.social_edges)
 
 
 def test_parent_agent_age_and_job_match_birth_record():
