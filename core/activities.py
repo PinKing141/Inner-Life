@@ -13,6 +13,14 @@ from core.state import GameState
 GYM_COST = 30
 DOCTOR_COST = 100
 
+# Per-activity unlock ages — exposed via the snapshot so the UI can show
+# locked rows with an "Age N" badge instead of letting players tap into a
+# silent rejection. Single source of truth.
+STUDY_MIN_AGE = 5
+GYM_MIN_AGE = 12
+DOCTOR_MIN_AGE = 0
+FAMILY_TIME_MIN_AGE = 0
+
 
 def study(state: GameState) -> tuple[bool, str]:
     state.stats.smarts = min(100, state.stats.smarts + 2)
@@ -45,3 +53,25 @@ def family_time(state: GameState) -> tuple[bool, str]:
 
 # Verb name (as the UI/bridge uses) -> effect function.
 BY_KIND = {"study": study, "gym": gym, "doctor": doctor, "spend_time": family_time}
+
+
+# UI descriptors — read by the controller into the snapshot so the front-end
+# can render the Activities screen without inventing its own copy of the data.
+DESCRIPTORS = [
+    {"id": "doctor", "title": "Visit the Doctor",
+     "subtitle": f"A check-up — costs £{DOCTOR_COST}.",
+     "unlock": DOCTOR_MIN_AGE, "icon": "doctor", "accent": "health"},
+    {"id": "study", "title": "Study Hard",
+     "subtitle": "Boost your smarts; a little bored.",
+     "unlock": STUDY_MIN_AGE, "icon": "book", "accent": "smarts"},
+    {"id": "gym", "title": "Go to the Gym",
+     "subtitle": f"Train for health and looks — £{GYM_COST}.",
+     "unlock": GYM_MIN_AGE, "icon": "dumbbell", "accent": "health"},
+    {"id": "spend_time", "title": "Spend Time with Family",
+     "subtitle": "Strengthen bonds with relatives.",
+     "unlock": FAMILY_TIME_MIN_AGE, "icon": "heart", "accent": "happy"},
+]
+
+
+def list_descriptors() -> list[dict]:
+    return [dict(d) for d in DESCRIPTORS]

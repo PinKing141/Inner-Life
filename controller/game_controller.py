@@ -60,6 +60,7 @@ class GameController:
             for j in economy.list_jobs()
         ]
         snap["courses"] = courses_mod.list_courses_for_ui()
+        snap["activities"] = activities.list_descriptors()
         snap["exam"] = self._exam_for_ui()
         snap["housing_market"] = housing.list_market(self.state)
         snap["net_worth"] = housing.net_worth(self.state)
