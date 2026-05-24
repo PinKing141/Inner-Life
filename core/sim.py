@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, economy, education, events, housing, relationships, social, world
+from core import agents, balance, economy, education, events, housing, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -173,6 +173,76 @@ def new_game(
     return state
 
 
+def _tick_economy(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
+    """Annual cashflow and the debt -> stress / deep-debt -> health erosion."""
+    if state.character.age < 18:
+        return
+    earnings, living_cost, note = economy.annual_cashflow(state, tick_rng.fork(7))
+    if note:
+        summary.append(note)
+    state.money += earnings - living_cost
+    if state.money < 0:
+        summary.append("You are in debt.")
+        # Debt is stress first; health only erodes under DEEP debt, and only
+        # stochastically with a depth-scaled chance — poverty is unstable but
+        # survivable rather than a guaranteed death clock.
+        state.stats.happiness += balance.HAPPY_DEBT_DELTA
+        if state.money < balance.DEBT_HEALTH_THRESHOLD:
+            depth = min(1.0, (balance.DEBT_HEALTH_THRESHOLD - state.money) / balance.DEBT_HEALTH_DEPTH_DIVISOR)
+            if tick_rng.fork(19).chance(balance.DEBT_HEALTH_BASE_CHANCE + balance.DEBT_HEALTH_DEPTH_BONUS * depth):
+                state.stats.health -= tick_rng.fork(21).randint(1, 4)
+    if not state.career:
+        state.stats.happiness += balance.HAPPY_NO_JOB_DELTA
+
+
+def _tick_career(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
+    """Promotions, layoffs, demotions; closes the happiness <-> work loop."""
+    outcome = economy.career_tick(state, tick_rng.fork(8))
+    if outcome is None:
+        return
+    kind = outcome.get("type")
+    if kind == "promotion":
+        state.pending_promotion = outcome
+        state.stats.happiness = min(100, state.stats.happiness + balance.HAPPY_PROMOTION_DELTA)
+        summary.append(f"You were promoted to {outcome['title']} (+{outcome['pct']}%).")
+    elif kind == "layoff":
+        state.pending_job_loss = outcome
+        state.stats.happiness = max(0, state.stats.happiness + balance.HAPPY_LAYOFF_DELTA)
+        verb = "fired" if outcome.get("fired") else "let go"
+        summary.append(f"You were {verb} from {outcome['employer']} ({outcome['reason']}).")
+    elif kind in ("demotion", "paycut"):
+        state.pending_career_setback = outcome
+        state.stats.happiness = max(0, state.stats.happiness + balance.HAPPY_SETBACK_DELTA)
+        if kind == "demotion":
+            summary.append(f"You were demoted to {outcome['title']} (-{outcome['pct']}%).")
+        else:
+            summary.append(f"Your salary was cut by {outcome['pct']}% ({outcome['reason']}).")
+
+
+def _tick_social(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
+    """Generosity bailout + weak-tie formation + partner formation/breakup."""
+    if agents.offer_financial_help(state, tick_rng.fork(37)):
+        summary.append("A loved one helped you out financially.")
+    tie_note = agents.form_incidental_ties(state, tick_rng.fork(39))
+    if tie_note:
+        summary.append(tie_note)
+    partner_note = agents.tick_partner(state, tick_rng.fork(41))
+    if partner_note:
+        summary.append(partner_note)
+
+
+def _tick_drift(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
+    """Natural stat decay, relationship erosion and the loneliness consequence."""
+    if state.character.age > 50:
+        state.stats.health -= tick_rng.fork(11).randint(0, 5)
+    state.stats.happiness -= tick_rng.fork(13).randint(0, balance.HAPPY_ANNUAL_DRIFT_MAX)
+    relationships.annual_drift(state)
+    lonely_note = relationships.loneliness_tick(state)
+    if lonely_note:
+        summary.append(lonely_note)
+    state.stats = state.stats.clamped()
+
+
 def age_up(state: GameState) -> None:
     """Advance one year. Mutates state in place."""
     if state.mode != "PLAYING" or state.character is None:
@@ -186,62 +256,18 @@ def age_up(state: GameState) -> None:
     age = state.character.age
     tick_rng = Rng(state.seed).fork(state.tick)
 
-    # --- Macro world tick (Phase 4A) ---
     world.tick_world(state, tick_rng.fork(29))
-
-    # --- NPC world tick (Phase 1 — parents and friends age too) ---
     agents.tick_world(state, tick_rng.fork(31))
-    social.tick_social(state, tick_rng.fork(33))
 
     summary_parts: list[str] = [f"You are now {age} years old."]
-
-    # --- Education lifecycle ---
     edu_msg = education.tick(state)
     if edu_msg:
         summary_parts.append(edu_msg)
-
-    # --- Economy ---
-    if age >= 18:
-        earnings, living_cost, note = economy.annual_cashflow(state, tick_rng.fork(7))
-        if note:
-            summary_parts.append(note)
-        state.money += earnings - living_cost
-        if state.money < 0:
-            summary_parts.append("You are in debt.")
-            state.stats.happiness -= 10
-            state.stats.health -= 5
-        if not state.career:
-            state.stats.happiness -= 5
-
-    # --- Housing (property values drift) ---
+    _tick_economy(state, tick_rng, summary_parts)
     housing.annual_update(state, tick_rng.fork(9))
-
-    # --- Career progression (promotions, layoffs, firing) ---
-    outcome = economy.career_tick(state, tick_rng.fork(8))
-    if outcome is not None and outcome.get("type") == "promotion":
-        state.pending_promotion = outcome
-        summary_parts.append(
-            f"You were promoted to {outcome['title']} (+{outcome['pct']}%)."
-        )
-    elif outcome is not None and outcome.get("type") == "layoff":
-        state.pending_job_loss = outcome
-        verb = "fired" if outcome.get("fired") else "let go"
-        summary_parts.append(
-            f"You were {verb} from {outcome['employer']} ({outcome['reason']})."
-        )
-    elif outcome is not None and outcome.get("type") in ("demotion", "paycut"):
-        state.pending_career_setback = outcome
-        if outcome["type"] == "demotion":
-            summary_parts.append(f"You were demoted to {outcome['title']} (-{outcome['pct']}%).")
-        else:
-            summary_parts.append(f"Your salary was cut by {outcome['pct']}% ({outcome['reason']}).")
-
-    # --- Natural drift ---
-    if age > 50:
-        state.stats.health -= tick_rng.fork(11).randint(0, 5)
-    state.stats.happiness -= tick_rng.fork(13).randint(0, 3)
-    relationships.annual_drift(state)
-    state.stats = state.stats.clamped()
+    _tick_career(state, tick_rng, summary_parts)
+    _tick_social(state, tick_rng, summary_parts)
+    _tick_drift(state, tick_rng, summary_parts)
 
     # --- Feed entry for the year ---
     state.feed.append(FeedEntry(

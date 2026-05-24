@@ -13,7 +13,6 @@ from typing import Literal
 
 from core.world import World
 
-Stage = Literal["Baby", "Child", "Teenager", "Adult", "Elder"]
 GameMode = Literal["CREATION", "PLAYING", "DEATH"]
 
 
@@ -140,8 +139,6 @@ class GameState:
     money: int = 0
     relationships: list[Relationship] = field(default_factory=list)
     agents: list = field(default_factory=list)  # list[Agent]; typed via core.agents
-    social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
-    rumours: list = field(default_factory=list)  # list[Rumour]; typed via core.social
     career: Job | None = None
     education: Education = field(default_factory=Education)
     feed: list[FeedEntry] = field(default_factory=list)
@@ -150,6 +147,7 @@ class GameState:
     causal_chain: list[dict] = field(default_factory=list)
     world: World = field(default_factory=World)
     tick: int = 0  # how many times age_up has been called
+    last_help_tick: int = -100  # tick of the last NPC financial bailout (cooldown)
     exam: dict | None = None  # active/finished final school exam (interactive)
     pending_job_offer: dict | None = None  # "you got the job" popup
     pending_promotion: dict | None = None  # "you got promoted" popup
@@ -198,8 +196,6 @@ class GameState:
                 for r in self.relationships
             ],
             "agents": [a.to_dict() for a in self.agents],
-            "social_edges": [e.to_dict() for e in self.social_edges],
-            "rumours": [r.to_dict() for r in self.rumours],
             "causal_chain": list(self.causal_chain),
             "world": self.world.to_dict(),
             "career": (
@@ -251,6 +247,7 @@ class GameState:
             "pending_event_id": self.pending_event_id,
             "fired_events": list(self.fired_events),
             "tick": self.tick,
+            "last_help_tick": self.last_help_tick,
             "exam": self.exam,
             "pending_job_offer": self.pending_job_offer,
             "pending_promotion": self.pending_promotion,
@@ -266,7 +263,6 @@ class GameState:
     def from_dict(cls, data: dict) -> "GameState":
         """Inverse of to_dict. Tolerant to missing fields from older snapshots."""
         from core.agents import Agent  # local import to avoid cycle at module-load
-        from core.social import Rumour, SocialEdge
 
         char_d = data.get("character")
         character: Character | None = None
@@ -315,8 +311,6 @@ class GameState:
         ]
 
         agents = [Agent.from_dict(a) for a in data.get("agents", [])]
-        social_edges = [SocialEdge.from_dict(e) for e in data.get("social_edges", [])]
-        rumours = [Rumour.from_dict(r) for r in data.get("rumours", [])]
 
         career_d = data.get("career")
         career = (
@@ -379,13 +373,12 @@ class GameState:
             money=data.get("money", 0),
             relationships=relationships,
             agents=agents,
-            social_edges=social_edges,
-            rumours=rumours,
             career=career,
             education=education,
             feed=feed,
             pending_event_id=data.get("pending_event_id"),
             fired_events=list(data.get("fired_events", [])),
+            last_help_tick=data.get("last_help_tick", -100),
             causal_chain=list(data.get("causal_chain", [])),
             world=world,
             tick=data.get("tick", 0),
@@ -398,15 +391,3 @@ class GameState:
             properties=list(data.get("properties", [])),
             rental=data.get("rental"),
         )
-
-
-def stage_for_age(age: int) -> Stage:
-    if age < 5:
-        return "Baby"
-    if age < 13:
-        return "Child"
-    if age < 18:
-        return "Teenager"
-    if age < 65:
-        return "Adult"
-    return "Elder"

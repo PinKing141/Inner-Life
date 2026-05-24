@@ -40,12 +40,54 @@ def spend_time_with_family(state: GameState) -> None:
             r.relationship = min(100, r.relationship + 5)
 
 
+WEAK_TIE_KINDS = ("Friend", "Coworker")
+
+
 def annual_drift(state: GameState) -> None:
-    """Relationships decay slightly if not actively maintained."""
+    """Relationships decay slightly if not maintained.
+
+    Weak ties (friends, coworkers) that decay all the way to zero drift out of
+    the player's life entirely — pruned from the list — so the graph has a way
+    to lose members short of death, which the renewal mechanic then refills.
+    Family and partners never drift out this way (only death removes them).
+    """
+    survivors = []
     for r in state.relationships:
-        if not r.alive:
-            continue
-        r.relationship = max(0, r.relationship - 1)
+        if r.alive:
+            if r.kind != "Partner":  # partnerships persist; they don't passively erode
+                r.relationship = max(0, r.relationship - 1)
+            if r.relationship <= 0 and r.kind in WEAK_TIE_KINDS:
+                continue  # drifted apart
+        survivors.append(r)
+    state.relationships = survivors
+
+
+# --- Isolation consequence (decay vertical slice) ---
+# Decay already nibbles relationships every year; this gives that decay teeth.
+# When the player has no remaining strong tie, isolation costs happiness — so
+# letting the social graph rot is now a real pressure, not just a number going
+# down. The narrative line is rate-limited (via tick) so it doesn't spam.
+LONELY_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
+LONELY_THRESHOLD = 25
+LONELY_PENALTY = 2
+
+
+def loneliness_tick(state: GameState) -> str | None:
+    """Apply a happiness penalty when the player is socially isolated.
+
+    Returns a feed-worthy note on the years it surfaces, else None. The
+    penalty itself applies every isolated year regardless of the note.
+    """
+    if state.character is None:
+        return None
+    close = [r for r in state.relationships if r.alive and r.kind in LONELY_KINDS]
+    support = max((r.relationship for r in close), default=0)
+    if support >= LONELY_THRESHOLD:
+        return None
+    state.stats.happiness = max(0, state.stats.happiness - LONELY_PENALTY)
+    if state.tick % 5 == 0:
+        return "You feel increasingly lonely and disconnected from those around you."
+    return None
 
 
 GIFT_COST = 50

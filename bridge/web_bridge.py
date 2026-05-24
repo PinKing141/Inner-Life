@@ -13,10 +13,13 @@ from __future__ import annotations
 import dataclasses
 import json
 from enum import Enum
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 from controller import GameController
+
+SAVE_PATH = Path.home() / ".inner-life-save.json"
 
 
 def _json_default(obj):
@@ -200,5 +203,22 @@ class WebBridge(QObject):
     @Slot(str, result=str)
     def activity(self, kind: str) -> str:
         return _dumps(self._controller.activity(kind))
+
+    # ---- Persistence ----
+
+    @Slot(result=bool)
+    def hasSave(self) -> bool:
+        return SAVE_PATH.exists()
+
+    @Slot(result=str)
+    def save(self) -> str:
+        self._controller.save(SAVE_PATH)
+        return _dumps(self._controller.snapshot())
+
+    @Slot(result=str)
+    def load(self) -> str:
+        if SAVE_PATH.exists():
+            return _dumps(self._controller.load(SAVE_PATH))
+        return _dumps(self._controller.snapshot())
 
 

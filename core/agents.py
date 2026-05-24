@@ -111,6 +111,10 @@ def seed_world(state: GameState, rng: Rng) -> None:
     surname = state.character.last_name
     country = state.character.country
     city = state.character.city
+    # parent_details (set in sim.new_game) is the single source of truth for a
+    # parent's age and job — the birth-story feed reads the same record, so the
+    # agent panel must not roll its own conflicting numbers.
+    parent_by_role = {d.get("role"): d for d in (state.character.parent_details or [])}
 
     for rel in state.relationships:
         existing = _find_agent(state, rel.npc_id)
@@ -122,6 +126,12 @@ def seed_world(state: GameState, rng: Rng) -> None:
             agent = _new_npc(rel.npc_id, "Male", "Father", surname, country, city, rng.fork(rel.npc_id + 1), parent_age=True)
         else:
             agent = _new_npc(rel.npc_id, "NonBinary", rel.kind, surname, country, city, rng.fork(rel.npc_id + 2))
+        # A parent's age/job come from the birth record, not a fresh roll.
+        detail = parent_by_role.get(rel.kind)
+        if detail is not None:
+            agent.age = detail.get("age_at_birth", agent.age)
+            if detail.get("job"):
+                agent.job_title = detail["job"]
         # Honour any pre-existing display name on the relationship.
         if rel.name and rel.name not in (agent.first_name, agent.name):
             # Treat the relationship name as the agent's full display name.
@@ -232,6 +242,13 @@ def tick_world(state: GameState, rng: Rng) -> None:
         if agent.job_title and a_rng.fork(7).chance(0.02):
             agent.job_title = None
 
+        # Neglected elders decline faster — a weak player tie now has stakes
+        # on the NPC side too, so isolation cuts both ways.
+        if agent.age >= 70:
+            rel = _find_relationship(state, agent.npc_id)
+            if rel is not None and rel.relationship < 30:
+                agent.health -= a_rng.fork(8).randint(0, 3)
+
         # Clamp
         agent.health = max(0, min(100, agent.health))
         agent.happiness = max(0, min(100, agent.happiness))
@@ -250,6 +267,186 @@ def tick_world(state: GameState, rng: Rng) -> None:
                 entry_id=f"feed:agent_death:{state.tick}:{agent.npc_id}",
             ))
             continue
+
+
+# --- Generosity consequence (first vertical slice) ---
+# A close, generous relative or friend may bail the player out of debt. This is
+# the first place an Agent's `generosity` trait and `money` actually do
+# something: until now both were decorative. Connects four previously-isolated
+# things — player money, relationship strength, generosity, and agent money.
+HELP_MIN_RELATIONSHIP = 60
+HELP_MIN_GENEROSITY = 60
+HELP_ELIGIBLE_KINDS = ("Mother", "Father", "Sibling", "Partner", "Friend")
+# Only steps in for genuine trouble, and not every year — otherwise a single
+# rich relative would erase financial failure and hollow out the economy.
+HELP_HARDSHIP_BALANCE = -1000  # must be deeper in debt than this
+HELP_COOLDOWN_YEARS = 5
+
+
+def _help_chance(generosity: int, relationship: int) -> float:
+    raw = (generosity - 50) / 120 + (relationship - 50) / 200
+    return max(0.05, min(0.6, raw))
+
+
+def offer_financial_help(state: GameState, rng: Rng) -> bool:
+    """If the player is in severe debt, a close & generous NPC may give money.
+
+    Gated by a hardship threshold and a cooldown so it can't dominate the
+    economy. Picks the most generous eligible helper (deterministic tie-break
+    by id), rolls a generosity-weighted chance, then transfers up to half the
+    helper's cash to cover the shortfall. Returns True if help was given.
+    """
+    if state.character is None or state.money >= HELP_HARDSHIP_BALANCE:
+        return False
+    if state.tick - state.last_help_tick < HELP_COOLDOWN_YEARS:
+        return False
+    need = -state.money
+
+    candidates: list[tuple[Relationship, Agent]] = []
+    for rel in state.relationships:
+        if rel.kind not in HELP_ELIGIBLE_KINDS or not rel.alive:
+            continue
+        if rel.relationship < HELP_MIN_RELATIONSHIP:
+            continue
+        agent = _find_agent(state, rel.npc_id)
+        if agent is None or not agent.alive:
+            continue
+        if agent.generosity < HELP_MIN_GENEROSITY or agent.money <= 0:
+            continue
+        candidates.append((rel, agent))
+    if not candidates:
+        return False
+    candidates.sort(key=lambda ra: (-ra[1].generosity, ra[0].npc_id))
+    rel, agent = candidates[0]
+
+    if not rng.fork(rel.npc_id).chance(_help_chance(agent.generosity, rel.relationship)):
+        return False
+
+    gift = min(need, agent.money // 2)
+    if gift <= 0:
+        return False
+
+    state.money += gift
+    agent.money -= gift
+    state.last_help_tick = state.tick
+    rel.relationship = min(100, rel.relationship + 5)
+    state.stats.happiness = min(100, state.stats.happiness + 5)
+    state.feed.append(FeedEntry(
+        age=state.character.age,
+        text=f"{agent.name} ({agent.role}) saw you were struggling and gave you £{gift:,}.",
+        kind="good",
+        entry_id=f"feed:help:{state.tick}:{agent.npc_id}",
+    ))
+    return True
+
+
+# --- Social renewal (counters graph entropy) ---
+# Decay + death only ever shrink the social graph; without formation it trends
+# mathematically toward zero. This is the missing counterforce: small, passive,
+# context-based weak-tie formation. Deliberately NOT dating/compatibility/AI —
+# just enough replenishment to keep the network from self-deleting.
+TIE_CAP = 8  # max living weak ties before formation pauses
+WEAK_TIE_STRENGTH = (28, 42)  # acquaintances, not close friends
+
+
+def form_incidental_ties(state: GameState, rng: Rng) -> str | None:
+    """Maybe form one weak tie this year, biased by current life context."""
+    if state.character is None:
+        return None
+    age = state.character.age
+    if age < 6:
+        return None
+    living_weak = [
+        r for r in state.relationships if r.alive and r.kind in ("Friend", "Coworker")
+    ]
+    if len(living_weak) >= TIE_CAP:
+        return None
+
+    if state.career is not None:
+        p, role, descr = 0.18, "Coworker", "a coworker"
+    elif state.education.in_school:
+        p, role, descr = 0.15, "Friend", "a classmate"
+    elif age < 18:
+        p, role, descr = 0.12, "Friend", "a friend"
+    else:
+        p, role, descr = 0.06, "Friend", "someone new"
+    # Looks act as social magnetism — a new, money-independent axis. A bounded
+    # multiplier (x0.5 .. x1.5), never a gate: everyone can still make ties, the
+    # attractive just do so more readily, producing socially-central vs sparse
+    # life types orthogonal to wealth.
+    p *= 0.5 + state.stats.looks / 100.0
+    if not rng.fork(1).chance(p):
+        return None
+
+    npc_id = max((a.npc_id for a in state.agents), default=0) + 1
+    gender = rng.fork(2).choice(["Male", "Female", "NonBinary"])
+    surname = names_mod.random_surname(state.character.country, rng.fork(3))
+    agent = _new_npc(npc_id, gender, role, surname, state.character.country, state.character.city, rng.fork(4))
+    # Classmates/young friends skew to the player's own age.
+    if role == "Friend" and age < 25:
+        agent.age = max(5, age + rng.fork(6).randint(-2, 2))
+    state.agents.append(agent)
+    state.relationships.append(Relationship(
+        npc_id=npc_id, name=agent.name, kind=role,
+        relationship=rng.fork(5).randint(*WEAK_TIE_STRENGTH), alive=True,
+    ))
+    return f"You became friendly with {agent.name}, {descr}."
+
+
+# --- Partner formation (producer for an already-consumed edge type) ---
+# `Partner` is consumed by support (CLOSE_KINDS) and generosity
+# (HELP_ELIGIBLE_KINDS) but nothing ever produced one. This closes that loop.
+# Partnerships are produced by deepening an existing strong tie — so socially
+# active / attractive people pair up and the isolated rarely do — and they
+# PERSIST (exempt from decay in relationships.annual_drift), ending only via a
+# small annual breakup chance or the partner's death.
+PARTNER_MIN_AGE = 18
+PARTNER_TIE_THRESHOLD = 40
+PARTNER_FORM_STRENGTH = (70, 85)
+PARTNER_BREAKUP_CHANCE = 0.04
+
+
+def tick_partner(state: GameState, rng: Rng) -> str | None:
+    if state.character is None or state.character.age < PARTNER_MIN_AGE:
+        return None
+    partner = next((r for r in state.relationships if r.kind == "Partner" and r.alive), None)
+    if partner is not None:
+        if rng.fork(1).chance(PARTNER_BREAKUP_CHANCE):
+            state.relationships = [r for r in state.relationships if r is not partner]
+            return f"You and {partner.name} broke up."
+        return None
+
+    looks_factor = 0.5 + state.stats.looks / 100.0
+    strong_ties = [
+        r for r in state.relationships
+        if r.alive and r.kind in ("Friend", "Coworker") and r.relationship >= PARTNER_TIE_THRESHOLD
+    ]
+    if strong_ties:
+        strong_ties.sort(key=lambda r: (-r.relationship, r.npc_id))
+        if rng.fork(2).chance(0.12 * looks_factor):
+            tie = strong_ties[0]
+            tie.kind = "Partner"
+            tie.relationship = rng.fork(3).randint(*PARTNER_FORM_STRENGTH)
+            agent = _find_agent(state, tie.npc_id)
+            if agent is not None:
+                agent.role = "Partner"  # keep agent/relationship truth aligned
+            return f"You and {tie.name} became a couple."
+        return None
+
+    # No close ties to deepen — small chance to meet someone new instead.
+    if rng.fork(4).chance(0.03 * looks_factor):
+        npc_id = max((a.npc_id for a in state.agents), default=0) + 1
+        gender = rng.fork(5).choice(["Male", "Female", "NonBinary"])
+        surname = names_mod.random_surname(state.character.country, rng.fork(6))
+        agent = _new_npc(npc_id, gender, "Partner", surname, state.character.country, state.character.city, rng.fork(7))
+        agent.age = max(18, state.character.age + rng.fork(8).randint(-5, 5))
+        state.agents.append(agent)
+        state.relationships.append(Relationship(
+            npc_id=npc_id, name=agent.name, kind="Partner",
+            relationship=rng.fork(9).randint(*PARTNER_FORM_STRENGTH), alive=True,
+        ))
+        return f"You met {agent.name} and became a couple."
+    return None
 
 
 def add_friend(state: GameState, rng: Rng, role: str = "Friend") -> Agent:

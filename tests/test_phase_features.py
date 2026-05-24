@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core import agents, economy, education, sim, social
+from core import agents, economy, education, relationships, sim
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -104,35 +104,168 @@ def test_save_load_roundtrip(tmp_path: Path):
     assert len(loaded.feed) == len(state.feed)
 
 
-def test_social_graph_seeded_with_allowed_relationship_types():
+def test_parent_agent_age_and_job_match_birth_record():
+    """The agent record for a parent must reuse the age/job baked into the
+    birth-story feed (parent_details), not roll its own conflicting values."""
     state = _new()
-    sim.age_up(state)
-    if state.pending_event_id is not None:
-        sim.resolve_choice(state, 0)
-    assert state.social_edges, "social graph should be seeded after the first yearly tick"
-    assert all(e.relation_type in ("friend", "family", "enemy", "coworker") for e in state.social_edges)
+    by_role = {d["role"]: d for d in state.character.parent_details}
+    for role in ("Mother", "Father"):
+        rel = next(r for r in state.relationships if r.kind == role)
+        agent = next(a for a in state.agents if a.npc_id == rel.npc_id)
+        assert agent.age == by_role[role]["age_at_birth"]
+        assert agent.job_title == by_role[role]["job"]
 
 
-def test_rumour_propagation_attenuates():
-    state = _new()
-    social.seed_social_graph(state, Rng(state.seed).fork(999))
-    if not state.social_edges:
-        return
-    first = state.social_edges[0]
-    first.contact_rate = 1.0
-    first.trust = 100
-    state.rumours.append(social.Rumour(
-        topic="test_rumour",
-        stance="negative",
-        origin_id=first.source_id,
-        current_id=first.source_id,
-        intensity=1.0,
-        credibility=0.9,
-        ttl=3,
-        seen_by=[],
-    ))
-    social.tick_social(state, Rng(state.seed).fork(1001))
-    assert any(r.intensity < 1.0 for r in state.rumours if r.topic == "test_rumour")
+def test_generous_relative_bails_out_player_in_debt():
+    # Across a fixed seed range, a close + generous + wealthy parent should
+    # sometimes help an in-debt player. When it fires, money is conserved
+    # (the helper's funds drop by exactly what the player gained).
+    fired = 0
+    for seed in range(60):
+        state = _new(seed=seed)
+        state.money = -2000
+        mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+        mom_rel.relationship = 95
+        mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+        mom.generosity = 100
+        mom.money = 10000
+        before_player, before_mom = state.money, mom.money
+        if agents.offer_financial_help(state, Rng(seed).fork(37)):
+            fired += 1
+            delta = state.money - before_player
+            assert delta > 0
+            assert mom.money == before_mom - delta
+            assert state.money <= 0  # never overpays past the shortfall
+            assert state.last_help_tick == state.tick  # cooldown stamped
+    assert fired > 0, "a generous, wealthy, close relative should sometimes help"
+
+
+def test_no_help_when_relatives_are_not_generous():
+    state = _new(seed=1)
+    state.money = -2000
+    for a in state.agents:
+        a.generosity = 0
+    assert agents.offer_financial_help(state, Rng(1).fork(37)) is False
+    assert state.money == -2000
+
+
+def test_no_help_when_player_is_not_in_debt():
+    state = _new(seed=1)
+    state.money = 500
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 10000
+    assert agents.offer_financial_help(state, Rng(1).fork(37)) is False
+    assert state.money == 500
+
+
+def test_no_help_for_mild_debt_above_hardship_threshold():
+    state = _new(seed=1)
+    state.money = -200  # in the red, but not severe enough to summon help
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 10000
+    for seed in range(20):
+        assert agents.offer_financial_help(state, Rng(seed).fork(37)) is False
+    assert state.money == -200
+
+
+def test_bailout_respects_cooldown():
+    state = _new(seed=3)
+    state.tick = 10
+    state.last_help_tick = 10  # already helped this very year
+    state.money = -5000
+    mom_rel = next(r for r in state.relationships if r.kind == "Mother")
+    mom_rel.relationship = 100
+    mom = next(a for a in state.agents if a.npc_id == mom_rel.npc_id)
+    mom.generosity = 100
+    mom.money = 50000
+    for seed in range(20):
+        assert agents.offer_financial_help(state, Rng(seed).fork(37)) is False
+    assert state.money == -5000
+
+
+def test_isolation_costs_happiness():
+    state = _new(seed=1)
+    for r in state.relationships:
+        r.relationship = 0  # sever every close tie
+    before = state.stats.happiness
+    relationships.loneliness_tick(state)
+    assert state.stats.happiness < before
+
+
+def test_strong_tie_prevents_loneliness_penalty():
+    state = _new(seed=1)
+    before = state.stats.happiness  # parents start at 90, well above threshold
+    assert relationships.loneliness_tick(state) is None
+    assert state.stats.happiness == before
+
+
+def test_low_happiness_erodes_job_performance_faster():
+    def perf_after(happiness: int) -> int:
+        s = _new(seed=5)
+        s.stats.happiness = happiness
+        s.career = Job(job_id="retail", title="Retail Assistant", salary=15_000,
+                       career="Retail", level=0, performance=60)
+        economy.career_tick(s, Rng(s.seed).fork(8))
+        return s.career.performance if s.career else 0
+
+    assert perf_after(10) < perf_after(90)
+
+
+def test_getting_hired_lifts_happiness():
+    for seed in range(20):
+        s = _new(seed=seed)
+        s.character.age = 18
+        s.stats.happiness = 50
+        ok, _ = economy.apply_for_job(s, "retail")
+        if ok:
+            assert s.stats.happiness > 50
+            return
+    raise AssertionError("expected at least one successful hire across seeds")
+
+
+def test_looks_bias_incidental_tie_formation():
+    def ties_formed(looks: int) -> int:
+        count = 0
+        for seed in range(40):
+            s = _new(seed=seed)
+            s.character.age = 20  # adult, jobless, not in school -> baseline rate
+            s.stats.looks = looks
+            if agents.form_incidental_ties(s, Rng(seed).fork(39)):
+                count += 1
+        return count
+
+    assert ties_formed(95) > ties_formed(15)
+
+
+def test_partner_forms_from_a_strong_tie():
+    from core.state import Relationship
+    formed = 0
+    for seed in range(40):
+        s = _new(seed=seed)
+        s.character.age = 25
+        s.stats.looks = 90
+        s.relationships.append(Relationship(npc_id=99, name="Sam Reed", kind="Friend",
+                                            relationship=70, alive=True))
+        agents.tick_partner(s, Rng(seed).fork(41))
+        if any(r.kind == "Partner" and r.alive for r in s.relationships):
+            formed += 1
+    assert formed > 0, "a sociable, attractive adult should sometimes pair up"
+
+
+def test_partner_tie_does_not_decay():
+    from core.state import Relationship
+    s = _new(seed=1)
+    s.relationships.append(Relationship(npc_id=99, name="Sam", kind="Partner",
+                                        relationship=80, alive=True))
+    relationships.annual_drift(s)
+    p = next(r for r in s.relationships if r.kind == "Partner")
+    assert p.relationship == 80
 
 
 def test_university_plan_major_and_dropout_flow():
