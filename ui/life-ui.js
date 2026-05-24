@@ -505,11 +505,21 @@ const LifeUI = (function () {
     S.root.innerHTML = `
       <div style="width:100%;height:100%;position:relative">
       <div class="app">
-        <div class="app-topbar">
+        <div class="app-topbar" data-drag>
           <div class="mark"></div>
           <div class="title">Life — A Deeper Simulation</div>
           <button class="app-menu" data-menu>${svg('menu', 2)}</button>
-          <div class="ver">v1.1</div>
+          <div class="win-controls">
+            <button class="win-btn" data-win="min" aria-label="Minimize" title="Minimize">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="2.5" y1="6" x2="9.5" y2="6"/></svg>
+            </button>
+            <button class="win-btn" data-win="max" aria-label="Maximize" title="Maximize">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2.5" y="2.5" width="7" height="7" rx="1"/></svg>
+            </button>
+            <button class="win-btn win-close" data-win="close" aria-label="Close" title="Close">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3" y1="3" x2="9" y2="9"/><line x1="9" y1="3" x2="3" y2="9"/></svg>
+            </button>
+          </div>
         </div>
         <div class="app-identity">
           <div class="flag"></div>

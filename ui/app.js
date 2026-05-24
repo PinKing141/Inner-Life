@@ -17,9 +17,11 @@
 
 const App = {
   bridge: null,
+  windowControls: null,  // Qt-only; null in browser preview
   state: null,
   loggedFeedCount: 0,
   currentModalKey: null,
+  deathShown: false,
   creation: { first_name: "", last_name: "", gender: "", country: "", city: "", talent: "" },
 
   // ===== Connection =====
@@ -41,6 +43,9 @@ const App = {
       await new Promise((resolve) => {
         new QWebChannel(qt.webChannelTransport, (channel) => {
           this.bridge = channel.objects.bridge;
+          // Frameless-window controls are optional — only present when the Qt
+          // shell exposes them. Browser preview leaves this null.
+          this.windowControls = channel.objects.windowControls || null;
           this.bridge.stateChanged.connect((json) => this.onSnapshot(JSON.parse(json)));
           resolve();
         });
@@ -51,6 +56,32 @@ const App = {
       console.warn("QWebChannel not present; using mock bridge.");
       this.bridge = MockBridge.make((s) => this.onSnapshot(s));
       this.onSnapshot(MockBridge.initial());
+    }
+    this.wireWindowControls();
+  },
+
+  // Wires the topbar's window control buttons (min/max/close) + drag to the
+  // Qt-side WindowControls slots. Safe to call when windowControls is null —
+  // the buttons simply do nothing in browser preview.
+  wireWindowControls() {
+    const wc = this.windowControls;
+    document.querySelectorAll(".win-btn").forEach((btn) => {
+      const action = btn.dataset.win;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!wc) return;
+        if (action === "min" && wc.minimize) wc.minimize();
+        else if (action === "max" && wc.toggleMaximize) wc.toggleMaximize();
+        else if (action === "close" && wc.closeWindow) wc.closeWindow();
+      });
+    });
+    // Drag the window by pressing the topbar (excluding buttons).
+    const bar = document.querySelector(".app-topbar[data-drag]");
+    if (bar && wc && wc.startDrag) {
+      bar.addEventListener("mousedown", (e) => {
+        if (e.target.closest("button")) return;
+        wc.startDrag();
+      });
     }
   },
 
@@ -69,6 +100,7 @@ const App = {
       LifeUI.clearLife();
       this.loggedFeedCount = 0;
       this.currentModalKey = null;
+      this.deathShown = false;
     }
     this.render();
   },
@@ -764,6 +796,7 @@ LifeUI.on("creation-submit", ({ stepId, values }) => {
     LifeUI.clearLife();
     App.loggedFeedCount = 0;
     App.currentModalKey = null;
+    App.deathShown = false;
     if (App.bridge.newGameFull) {
       App.bridge.newGameFull(c.first_name, c.last_name, c.gender, c.country, c.city, c.talent);
     } else {
