@@ -115,6 +115,7 @@ body{
 /* --- identity strip (no avatar, per spec) --- */
 .app-identity{
   display:flex;align-items:center;gap:14px;padding:16px 18px;
+  background:var(--bg-2);
   background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 10%,var(--bg-2)) 0%,var(--bg-1) 100%);
   border-bottom:1px solid var(--line);flex-shrink:0;
 }
@@ -208,9 +209,13 @@ body{
 .ui-tile{
   width:40px;height:40px;border-radius:10px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
+  /* Fallback first (works everywhere), then the color-mix tinted version
+     wins on Chromium versions that support it. */
+  background:var(--bg-3);
   background:color-mix(in srgb,var(--accent,var(--gold)) 24%,var(--bg-3));
+  border:1.5px solid var(--accent,var(--gold));
   border:1px solid color-mix(in srgb,var(--accent,var(--gold)) 45%,transparent);
-  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent,var(--gold)) 18%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
 .ui-tile svg{width:20px;height:20px;color:var(--accent,var(--gold))}
 
@@ -242,17 +247,21 @@ body{
    6 · PRIMITIVE: meter
    ============================================================ */
 .ui-meter{
-  height:9px;border-radius:6px;flex:1;
-  background:var(--bg-0);border:1px solid var(--line-soft);
+  height:10px;border-radius:6px;flex:1;
+  /* Track uses a different surface than the stat bar background so the bar
+     is visible even when the fill is at 0. color-mix is avoided here so
+     older Qt/Chromium versions still render the track. */
+  background:var(--bg-2);border:1px solid var(--line);
   overflow:hidden;position:relative;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.55);
 }
 .ui-meter > i{
   display:block;height:100%;border-radius:6px;width:0;
-  background:linear-gradient(90deg,
-     color-mix(in srgb,var(--accent,var(--gold)) 60%,#000),
-     var(--accent,var(--gold)));
+  /* Solid accent fill — no color-mix, no gradient dependencies. Older
+     Chromium fell back to transparent here, which made the bar invisible. */
+  background:var(--accent,var(--gold));
   box-shadow:0 0 14px -1px var(--accent,var(--gold)),
-             inset 0 1px 0 color-mix(in srgb,var(--accent,var(--gold)) 35%,transparent);
+             inset 0 1px 0 rgba(255,255,255,.22);
   transition:width 1s var(--ease);
 }
 
@@ -266,7 +275,9 @@ body{
   letter-spacing:.1em;text-transform:uppercase;
   color:var(--accent,var(--gold));
   padding:3px 7px;border-radius:999px;
+  background:var(--bg-3);
   background:color-mix(in srgb,var(--accent,var(--gold)) 14%,transparent);
+  border:1px solid var(--accent,var(--gold));
   border:1px solid color-mix(in srgb,var(--accent,var(--gold)) 28%,transparent);
 }
 .ui-pill svg{width:11px;height:11px}
@@ -307,6 +318,7 @@ body{
 }
 .ui-event.is-latest .node{
   border-color:var(--gold);color:var(--gold-bright);
+  background:var(--bg-3);
   background:radial-gradient(circle,color-mix(in srgb,var(--gold) 25%,var(--bg-2)),var(--bg-2));
   box-shadow:0 0 0 5px rgba(230,196,133,.12),0 6px 14px -6px rgba(0,0,0,.8);
 }
@@ -317,6 +329,7 @@ body{
 }
 .ui-event.is-latest .card{
   border-color:var(--gold-deep);
+  background:var(--bg-2);
   background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 8%,var(--bg-2)),var(--bg-2));
   box-shadow:0 10px 24px -14px rgba(0,0,0,.9);
 }
@@ -464,12 +477,18 @@ body{
 .ui-btn.primary:hover{box-shadow:0 11px 22px -10px rgba(217,184,120,.75),inset 0 1px 0 rgba(255,255,255,.4)}
 .ui-btn.ghost{background:transparent;border-color:var(--line);color:var(--ink-dim)}
 .ui-btn.ghost:hover{border-color:var(--gold-deep);color:var(--ink)}
-.ui-btn.danger{background:transparent;border-color:color-mix(in srgb,var(--c-bad) 45%,transparent);
+.ui-btn.danger{background:transparent;
+  border-color:var(--c-bad);
+  border-color:color-mix(in srgb,var(--c-bad) 45%,transparent);
   color:var(--c-bad)}
-.ui-btn.danger:hover{background:color-mix(in srgb,var(--c-bad) 12%,transparent)}
-.ui-btn.good{background:transparent;border-color:color-mix(in srgb,var(--c-good) 45%,transparent);
+.ui-btn.danger:hover{background:rgba(236,129,112,.12);
+  background:color-mix(in srgb,var(--c-bad) 12%,transparent)}
+.ui-btn.good{background:transparent;
+  border-color:var(--c-good);
+  border-color:color-mix(in srgb,var(--c-good) 45%,transparent);
   color:var(--c-good)}
-.ui-btn.good:hover{background:color-mix(in srgb,var(--c-good) 12%,transparent)}
+.ui-btn.good:hover{background:rgba(155,210,179,.12);
+  background:color-mix(in srgb,var(--c-good) 12%,transparent)}
 .ui-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .ui-btn-row{display:flex;gap:9px}
 .ui-btn-row .ui-btn{flex:1}
@@ -504,7 +523,9 @@ body{
 .ui-modal-head .m-ico{
   width:36px;height:36px;border-radius:10px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
+  background:var(--bg-3);
   background:color-mix(in srgb,var(--accent) 16%,var(--bg-3));
+  border:1.5px solid var(--accent);
   border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
 }
 .ui-modal-head .m-ico svg{width:19px;height:19px;color:var(--accent)}
@@ -588,8 +609,11 @@ body{
 .ui-award .a-ring{
   width:74px;height:74px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
+  background:var(--bg-3);
   background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,var(--bg-3)),var(--bg-3));
+  border:1.5px solid var(--accent);
   border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+  box-shadow:0 0 0 6px rgba(0,0,0,.25);
   box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 9%,transparent);
 }
 .ui-award .a-ring svg{width:34px;height:34px;color:var(--accent)}
@@ -693,6 +717,8 @@ body{
 }
 .cr-segment button:hover{border-color:var(--gold-deep);color:var(--ink);background:var(--bg-3);transform:translateY(-1px)}
 .cr-segment button.sel{
+  /* Fallback (no color-mix) then the gradient. */
+  background:var(--bg-3);
   background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 28%,var(--bg-3)),color-mix(in srgb,var(--gold) 14%,var(--bg-2)));
   border-color:var(--gold);color:var(--gold-bright);
   box-shadow:0 8px 20px -12px rgba(230,196,133,.5),inset 0 1px 0 rgba(255,255,255,.18);
@@ -708,6 +734,7 @@ body{
 }
 .cr-flag:hover{border-color:var(--gold-deep);background:var(--bg-3);transform:translateY(-1px)}
 .cr-flag.sel{border-color:var(--gold);
+  background:var(--bg-3);
   background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 16%,var(--bg-3)),var(--bg-2));
   box-shadow:0 8px 20px -12px rgba(230,196,133,.45)}
 .cr-flag .fimg{
@@ -733,14 +760,17 @@ body{
 }
 .cr-card:hover{border-color:var(--gold-deep);background:var(--bg-3);transform:translateY(-1px)}
 .cr-card.sel{border-color:var(--gold);
+  background:var(--bg-3);
   background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 14%,var(--bg-3)),var(--bg-2));
-  box-shadow:0 10px 24px -14px rgba(0,0,0,.9),inset 0 0 0 1px color-mix(in srgb,var(--gold) 35%,transparent)}
+  box-shadow:0 10px 24px -14px rgba(0,0,0,.9),inset 0 0 0 1px rgba(230,196,133,.35)}
 .cr-card .cc-ico{
   width:42px;height:42px;border-radius:10px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
+  background:var(--bg-3);
   background:color-mix(in srgb,var(--accent,var(--gold)) 24%,var(--bg-3));
+  border:1.5px solid var(--accent,var(--gold));
   border:1px solid color-mix(in srgb,var(--accent,var(--gold)) 45%,transparent);
-  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent,var(--gold)) 18%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
 .cr-card .cc-ico svg{width:20px;height:20px;color:var(--accent,var(--gold))}
 /* Body is a span containing two more spans (.cc-name + .cc-desc); without
@@ -765,6 +795,7 @@ body{
 }
 .cr-row:hover{border-color:var(--gold-deep);color:var(--ink);background:var(--bg-3);transform:translateY(-1px)}
 .cr-row.sel{border-color:var(--gold);color:var(--gold-bright);
+  background:var(--bg-3);
   background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 14%,var(--bg-3)),var(--bg-2));
   box-shadow:0 8px 20px -12px rgba(0,0,0,.9)}
 .cr-row .r-sub{margin-left:auto;font-family:var(--font-label);
