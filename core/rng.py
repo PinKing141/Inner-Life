@@ -7,7 +7,7 @@ core/ — that breaks determinism and makes Phase 7-style tracing harder.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -15,7 +15,9 @@ class Rng:
     """Thin wrapper around random.Random that we can pass around explicitly."""
 
     seed: int
-    _r: random.Random | None = None
+    # Always constructed in __post_init__; init=False keeps it out of the
+    # constructor signature and lets the type stay non-optional.
+    _r: random.Random = field(init=False)
 
     def __post_init__(self) -> None:
         self._r = random.Random(self.seed)

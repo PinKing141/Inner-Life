@@ -53,6 +53,42 @@ def test_agent_tick_world_ages_npcs():
     assert mum_after.age >= age_before + 5
 
 
+def test_kill_agent_syncs_relationship_in_same_tick():
+    """When an agent dies its player-facing relationship must flip dead too,
+    immediately — not a tick later."""
+    state = _new()
+    mum_agent = next(a for a in state.agents if a.role == "Mother")
+    mum_rel = next(r for r in state.relationships if r.npc_id == mum_agent.npc_id)
+    assert mum_rel.alive
+
+    agents._kill_agent(state, mum_agent, player_age=state.character.age)
+
+    assert not mum_agent.alive
+    assert not mum_rel.alive
+    assert any(f.entry_id.startswith("feed:agent_death:") for f in state.feed)
+
+
+def test_sync_relationship_liveness_catches_orphaned_death():
+    """If an agent is killed without going through _kill_agent (e.g. a future
+    code path sets alive=False directly), the reconciliation pass still brings
+    the relationship into line."""
+    state = _new()
+    dad_agent = next(a for a in state.agents if a.role == "Father")
+    dad_rel = next(r for r in state.relationships if r.npc_id == dad_agent.npc_id)
+
+    dad_agent.alive = False  # bypass _kill_agent entirely
+    assert dad_rel.alive     # relationship still stale
+
+    agents.sync_relationship_liveness(state)
+    assert not dad_rel.alive
+
+
+def test_sync_relationship_liveness_is_idempotent_for_living():
+    state = _new()
+    agents.sync_relationship_liveness(state)
+    assert all(r.alive for r in state.relationships if r.kind in ("Mother", "Father"))
+
+
 def test_predicates_evaluate_empty():
     state = _new()
     assert evaluate(None, state) is True
@@ -227,6 +263,24 @@ def test_getting_hired_lifts_happiness():
             assert s.stats.happiness > 50
             return
     raise AssertionError("expected at least one successful hire across seeds")
+
+
+def test_action_result_is_tuple_compatible_and_named():
+    """The typed result records must keep working with legacy tuple unpacking
+    AND expose named fields, so neither old call sites nor new ones break."""
+    s = _new()
+    s.character.age = 30
+    res = economy.request_raise(s)  # no job -> (False, msg)
+    ok, msg = res                   # tuple unpacking still works
+    assert ok is False and isinstance(msg, str)
+    assert res.ok is False          # named access works too
+    assert res.message == msg
+    assert res[0] is False          # index access works
+
+    promo = economy.request_promotion(s)  # no job -> 3-field PromotionResult
+    p_ok, p_msg, payload = promo
+    assert (p_ok, payload) == (False, None)
+    assert promo.promotion is None
 
 
 def test_looks_bias_incidental_tie_formation():

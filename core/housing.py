@@ -8,6 +8,7 @@ Owned property is an asset that drifts in value and counts toward net worth.
 from __future__ import annotations
 
 from core.content import housing as housing_content
+from core.results import ActionResult
 from core.rng import Rng
 from core.state import GameState
 
@@ -62,11 +63,11 @@ def _can_buy(state: GameState, listing_id: str):
     return listing, ""
 
 
-def buy_home(state: GameState, listing_id: str) -> tuple[bool, str]:
+def buy_home(state: GameState, listing_id: str) -> ActionResult:
     """Buy outright — pays the full price now."""
     listing, err = _can_buy(state, listing_id)
     if listing is None:
-        return False, err
+        return ActionResult(False, err)
     price = listing["price"]
     state.money -= price
     state.properties.append({
@@ -79,18 +80,18 @@ def buy_home(state: GameState, listing_id: str) -> tuple[bool, str]:
         "mortgage_rate": 0.0,
         "mortgage_term_left": 0,
     })
-    return True, f"You bought {listing['name']} outright for £{price:,}."
+    return ActionResult(True, f"You bought {listing['name']} outright for £{price:,}.")
 
 
-def buy_home_mortgage(state: GameState, listing_id: str) -> tuple[bool, str]:
+def buy_home_mortgage(state: GameState, listing_id: str) -> ActionResult:
     """Buy with a mortgage — a deposit now, then annual payments."""
     listing, err = _can_buy(state, listing_id)
     if listing is None:
-        return False, err
+        return ActionResult(False, err)
     price = listing["price"]
     deposit = int(price * MORTGAGE_DOWN_PCT)
     if state.money < deposit:
-        return False, f"You can't afford the £{deposit:,} deposit."
+        return ActionResult(False, f"You can't afford the £{deposit:,} deposit.")
     principal = price - deposit
     payment = _annual_payment(principal, MORTGAGE_RATE, MORTGAGE_TERM)
     state.money -= deposit
@@ -105,45 +106,45 @@ def buy_home_mortgage(state: GameState, listing_id: str) -> tuple[bool, str]:
         "mortgage_term_left": MORTGAGE_TERM,
     })
     monthly = payment // 12
-    return True, (
+    return ActionResult(True, (
         f"You bought {listing['name']} with a mortgage — £{deposit:,} deposit, "
         f"about £{monthly:,}/month."
-    )
+    ))
 
 
-def rent_home(state: GameState, listing_id: str) -> tuple[bool, str]:
+def rent_home(state: GameState, listing_id: str) -> ActionResult:
     if state.character is None:
-        return False, "No character."
+        return ActionResult(False, "No character.")
     if state.character.age < MIN_HOUSING_AGE:
-        return False, "You're too young to rent a home."
+        return ActionResult(False, "You're too young to rent a home.")
     city = state.character.city
     listing = housing_content.find_listing(state.seed, city, listing_id)
     if listing is None:
-        return False, "That property isn't on the market."
+        return ActionResult(False, "That property isn't on the market.")
     state.rental = {"id": listing["id"], "name": listing["name"], "rent": listing["rent"]}
-    return True, f"You moved into {listing['name']} for £{listing['rent']:,}/yr."
+    return ActionResult(True, f"You moved into {listing['name']} for £{listing['rent']:,}/yr.")
 
 
-def stop_renting(state: GameState) -> tuple[bool, str]:
+def stop_renting(state: GameState) -> ActionResult:
     if not state.rental:
-        return False, "You aren't renting anywhere."
+        return ActionResult(False, "You aren't renting anywhere.")
     name = state.rental["name"]
     state.rental = None
-    return True, f"You moved out of {name}."
+    return ActionResult(True, f"You moved out of {name}.")
 
 
-def sell_home(state: GameState, property_id: str) -> tuple[bool, str]:
+def sell_home(state: GameState, property_id: str) -> ActionResult:
     prop = next((p for p in state.properties if p["id"] == property_id), None)
     if prop is None:
-        return False, "You don't own that property."
+        return ActionResult(False, "You don't own that property.")
     value = prop.get("value", 0)
     balance = prop.get("mortgage_balance", 0)
     proceeds = value - balance
     state.money += proceeds
     state.properties.remove(prop)
     if balance > 0:
-        return True, f"You sold {prop['name']} for £{value:,}, settling the £{balance:,} mortgage."
-    return True, f"You sold {prop['name']} for £{value:,}."
+        return ActionResult(True, f"You sold {prop['name']} for £{value:,}, settling the £{balance:,} mortgage.")
+    return ActionResult(True, f"You sold {prop['name']} for £{value:,}.")
 
 
 def annual_update(state: GameState, rng: Rng) -> None:

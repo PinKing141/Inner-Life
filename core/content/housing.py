@@ -9,6 +9,8 @@ is a natural later extension; this is the first, simple pass.
 """
 from __future__ import annotations
 
+from typing import cast
+
 from core.rng import Rng
 
 # Base price (buy) and annual rent for each property type.
@@ -31,8 +33,10 @@ def list_market(seed: int, city: str) -> list[dict]:
     for i, t in enumerate(PROPERTY_TYPES):
         rng = Rng(seed).fork(salt * 31 + i)
         variation = 1.0 + rng.randint(-12, 12) / 100.0
-        price = int(t["price"] * variation)
-        rent = int(t["rent"] * variation)
+        # PROPERTY_TYPES holds mixed-type values, so the price/rent read back as
+        # `object`; narrow to int for the arithmetic.
+        price = int(cast(int, t["price"]) * variation)
+        rent = int(cast(int, t["rent"]) * variation)
         market.append({
             "id": f"{t['key']}-{salt}",
             "key": t["key"],

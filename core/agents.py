@@ -211,6 +211,37 @@ def _find_relationship(state: GameState, npc_id: int) -> Optional[Relationship]:
     return None
 
 
+def _kill_agent(state: GameState, agent: Agent, player_age: int) -> None:
+    """The single place an agent dies. Flips the agent's `alive`, mirrors it
+    onto the player-facing Relationship in the SAME tick, and logs the death.
+    Everything that ends an NPC's life should route through here so the agent
+    and its relationship can never disagree."""
+    agent.alive = False
+    rel = _find_relationship(state, agent.npc_id)
+    if rel is not None:
+        rel.alive = False
+    state.feed.append(FeedEntry(
+        age=player_age,
+        text=f"{agent.name} ({agent.role}) passed away at {agent.age}.",
+        kind="bad",
+        entry_id=f"feed:agent_death:{state.tick}:{agent.npc_id}",
+    ))
+
+
+def sync_relationship_liveness(state: GameState) -> None:
+    """Reconcile every Relationship.alive with its backing Agent.alive.
+
+    `_kill_agent` already keeps the two in step, but this is the invariant's
+    hard guarantee: after the world ticks, no relationship can be shown as
+    living while its agent is dead — regardless of how the agent died.
+    Idempotent and silent (the death feed belongs to whoever did the killing)."""
+    by_id = {a.npc_id: a for a in state.agents}
+    for rel in state.relationships:
+        agent = by_id.get(rel.npc_id)
+        if agent is not None and not agent.alive and rel.alive:
+            rel.alive = False
+
+
 def tick_world(state: GameState, rng: Rng) -> None:
     """Run a year for every NPC. May add narrative entries to the feed.
 
@@ -256,16 +287,7 @@ def tick_world(state: GameState, rng: Rng) -> None:
         # Death check — peaks after 70, plus illness from low health.
         death_chance = max(0.0, (agent.age - 60) * 0.008) + (1 - agent.health / 100) * 0.05
         if agent.health <= 0 or a_rng.fork(11).chance(death_chance):
-            agent.alive = False
-            rel = _find_relationship(state, agent.npc_id)
-            if rel:
-                rel.alive = False
-            state.feed.append(FeedEntry(
-                age=player_age,
-                text=f"{agent.name} ({agent.role}) passed away at {agent.age}.",
-                kind="bad",
-                entry_id=f"feed:agent_death:{state.tick}:{agent.npc_id}",
-            ))
+            _kill_agent(state, agent, player_age)
             continue
 
 

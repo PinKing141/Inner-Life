@@ -169,9 +169,9 @@ class GameController:
         return self.snapshot()
 
     def set_university_plan(self, attend: bool, major: str = "") -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         edu = s.education
         edu.university_intent = "attend" if attend else "skip"
         edu.university_major = major.strip() if attend else ""
@@ -212,15 +212,17 @@ class GameController:
 
     def _feed(self, text: str, kind: str, tag: str) -> None:
         s = self.state
+        if s is None:
+            return
         s.feed.append(FeedEntry(
             age=s.character.age if s.character else 0,
             text=text, kind=kind, entry_id=f"feed:{tag}:{s.tick}",
         ))
 
     def answer_exam(self, choice_index: int) -> dict:
-        if self.state is None or self.state.exam is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.exam is None:
+            return self.snapshot()
         ex = s.exam
         if ex.get("finished"):
             return self.snapshot()
@@ -241,9 +243,9 @@ class GameController:
 
     def cheat_exam(self) -> dict:
         """Reveal the current answer — unless you're caught, which ends the exam."""
-        if self.state is None or self.state.exam is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.exam is None:
+            return self.snapshot()
         ex = s.exam
         if ex.get("finished"):
             return self.snapshot()
@@ -358,9 +360,9 @@ class GameController:
         return self.snapshot()
 
     def drop_out_university(self) -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         if s.education.level != "University" or not s.education.in_school:
             return self.snapshot()
         s.education.in_school = False
@@ -437,9 +439,9 @@ class GameController:
 
 
     def activity(self, kind: str) -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         fn = activities.BY_KIND.get(kind)
         if fn is None:
             return self.snapshot()
