@@ -19,7 +19,8 @@ class LegendOptions:
 def _label_for(node: dict) -> str:
     kind = node.get("kind", "")
     if kind == "event_choice":
-        details = node.get("details") if isinstance(node.get("details"), dict) else {}
+        raw_details = node.get("details")
+        details = raw_details if isinstance(raw_details, dict) else {}
         event_id = details.get("event_id") or node.get("event_id", "event")
         choice = details.get("choice") or node.get("choice", "")
         if choice:

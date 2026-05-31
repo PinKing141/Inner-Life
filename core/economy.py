@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from core import balance
 from core.content.jobs import JOBS, JobSpec, education_meets
+from core.results import ActionResult, Cashflow, PromotionResult
 from core.rng import Rng
 from core.state import GameState, Job
 
@@ -70,21 +71,21 @@ def rung_title(spec: JobSpec, level: int) -> str:
     return f"{RANK_PREFIX[level]}{profession_for(spec)}".strip()
 
 
-def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
+def apply_for_job(state: GameState, job_id: str) -> ActionResult:
     """Returns (hired, message). State is mutated only on success.
 
     Every rejection sets ``state.job_application_error`` so the UI can surface
     a dedicated "you were rejected" popup with the reason.
     """
-    def reject(msg: str) -> tuple[bool, str]:
+    def reject(msg: str) -> ActionResult:
         state.job_application_error = msg
-        return False, msg
+        return ActionResult(False, msg)
 
     if state.character is None:
-        return False, "No character."
+        return ActionResult(False, "No character.")
     spec = find_job(job_id)
     if spec is None:
-        return False, "That job does not exist."
+        return ActionResult(False, "That job does not exist.")
     if state.character.age < spec.min_age:
         return reject(f"You are too young to be a {spec.title}.")
     if state.stats.smarts < spec.min_smarts:
@@ -128,7 +129,7 @@ def apply_for_job(state: GameState, job_id: str) -> tuple[bool, str]:
         "employer": employer,
         "salary": spec.salary,
     }
-    return True, f"You were hired as a {title} at {employer}. Your salary is £{spec.salary:,}."
+    return ActionResult(True, f"You were hired as a {title} at {employer}. Your salary is £{spec.salary:,}.")
 
 
 def work_harder(state: GameState) -> str:
@@ -149,35 +150,35 @@ def quit_job(state: GameState) -> str:
     return f"You quit your job as a {title}."
 
 
-def request_raise(state: GameState) -> tuple[bool, str]:
+def request_raise(state: GameState) -> ActionResult:
     """Ask the boss for a raise. One ask per year; refusal annoys the boss."""
     job = state.career
     if job is None:
-        return False, "You don't have a job."
+        return ActionResult(False, "You don't have a job.")
     if job.last_ask_tick == state.tick:
-        return False, "You've already spoken to your boss this year."
+        return ActionResult(False, "You've already spoken to your boss this year.")
     job.last_ask_tick = state.tick
     rng = Rng(state.seed).fork(state.tick).fork(777)
     chance = max(0.05, min(0.9, 0.2 + (job.performance - 50) / 100.0))
     if rng.fork(1).chance(chance):
         pct = rng.fork(2).randint(5, 12)
         job.salary = int(job.salary * (1 + pct / 100.0))
-        return True, f"Your boss approved a {pct}% raise! You now earn £{job.salary:,}."
+        return ActionResult(True, f"Your boss approved a {pct}% raise! You now earn £{job.salary:,}.")
     job.performance = max(0, job.performance - 5)
-    return False, "Your boss turned down your request for a raise."
+    return ActionResult(False, "Your boss turned down your request for a raise.")
 
 
-def request_promotion(state: GameState) -> tuple[bool, str, dict | None]:
+def request_promotion(state: GameState) -> PromotionResult:
     """Ask the boss for a promotion. Needs decent performance; refusal stings."""
     job = state.career
     if job is None:
-        return False, "You don't have a job.", None
+        return PromotionResult(False, "You don't have a job.")
     spec = find_job(job.job_id)
     max_level = max_level_for(spec) if spec else MAX_LEVEL
     if job.level >= max_level:
-        return False, "You're already at the top of your field.", None
+        return PromotionResult(False, "You're already at the top of your field.")
     if job.last_ask_tick == state.tick:
-        return False, "You've already spoken to your boss this year.", None
+        return PromotionResult(False, "You've already spoken to your boss this year.")
     job.last_ask_tick = state.tick
     rng = Rng(state.seed).fork(state.tick).fork(778)
     chance = max(0.05, min(0.85, (job.performance - 55) / 60.0))
@@ -196,9 +197,9 @@ def request_promotion(state: GameState) -> tuple[bool, str, dict | None]:
             "salary": job.salary,
             "pct": pct,
         }
-        return True, f"You asked for a promotion — and got it!", promo
+        return PromotionResult(True, "You asked for a promotion — and got it!", promo)
     job.performance = max(0, job.performance - 5)
-    return False, "Your boss declined to promote you this time.", None
+    return PromotionResult(False, "Your boss declined to promote you this time.")
 
 
 def career_tick(state: GameState, rng: Rng) -> dict | None:
@@ -308,10 +309,10 @@ def career_tick(state: GameState, rng: Rng) -> dict | None:
     }
 
 
-def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
+def annual_cashflow(state: GameState, rng: Rng) -> Cashflow:
     """Returns (earnings, living_cost, note). State is NOT mutated."""
     if state.character is None or state.character.age < 18:
-        return 0, 0, ""
+        return Cashflow(0, 0, "")
     world = state.world.clamped()
     inflation = world.inflation_index
 
@@ -340,4 +341,4 @@ def annual_cashflow(state: GameState, rng: Rng) -> tuple[int, int, str]:
         living_cost = subsistence  # no lifestyle creep without an income
         note = "You are unemployed and struggling in a weak economy."
 
-    return earnings, max(0, living_cost), note
+    return Cashflow(earnings, max(0, living_cost), note)

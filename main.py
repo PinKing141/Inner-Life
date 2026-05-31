@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Life — A Deeper Simulation")
         # Drop the native OS frame; the web UI draws its own titlebar.
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.resize(440, 920)
         self.setMinimumSize(440, 920)
 

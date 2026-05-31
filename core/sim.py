@@ -175,7 +175,7 @@ def new_game(
 
 def _tick_economy(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
     """Annual cashflow and the debt -> stress / deep-debt -> health erosion."""
-    if state.character.age < 18:
+    if state.character is None or state.character.age < 18:
         return
     earnings, living_cost, note = economy.annual_cashflow(state, tick_rng.fork(7))
     if note:
@@ -233,6 +233,8 @@ def _tick_social(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
 
 def _tick_drift(state: GameState, tick_rng: Rng, summary: list[str]) -> None:
     """Natural stat decay, relationship erosion and the loneliness consequence."""
+    if state.character is None:
+        return
     if state.character.age > 50:
         state.stats.health -= tick_rng.fork(11).randint(0, 5)
     state.stats.happiness -= tick_rng.fork(13).randint(0, balance.HAPPY_ANNUAL_DRIFT_MAX)
@@ -258,6 +260,9 @@ def age_up(state: GameState) -> None:
 
     world.tick_world(state, tick_rng.fork(29))
     agents.tick_world(state, tick_rng.fork(31))
+    # Guarantee the agent/relationship liveness invariant before the player's
+    # year resolves, so event predicates and the UI see a consistent graph.
+    agents.sync_relationship_liveness(state)
 
     summary_parts: list[str] = [f"You are now {age} years old."]
     edu_msg = education.tick(state)

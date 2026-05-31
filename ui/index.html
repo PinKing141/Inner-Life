@@ -25,8 +25,17 @@
 </head>
 <body>
 <div id="game"></div>
+<!-- Load order matters: icons table -> UI toolkit -> mock data -> App
+     modules (each augments window.App) -> app.js bootstrap. -->
+<script src="lib/icons.js"></script>
 <script src="life-ui.js"></script>
 <script src="mock_snapshot.js"></script>
+<script src="app/screens.js"></script>
+<script src="app/modals.js"></script>
+<script src="app/creation.js"></script>
+<script src="app/feed.js"></script>
+<script src="app/bridge.js"></script>
+<script src="app/dispatch.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

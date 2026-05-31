@@ -169,9 +169,9 @@ class GameController:
         return self.snapshot()
 
     def set_university_plan(self, attend: bool, major: str = "") -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         edu = s.education
         edu.university_intent = "attend" if attend else "skip"
         edu.university_major = major.strip() if attend else ""
@@ -212,15 +212,17 @@ class GameController:
 
     def _feed(self, text: str, kind: str, tag: str) -> None:
         s = self.state
+        if s is None:
+            return
         s.feed.append(FeedEntry(
             age=s.character.age if s.character else 0,
             text=text, kind=kind, entry_id=f"feed:{tag}:{s.tick}",
         ))
 
     def answer_exam(self, choice_index: int) -> dict:
-        if self.state is None or self.state.exam is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.exam is None:
+            return self.snapshot()
         ex = s.exam
         if ex.get("finished"):
             return self.snapshot()
@@ -241,9 +243,9 @@ class GameController:
 
     def cheat_exam(self) -> dict:
         """Reveal the current answer — unless you're caught, which ends the exam."""
-        if self.state is None or self.state.exam is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.exam is None:
+            return self.snapshot()
         ex = s.exam
         if ex.get("finished"):
             return self.snapshot()
@@ -358,9 +360,9 @@ class GameController:
         return self.snapshot()
 
     def drop_out_university(self) -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         if s.education.level != "University" or not s.education.in_school:
             return self.snapshot()
         s.education.in_school = False
@@ -437,9 +439,9 @@ class GameController:
 
 
     def activity(self, kind: str) -> dict:
-        if self.state is None or self.state.character is None:
-            return self.snapshot()
         s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
         fn = activities.BY_KIND.get(kind)
         if fn is None:
             return self.snapshot()
@@ -454,18 +456,40 @@ class GameController:
     # ---- Save / load ----
 
     def save(self, path: Path) -> None:
+        """Persist the CANONICAL state. Atomic: write to a temp file in the
+        same directory and rename, so a crash mid-write never leaves a
+        corrupt save in place. Raises OSError on I/O failure — callers
+        (bridge / CLI) translate to user-facing messages."""
         if self.state is None:
-            return
-        # Persist the CANONICAL state, not snapshot() — the snapshot is
-        # UI-decorated and reshapes fields (e.g. exam is stripped to a UI view),
-        # which would corrupt round-trips. to_dict() is the serialization
-        # contract that from_dict() inverts exactly.
-        path.write_text(json.dumps(self.state.to_dict(), indent=2, default=str))
+            raise RuntimeError("no active game to save")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # to_dict() is the serialization contract that from_dict() inverts
+        # exactly; snapshot() is UI-decorated and would corrupt round-trips.
+        payload = json.dumps(self.state.to_dict(), indent=2, default=str)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(path)
 
     def load(self, path: Path) -> dict:
-        """Rebuild a full GameState from a canonical state dict on disk."""
+        """Rebuild a full GameState from a canonical state dict on disk.
+        Raises OSError on read failure, ValueError on parse / shape failure."""
+        if not path.exists():
+            raise FileNotFoundError(f"save file not found: {path}")
         raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        self.state = GameState.from_dict(data)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"save file is not valid JSON: {e}") from e
+        # Valid JSON isn't enough — `from_dict` calls `.get(...)` on the root,
+        # so a JSON array, string, or null would raise AttributeError and slip
+        # past both this layer and the bridge envelope. Pin the contract here.
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"save file root must be a JSON object, got {type(data).__name__}"
+            )
+        try:
+            self.state = GameState.from_dict(data)
+        except (KeyError, TypeError, ValueError, AttributeError) as e:
+            raise ValueError(f"save file is unreadable (schema mismatch): {e}") from e
         self._broadcast()
         return self.snapshot()
