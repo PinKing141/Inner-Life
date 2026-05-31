@@ -204,6 +204,12 @@ class WebBridge(QObject):
     def activity(self, kind: str) -> str:
         return _dumps(self._controller.activity(kind))
 
+    @Slot(int, result=str)
+    def continueAsHeir(self, npc_id: int) -> str:
+        """Phase 5: pivot the game onto a living child as the new playable
+        character after the current one dies."""
+        return _dumps(self._controller.continue_as_heir(npc_id))
+
     # ---- Persistence ----
     #
     # Save/load talk to the filesystem, which can fail in user-visible ways

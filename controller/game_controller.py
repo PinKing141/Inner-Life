@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import activities, economy, education, housing, relationships, sim
+from core import activities, economy, education, genealogy, housing, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -64,6 +64,11 @@ class GameController:
         snap["exam"] = self._exam_for_ui()
         snap["housing_market"] = housing.list_market(self.state)
         snap["net_worth"] = housing.net_worth(self.state)
+        # Phase 5: the death modal reads eligible_heirs to decide whether
+        # to offer "continue as [child]" buttons; ancestors carries the
+        # outgoing lives so a future family-history UI can browse them.
+        snap["eligible_heirs"] = genealogy.eligible_heirs(self.state)
+        snap["ancestors"] = list(self.state.ancestors)
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -437,6 +442,20 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+
+    def continue_as_heir(self, npc_id: int) -> dict:
+        """Phase 5: transition the playable across a generational boundary.
+
+        Routes through genealogy.continue_as_heir, which archives the
+        current Character into state.ancestors, swaps in a fresh
+        Character built from the heir's Agent record, applies the
+        estate share, and flips mode back to PLAYING. No-op if the
+        engine refuses (not in DEATH, heir unknown, heir dead)."""
+        if self.state is None:
+            return self.snapshot()
+        genealogy.continue_as_heir(self.state, npc_id)
+        self._broadcast()
+        return self.snapshot()
 
     def activity(self, kind: str) -> dict:
         s = self.state

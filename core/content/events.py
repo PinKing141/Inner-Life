@@ -13,6 +13,7 @@ To add a new event: append a dict here. No engine changes needed.
 from __future__ import annotations
 
 from core.predicates import (
+    ChildCountAtMost,
     EducationAtLeast,
     HasJob,
     HasLivingRelationship,
@@ -529,6 +530,34 @@ EVENTS: list[dict] = [
              "log": "Months of waiting. Reject and resubmit, but you got it in eventually."},
             {"text": "Send to a smaller journal", "effects": {"smarts": 2, "happiness": 3},
              "log": "Accepted with light edits. Less prestige, less stress."},
+        ],
+    },
+
+    # ----- Phase 5: genealogy -----
+    # Birth event. Available once the player has a Partner; tapers off as
+    # the family grows (ChildCountAtMost(2) keeps it firing for the first
+    # two would-be siblings). Accepting routes through the `have_child`
+    # side-effect in core.events which mints a fresh Agent + Relationship
+    # and registers the npc_id on Character.children so eligible_heirs
+    # picks it up at death.
+    {
+        "id": "consider_child",
+        "min_age": 22, "max_age": 42, "prob": 0.18,
+        "predicates": [
+            HasLivingRelationship("Partner"),
+            ChildCountAtMost(2),
+        ],
+        "text": (
+            "You and your partner have been talking about starting a family. "
+            "It would change everything — and start a new line."
+        ),
+        "choices": [
+            {"text": "Yes — start a family",
+             "effects": {"happiness": 6, "money": -3_000},
+             "log": "Your partner squeezed your hand. The decision was made.",
+             "side_effect": "have_child"},
+            {"text": "Not yet", "effects": {"happiness": -2},
+             "log": "You said maybe later. Your partner nodded, quietly."},
         ],
     },
 ]

@@ -43,6 +43,16 @@
       case "uni-skip":            await b.setUniversityPlan(false, ""); break;
       case "drop-out-university": await b.dropOutUniversity(); break;
       case "enroll-postgrad":     await b.enrollPostgrad(payload); break;
+      case "continue-as-heir":
+        // Phase 5: crossing a generational boundary. Reset the latches
+        // the death modal sets so the heir's life renders cleanly
+        // (otherwise we'd suppress the next death modal because
+        // deathShown stays true from the parent's death).
+        this.deathShown = false;
+        this.currentModalKey = null;
+        this.loggedFeedCount = 0;
+        if (b.continueAsHeir) await b.continueAsHeir(payload);
+        break;
       case "save-game":
         if (b.save) await this.handleSaveLoad(b.save(), "Game saved");
         break;

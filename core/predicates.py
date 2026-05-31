@@ -209,6 +209,36 @@ class HasNoLivingRelationship:
         return not any(r.kind == self.kind and r.alive for r in s.relationships)
 
 
+# --- Phase 5: genealogy -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ChildCountAtMost:
+    """True when the player's existing children list is at or below ``n``.
+    Lets the 'consider a child?' event taper off naturally as a family
+    grows, rather than firing indefinitely."""
+
+    n: int
+
+    def __call__(self, s: GameState) -> bool:
+        if s.character is None:
+            return False
+        return len(s.character.children) <= self.n
+
+
+@dataclass(frozen=True)
+class HasLivingChild:
+    """True when the player has at least one living child Agent — the
+    minimum condition for the 'continue as heir' transition to be offered
+    on death."""
+
+    def __call__(self, s: GameState) -> bool:
+        if s.character is None:
+            return False
+        child_ids = set(s.character.children)
+        return any(a.alive for a in s.agents if a.npc_id in child_ids)
+
+
 # --- Evaluation -----------------------------------------------------------
 
 def evaluate(preds: list[Predicate] | None, state: GameState) -> bool:

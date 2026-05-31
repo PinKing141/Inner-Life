@@ -156,6 +156,11 @@ class GameState:
     job_application_error: str | None = None  # last rejected application message
     properties: list = field(default_factory=list)  # owned homes [{id,name,value,purchase_price}]
     rental: dict | None = None  # current rental {id,name,rent}
+    # Phase 5 — genealogy. `ancestors` is the archive of prior playable
+    # characters: when the player dies and continues as a child, the
+    # outgoing life is snapshotted here so legend / family-history UI can
+    # read it back. Each entry is a dict (see core.genealogy.snapshot).
+    ancestors: list[dict] = field(default_factory=list)
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -256,6 +261,7 @@ class GameState:
             "job_application_error": self.job_application_error,
             "properties": list(self.properties),
             "rental": self.rental,
+            "ancestors": list(self.ancestors),
         }
 
 
@@ -390,4 +396,5 @@ class GameState:
             job_application_error=data.get("job_application_error"),
             properties=list(data.get("properties", [])),
             rental=data.get("rental"),
+            ancestors=list(data.get("ancestors", [])),
         )
