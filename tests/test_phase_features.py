@@ -448,6 +448,14 @@ def test_tuition_pushes_balance_negative_and_work_repays():
         if ok:
             break
     assert c.state.career is not None
+    # Isolate the economic claim under test (salary repays debt) from random
+    # event interference: mark every catalogue event as already-fired, so
+    # `_age_to` can't pick choice 0 on a `lose_job`-tagged event during the
+    # 12-year working window. Adding a new event to the catalogue previously
+    # could shift the RNG cascade enough to break this test for a specific
+    # seed; pinning the no-event window makes the test robust to that.
+    from core.content.events import EVENTS as _EV
+    c.state.fired_events = [e["id"] for e in _EV]
     low = c.state.money
     _age_to(c, c.state.character.age + 12)
     assert c.state.money > low

@@ -156,6 +156,7 @@ class GameState:
     job_application_error: str | None = None  # last rejected application message
     properties: list = field(default_factory=list)  # owned homes [{id,name,value,purchase_price}]
     rental: dict | None = None  # current rental {id,name,rent}
+    social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -256,6 +257,7 @@ class GameState:
             "job_application_error": self.job_application_error,
             "properties": list(self.properties),
             "rental": self.rental,
+            "social_edges": [e.to_dict() for e in self.social_edges],
         }
 
 
@@ -263,6 +265,7 @@ class GameState:
     def from_dict(cls, data: dict) -> "GameState":
         """Inverse of to_dict. Tolerant to missing fields from older snapshots."""
         from core.agents import Agent  # local import to avoid cycle at module-load
+        from core.social import SocialEdge  # ditto
 
         char_d = data.get("character")
         character: Character | None = None
@@ -390,4 +393,5 @@ class GameState:
             job_application_error=data.get("job_application_error"),
             properties=list(data.get("properties", [])),
             rental=data.get("rental"),
+            social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
         )

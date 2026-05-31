@@ -28,6 +28,7 @@ from core.predicates import (
     DuringRecession,
     DuringWar,
     MinInflationIndex,
+    RelativeHasEmployedFriend,
 )
 
 # Each "choice" maps to: text shown to player, stat/money effects, log line.
@@ -529,6 +530,36 @@ EVENTS: list[dict] = [
              "log": "Months of waiting. Reject and resubmit, but you got it in eventually."},
             {"text": "Send to a smaller journal", "effects": {"smarts": 2, "happiness": 3},
              "log": "Accepted with light edits. Less prestige, less stress."},
+        ],
+    },
+
+    # ----- Phase 2: NPC↔NPC graph -----
+    # First event powered by the Phase 2 social graph: the player gets a
+    # job referral through a *third party* — a friend of mum/dad who the
+    # player doesn't know directly. The predicate reads the NPC↔NPC graph,
+    # the `take_family_friend_job` side-effect mints a real career using
+    # that friend's job_title. Drama from triangles, not just the star.
+    {
+        "id": "family_friend_referral",
+        "min_age": 18, "max_age": 30, "prob": 0.10,
+        "predicates": [
+            NoJob(),
+            HasLivingRelationship("Mother"),
+            RelativeHasEmployedFriend("Mother"),
+        ],
+        "text": (
+            "Your mother mentions an old friend of hers is looking to "
+            "hire someone trustworthy at their workplace. She quietly "
+            "put your name forward. Take the offer?"
+        ),
+        "choices": [
+            {"text": "Yes — start there", "effects": {"happiness": 6},
+             "log": "You took the job your mother's friend offered. "
+                    "It's not glamorous, but it's a foot in the door.",
+             "side_effect": "take_family_friend_job"},
+            {"text": "No — you'll find your own way", "effects": {"happiness": -4},
+             "log": "You thanked your mother but didn't follow up. "
+                    "She tried not to look hurt."},
         ],
     },
 ]
