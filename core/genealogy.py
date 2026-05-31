@@ -359,6 +359,8 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
     state.job_application_error = None
     state.fired_events = []
     state.causal_chain = []
+    state.pending_milestone = None
+    state.milestones_seen = []
     state.feed = []
     # Note: properties don't carry over in MVP — sold at probate, value
     # already counted in `money` would be too much complexity here. Future
