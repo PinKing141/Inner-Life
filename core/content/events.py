@@ -542,6 +542,10 @@ EVENTS: list[dict] = [
     # picks it up at death.
     {
         "id": "consider_child",
+        # Events default to firing-once; this one needs to repeat so the
+        # ChildCountAtMost(2) gate can let it offer a 2nd and 3rd child,
+        # and so 'Not yet' isn't a permanent decision.
+        "unique": False,
         "min_age": 22, "max_age": 42, "prob": 0.18,
         "predicates": [
             HasLivingRelationship("Partner"),

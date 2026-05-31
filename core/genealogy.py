@@ -286,8 +286,54 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
 
     # 4. Heir Agent leaves the NPC list — they ARE the player now.
     state.agents = [a for a in state.agents if a.npc_id != heir_npc_id]
-    # And drop the Child relationship the player had with them.
-    state.relationships = [r for r in state.relationships if r.npc_id != heir_npc_id]
+
+    # 4b. Rebuild the heir's player-facing relationships from the heir's
+    # perspective. The previous player's social graph belonged to them,
+    # not to the heir: their Partner is the heir's *other parent*, not
+    # the heir's spouse; their Friends/Coworkers are strangers to the
+    # heir; their Mother/Father are the heir's grandparents (usually
+    # long dead). Carrying any of that across would let the sim treat
+    # the heir as romantically partnered to a step-parent the first
+    # time consider_child or tick_partner runs. Rebuild instead of
+    # filter — narrow, explicit, defensible.
+    prev_partner_id = next(
+        (r.npc_id for r in state.relationships
+         if r.kind == "Partner" and r.alive and r.npc_id != heir_npc_id),
+        None,
+    )
+    other_child_ids = [c for c in state.character.children if c != heir_npc_id]
+    new_relationships: list[Relationship] = []
+
+    # Surviving partner of the deceased -> heir's other biological parent.
+    # Mother / Father is read from the partner Agent's gender.
+    if prev_partner_id is not None:
+        partner_agent = next(
+            (a for a in state.agents if a.npc_id == prev_partner_id), None,
+        )
+        if partner_agent is not None and partner_agent.alive:
+            parent_kind = (
+                "Mother" if partner_agent.gender == "Female"
+                else "Father" if partner_agent.gender == "Male"
+                else "Parent"
+            )
+            partner_agent.role = parent_kind  # keep Agent.role consistent
+            new_relationships.append(Relationship(
+                npc_id=prev_partner_id, name=partner_agent.name,
+                kind=parent_kind, relationship=85, alive=True,
+            ))
+
+    # Other living children of the deceased -> heir's siblings.
+    for sib_id in other_child_ids:
+        sib_agent = next((a for a in state.agents if a.npc_id == sib_id), None)
+        if sib_agent is None or not sib_agent.alive:
+            continue
+        sib_agent.role = "Sibling"
+        new_relationships.append(Relationship(
+            npc_id=sib_id, name=sib_agent.name,
+            kind="Sibling", relationship=70, alive=True,
+        ))
+
+    state.relationships = new_relationships
 
     # 5. Stats — re-roll lightly from the heir's Agent stats (those were
     # already shaped at birth by parental inheritance).

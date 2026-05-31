@@ -246,6 +246,107 @@ def test_continue_as_heir_resets_per_life_subsystems():
     assert "inherited" in s.feed[0].text.lower()
 
 
+def test_continue_as_heir_drops_old_partner_friends_and_grandparents():
+    """The deceased's Partner / Friends / Mother / Father must NOT carry
+    over as the heir's romantic partner / friends / parents. Otherwise the
+    sim's `kind == 'Partner'` checks treat a step-parent as the heir's
+    spouse and consider_child fires on the wrong person."""
+    s = _new(seed=77)
+    _give_partner(s, npc_id=900)
+    # Seed a couple of arbitrary friends/coworkers on the deceased.
+    from core.agents import Agent
+    for npc_id, kind in ((500, "Friend"), (501, "Coworker")):
+        s.agents.append(Agent(
+            npc_id=npc_id, first_name="Pal", last_name="X",
+            gender="NonBinary", role=kind, age=35,
+            country=s.character.country, city=s.character.city,
+        ))
+        s.relationships.append(Relationship(
+            npc_id=npc_id, name="Pal X", kind=kind, relationship=60, alive=True,
+        ))
+    genealogy.have_child(s, Rng(61).fork(7))
+    heir_id = s.character.children[0]
+    s.mode = "DEATH"
+
+    genealogy.continue_as_heir(s, heir_id)
+
+    kinds = {r.kind for r in s.relationships if r.alive}
+    assert "Partner" not in kinds
+    assert "Friend" not in kinds
+    assert "Coworker" not in kinds
+    # The original Mother/Father (heir's grandparents) drop too — they
+    # belonged to the deceased's life, not the heir's.
+    assert all(r.kind not in ("Mother", "Father") or r.npc_id == 900
+               for r in s.relationships)
+
+
+def test_surviving_partner_becomes_heirs_parent():
+    """The deceased's living Partner is the heir's biological other
+    parent, so they reclassify to Mother/Father based on gender."""
+    s = _new(seed=77)
+    _give_partner(s, npc_id=900)
+    # Make the partner female so we land on Mother.
+    partner_agent = next(a for a in s.agents if a.npc_id == 900)
+    partner_agent.gender = "Female"
+    genealogy.have_child(s, Rng(63).fork(7))
+    heir_id = s.character.children[0]
+    s.mode = "DEATH"
+
+    genealogy.continue_as_heir(s, heir_id)
+    mom = next((r for r in s.relationships if r.kind == "Mother"), None)
+    assert mom is not None
+    assert mom.npc_id == 900
+    assert mom.alive is True
+    # The Agent's role moved with the relationship — keep the two aligned.
+    assert next(a for a in s.agents if a.npc_id == 900).role == "Mother"
+
+
+def test_other_living_children_become_heirs_siblings():
+    s = _new(seed=77)
+    _give_partner(s)
+    genealogy.have_child(s, Rng(71).fork(7))
+    genealogy.have_child(s, Rng(72).fork(7))
+    heir_id, sibling_id = s.character.children[0], s.character.children[1]
+    s.mode = "DEATH"
+
+    genealogy.continue_as_heir(s, heir_id)
+    sib = next((r for r in s.relationships if r.npc_id == sibling_id), None)
+    assert sib is not None
+    assert sib.kind == "Sibling"
+    assert sib.alive is True
+
+
+def test_dead_partner_does_not_become_parent():
+    """If the partner pre-deceased the player, they don't get resurrected
+    as the heir's parent — they stay gone."""
+    s = _new(seed=77)
+    _give_partner(s, npc_id=900)
+    # Have the child while the partner is still alive (birth requires it),
+    # then kill the partner before the death-and-continue transition.
+    genealogy.have_child(s, Rng(81).fork(7))
+    heir_id = s.character.children[0]
+    next(a for a in s.agents if a.npc_id == 900).alive = False
+    next(r for r in s.relationships if r.npc_id == 900).alive = False
+    s.mode = "DEATH"
+    genealogy.continue_as_heir(s, heir_id)
+    assert not any(r.kind in ("Mother", "Father") and r.npc_id == 900
+                   for r in s.relationships)
+
+
+def test_consider_child_event_is_not_unique():
+    """Without `unique: False`, the event is marked fired after the first
+    resolution and ChildCountAtMost(2) can never offer a sibling."""
+    s = _new()
+    _give_partner(s)
+    ev = event_engine.get_event("consider_child")
+    assert ev is not None
+    s.pending_event_id = ev["id"]
+    event_engine.resolve_choice(s, ev["id"], 0)  # have first child
+    assert "consider_child" not in s.fired_events, (
+        "non-unique event should not be recorded in fired_events"
+    )
+
+
 def test_continue_as_heir_refuses_dead_heir():
     s = _new(seed=77)
     _give_partner(s)
