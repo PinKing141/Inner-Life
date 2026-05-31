@@ -1,0 +1,102 @@
+/* ============================================================================
+   LIFE UI · SHELL  —  the fixed frame every screen lives inside
+   ----------------------------------------------------------------------------
+   App container, frameless titlebar, identity strip, scrolling screen region,
+   and the in-app window controls (min / max / close) wired in main.py.
+   ============================================================================ */
+
+.app{
+  width:100%;height:100%;
+  background:var(--bg-1);
+  display:flex;flex-direction:column;
+  overflow:hidden;position:relative;
+}
+/* faint paper grain for atmosphere — atmosphere, not decoration */
+.app::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:80;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.022'/></svg>");
+  mix-blend-mode:overlay;
+}
+
+/* --- top bar --- */
+.app-topbar{
+  display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:var(--bg-2);border-bottom:1px solid var(--line-soft);flex-shrink:0;
+}
+.app-topbar .mark{width:13px;height:13px;border-radius:4px;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold-deep))}
+.app-topbar .title{
+  font-family:var(--font-label);font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);flex:1;
+}
+.app-topbar .ver{font-family:var(--font-label);font-size:9px;
+  letter-spacing:.1em;color:var(--ink-faint)}
+
+/* TOPBAR: menu button */
+.app-menu{
+  width:26px;height:26px;border:none;background:none;cursor:pointer;
+  color:var(--ink-faint);border-radius:7px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.app-menu:hover{background:var(--bg-3);color:var(--gold)}
+.app-menu svg{width:16px;height:16px}
+
+/* TOPBAR: frameless window controls — paired with WindowControls in main.py.
+   The topbar drives drag; the three buttons drive min / max / close. Hidden
+   gracefully when no Qt windowControls object is exposed (browser preview). */
+.app-topbar[data-drag]{-webkit-app-region:drag}
+.win-controls{display:flex;align-items:center;gap:2px;flex-shrink:0;
+  -webkit-app-region:no-drag}
+.win-btn{
+  width:30px;height:22px;display:inline-flex;align-items:center;
+  justify-content:center;background:transparent;border:none;border-radius:6px;
+  cursor:pointer;color:var(--ink-faint);flex-shrink:0;
+  transition:background .15s var(--ease),color .15s var(--ease);
+}
+.win-btn:hover{background:var(--bg-3);color:var(--ink)}
+.win-btn.win-close:hover{background:#c8412e;color:#fff}
+.win-btn svg{width:12px;height:12px}
+/* App-menu is also a button — keep it out of the drag region. */
+.app-menu{-webkit-app-region:no-drag}
+
+/* --- identity strip (no avatar, per spec) --- */
+.app-identity{
+  display:flex;align-items:center;gap:14px;padding:16px 18px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 10%,var(--bg-2)) 0%,var(--bg-1) 100%);
+  border-bottom:1px solid var(--line);flex-shrink:0;
+}
+.app-identity .flag{
+  width:38px;height:26px;border-radius:5px;flex-shrink:0;overflow:hidden;
+  border:1px solid var(--line);box-shadow:0 4px 10px -4px rgba(0,0,0,.75);
+}
+.app-identity .flag svg,
+.app-identity .flag img{display:block;width:100%;height:100%}
+.app-identity .who{flex:1;min-width:0}
+.app-identity .who .nm{
+  font-family:var(--font-display);font-weight:600;font-size:23px;
+  color:var(--ink);line-height:1.1;letter-spacing:-.01em;
+}
+.app-identity .who .stage{
+  margin-top:3px;font-family:var(--font-label);font-size:10px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--gold);
+  display:flex;align-items:center;gap:7px;
+}
+.app-identity .who .stage .sep{width:3px;height:3px;border-radius:50%;
+  background:var(--ink-faint)}
+.app-identity .who .stage .loc{color:var(--ink-faint);
+  letter-spacing:.04em;text-transform:none;font-weight:400;font-size:11px}
+.app-identity .bal{text-align:right;flex-shrink:0}
+.app-identity .bal .k{font-family:var(--font-label);font-size:8.5px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--ink-faint)}
+.app-identity .bal .v{font-family:var(--font-display);font-size:20px;
+  font-weight:500;color:var(--gold-bright);line-height:1.1;margin-top:1px}
+
+/* --- scrolling screen region --- */
+.app-screens{flex:1;overflow-y:auto;position:relative;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.app-screens::-webkit-scrollbar{width:5px}
+.app-screens::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+.screen{display:none;padding:18px 16px 18px}
+.screen.is-active{display:block;animation:screen-in .38s var(--ease) both}
+@keyframes screen-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

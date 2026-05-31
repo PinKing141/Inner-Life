@@ -1,0 +1,67 @@
+/* ============================================================================
+   LIFE UI · TOKENS  —  change the entire look from right here
+   ----------------------------------------------------------------------------
+   Every colour, radius, shadow, and font lives in :root. Touch nothing in the
+   other files when reflavouring — adjust the tokens and the whole UI follows.
+   ============================================================================ */
+
+:root{
+  /* surfaces — warm near-black, layered so cards read as "raised".
+     The bg-0 → bg-2 step is intentionally generous so panels actually
+     register as raised against the body rather than blending into it. */
+  --bg-0:#0c0a07;        /* window backdrop                              */
+  --bg-1:#17130d;        /* app body                                     */
+  --bg-2:#241d12;        /* panels / cards — clearly above the body      */
+  --bg-3:#302718;        /* hover / pressed                              */
+  --line:#5a4d34;        /* visible hairline — clearly drawn             */
+  --line-soft:#3a3221;   /* faint hairline                               */
+
+  /* ink */
+  --ink:#f3eada;         /* primary text                                 */
+  --ink-dim:#bba98a;     /* secondary text                               */
+  --ink-faint:#86785b;   /* labels, captions                             */
+
+  /* brand */
+  --gold:#e6c485;
+  --gold-bright:#f7dca0;
+  --gold-deep:#b08f51;
+
+  /* semantic */
+  --c-happy:#f0c061;
+  --c-health:#ec8170;
+  --c-smarts:#8fc1de;
+  --c-looks:#d49bc1;
+  --c-good:#9bd2b3;
+  --c-warn:#f0c061;
+  --c-bad:#ec8170;
+
+  /* category accents */
+  --cat-birth:#f7dca0;
+  --cat-family:#dcaccb;
+  --cat-education:#9bc0df;
+  --cat-money:#f0cf61;
+  --cat-health:#ec8170;
+  --cat-social:#9bd2b3;
+  --cat-milestone:#9bd2b3;
+  --cat-crime:#e09584;
+  --cat-event:#c0b390;
+
+  /* shape & motion */
+  --r-lg:18px; --r-md:13px; --r-sm:9px;
+  --shadow:0 22px 48px -22px rgba(0,0,0,.95);
+  --card-shadow:0 6px 18px -12px rgba(0,0,0,.85);
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  /* type */
+  --font-display:'Fraunces',Georgia,serif;
+  --font-body:'Newsreader',Georgia,serif;
+  --font-label:'Archivo','Helvetica Neue',sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:radial-gradient(120% 80% at 50% -10%,#241d12 0%,transparent 55%),var(--bg-0);
+  font-family:var(--font-body);color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}

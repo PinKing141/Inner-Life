@@ -295,9 +295,9 @@ body{
   content:"";position:absolute;left:18px;top:6px;bottom:8px;width:2px;border-radius:2px;
   background:linear-gradient(180deg,var(--gold),var(--gold-deep) 30%,var(--line) 75%,transparent);
 }
-.ui-event{position:relative;margin-bottom:18px}
-.ui-event:last-child{margin-bottom:2px}
-.ui-event .node{
+.ui-year{position:relative;margin-bottom:18px}
+.ui-year:last-child{margin-bottom:2px}
+.ui-year .node{
   position:absolute;left:-48px;top:1px;width:36px;height:36px;border-radius:50%;
   background:var(--bg-2);border:1.5px solid var(--line);
   display:flex;align-items:center;justify-content:center;
@@ -305,38 +305,39 @@ body{
   color:var(--ink-dim);
   box-shadow:0 4px 10px -6px rgba(0,0,0,.7);
 }
-.ui-event.is-latest .node{
+.ui-year.is-latest .node{
   border-color:var(--gold);color:var(--gold-bright);
   background:radial-gradient(circle,color-mix(in srgb,var(--gold) 25%,var(--bg-2)),var(--bg-2));
   box-shadow:0 0 0 5px rgba(230,196,133,.12),0 6px 14px -6px rgba(0,0,0,.8);
 }
-.ui-event .card{
+.ui-year .card{
   background:var(--bg-2);border:1px solid var(--line-soft);
   border-radius:var(--r-md);padding:14px 16px;
   box-shadow:var(--card-shadow);
 }
-.ui-event.is-latest .card{
+.ui-year.is-latest .card{
   border-color:var(--gold-deep);
   background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 8%,var(--bg-2)),var(--bg-2));
   box-shadow:0 10px 24px -14px rgba(0,0,0,.9);
 }
-.ui-event .cat{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.ui-event .cat i{width:6px;height:6px;border-radius:50%;
+.ui-year .entry + .entry{
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);
+}
+.ui-year .cat{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.ui-year .cat i{width:6px;height:6px;border-radius:50%;
   background:var(--accent,var(--gold));display:block}
-.ui-event .cat span{
+.ui-year .cat span{
   font-family:var(--font-label);font-size:9px;font-weight:700;
   letter-spacing:.14em;text-transform:uppercase;color:var(--accent,var(--gold));
 }
-.ui-event .cat .age{margin-left:auto;font-size:9px;color:var(--ink-faint);
-  letter-spacing:.1em}
-.ui-event .text{
+.ui-year .text{
   font-family:var(--font-body);font-size:15px;line-height:1.58;color:var(--ink);
 }
-.ui-event.is-birth .text::first-letter{
+.ui-year .entry.is-birth .text::first-letter{
   font-family:var(--font-display);font-weight:600;font-size:42px;line-height:.8;
   float:left;margin:5px 9px 0 0;color:var(--gold-bright);
 }
-.ui-event.fresh{animation:event-pop .45s var(--ease) both}
+.ui-year .entry.fresh{animation:event-pop .45s var(--ease) both}
 @keyframes event-pop{from{opacity:0;transform:translateY(-6px) scale(.97)}
   to{opacity:1;transform:none}}
 
@@ -406,12 +407,11 @@ body{
 .ui-stat .name{
   font-family:var(--font-label);font-size:10px;font-weight:800;
   letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);
-  width:78px;flex-shrink:0;
+  flex:1;
 }
-.ui-stat .ui-meter{height:11px}
 .ui-stat .num{
   font-family:var(--font-display);font-size:16px;font-weight:600;
-  color:var(--ink);width:36px;text-align:right;flex-shrink:0;
+  color:var(--ink);text-align:right;flex-shrink:0;
 }
 
 

@@ -110,16 +110,17 @@ const LifeUI = (function () {
            (trail ? `<span class="ui-trail">${trail}</span>` : '') +
            `</${tag}>`;
   }
-  function eventHTML(e, latest) {
+  function entryHTML(e, fresh) {
     const cat = e.category || 'event';
-    return `<div class="ui-event t-${cat}${latest ? ' is-latest' : ''}` +
-           `${cat === 'birth' ? ' is-birth' : ''}${latest ? ' fresh' : ''}" ` +
-           `style="--accent:var(--cat-${cat},var(--gold))">` +
+    return `<div class="entry t-${cat}${cat === 'birth' ? ' is-birth' : ''}` +
+           `${fresh ? ' fresh' : ''}" style="--accent:var(--cat-${cat},var(--gold))">` +
+           `<div class="cat"><i></i><span>${esc(e.label || cat)}</span></div>` +
+           `<div class="text">${e.text == null ? '' : e.text}</div></div>`;
+  }
+  function yearHTML(e, latest) {
+    return `<div class="ui-year${latest ? ' is-latest' : ''}" data-age="${esc(e.age)}">` +
            `<div class="node">${esc(e.age)}</div>` +
-           `<div class="card"><div class="cat"><i></i>` +
-           `<span>${esc(e.label || cat)}</span>` +
-           `<span class="age">Age ${esc(e.age)}</span></div>` +
-           `<div class="text">${e.text == null ? '' : e.text}</div></div></div>`;
+           `<div class="card">${entryHTML(e, latest)}</div></div>`;
   }
 
   const KIND_DEFAULTS = {
@@ -444,7 +445,6 @@ const LifeUI = (function () {
       const row = S.root.querySelector(`.ui-stat[data-stat="${key}"]`);
       if (!row) return;
       const v = Math.max(0, Math.min(100, Math.round(stats[key])));
-      row.querySelector('.ui-meter > i').style.width = v + '%';
       row.querySelector('.num').textContent = v;
     });
   }
@@ -452,9 +452,17 @@ const LifeUI = (function () {
   function logEvent(e) {
     const tl = $('.app-screens .screen[data-screen="life"] .ui-timeline');
     if (!tl) return;
-    tl.querySelectorAll('.ui-event.is-latest').forEach(n =>
-      n.classList.remove('is-latest', 'fresh'));
-    tl.insertAdjacentHTML('beforeend', eventHTML(e, true));
+    tl.querySelectorAll('.entry.fresh').forEach(n => n.classList.remove('fresh'));
+    const last = tl.lastElementChild;
+    if (last && last.dataset.age === String(e.age)) {
+      // Same year — append this entry into the existing block.
+      last.querySelector('.card').insertAdjacentHTML('beforeend', entryHTML(e, true));
+    } else {
+      // New year — start a fresh block.
+      tl.querySelectorAll('.ui-year.is-latest').forEach(n =>
+        n.classList.remove('is-latest'));
+      tl.insertAdjacentHTML('beforeend', yearHTML(e, true));
+    }
     tl.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
@@ -548,7 +556,7 @@ const LifeUI = (function () {
             return `<div class="ui-stat" data-stat="${k}" style="--accent:${m.color}">` +
                    `<span class="ico">${svg(m.icon, 2)}</span>` +
                    `<span class="name">${m.label}</span>` +
-                   `${meter(0, m.color)}<span class="num">0</span></div>`;
+                   `<span class="num">0</span></div>`;
           }).join('')}
         </div>
       </div>
