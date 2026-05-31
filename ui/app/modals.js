@@ -155,11 +155,30 @@
 
   App.raiseDeathModal = function (s) {
     const ch = s.character || {};
+    // Phase 5: if the player left living heirs, the modal becomes a
+    // generational hand-off rather than a terminal screen. Each heir
+    // surfaces as a picker row carrying their npc_id; clicking routes
+    // through `continue-as-heir` -> bridge.continueAsHeir.
+    const heirs = s.eligible_heirs || [];
+    const blocks = [{ type: "award", icon: "hourglass",
+      title: `${ch.name || "You"} died at ${ch.age || 0}`,
+      subtitle: heirs.length
+        ? "Your line endures — choose an heir to carry on."
+        : "Your story is complete. Open the menu to start another life." }];
+
+    if (heirs.length) {
+      blocks.push({ type: "list", items: heirs.map(h => ({
+        icon: "infant", accent: "var(--gold)",
+        title: `${h.name} — age ${h.age}`,
+        subtitle: `Continue as your child`,
+        trailing: { kind: "chevron" },
+        action: "continue-as-heir", payload: h.npc_id,
+      })) });
+    }
+
     LifeUI.modal({
       kind: "award", title: "End of Life", dismissable: true,
-      blocks: [{ type: "award", icon: "hourglass",
-        title: `${ch.name || "You"} died at ${ch.age || 0}`,
-        subtitle: "Your story is complete. Open the menu to start another life." }],
+      blocks,
       actions: [{ label: "Close", variant: "ghost", action: "__close" }],
     });
   };

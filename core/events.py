@@ -106,6 +106,21 @@ def _apply_side_effect(state: GameState, name: str) -> None:
         state.career = None
     elif name == "leave_school":
         state.education.in_school = False
+    elif name == "have_child":
+        # Phase 5: route the birth through genealogy.have_child so the
+        # child Agent, Relationship, and Character.children list all
+        # update through one well-tested path. RNG forks off the event
+        # tick so the same seed produces the same child.
+        from core import genealogy
+        rng = Rng(state.seed).fork(state.tick).fork(0xC4112D)
+        note = genealogy.have_child(state, rng)
+        if note:
+            state.feed.append(FeedEntry(
+                age=state.character.age if state.character else 0,
+                text=note,
+                kind="special",
+                entry_id=f"feed:birth_child:{state.tick}",
+            ))
     elif name == "take_family_friend_job":
         _take_family_friend_job(state)
 
