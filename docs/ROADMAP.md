@@ -31,17 +31,7 @@ Touchpoints:
 - `core/events.py` gains predicates that match on graph shape.
 - Information propagation: rumours travel along edges with attenuation.
 
-## Phase 3 — Causal narrative reader
-
-The data is already there (every choice writes a `cause_id` into
-`state.causal_chain`). What's missing is a renderer that walks the chain
-and produces "you got promoted because Helen quit, and Helen quit because
-her husband was transferred" without an LLM.
-
-Direct port of Fantasy Engine's `LegendsReader`. Drop it into `core/legend.py`
-and expose via the controller as a new verb (`controller.read_legend()`).
-
-## Phase 4 — World state
+## Phase 3 — World state
 
 The world has an era, an economy, a government. A 1962 life and a 2002 life
 must feel different not because of labels but because prices, jobs, norms,
@@ -54,7 +44,7 @@ Touchpoints:
 - New event predicates: "during a war", "during recession".
 
 
-## Phase 5 — Genealogy
+## Phase 4 — Genealogy
 
 Continuing as your child. Dynasties. Inherited traits, reputation, wealth,
 grudges, family business.
@@ -64,7 +54,7 @@ Touchpoints:
 - `Character` gains `parents`, `children`, `lineage_id`.
 
 
-## Phase 6 — State-gated events
+## Phase 5 — State-gated events
 
 Today events only check age. They should check state:
 
@@ -81,7 +71,7 @@ Touchpoints:
 - `core/predicates.py` — small DSL.
 - `events.roll_event` filters by predicates before probability.
 
-## Phase 7 — Persistence
+## Phase 6 — Persistence
 
 Wire up `GameController.load` for real. JSON for human-readable saves;
 optionally SQLite once the schema is stable.
