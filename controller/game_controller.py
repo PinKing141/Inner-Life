@@ -454,18 +454,33 @@ class GameController:
     # ---- Save / load ----
 
     def save(self, path: Path) -> None:
+        """Persist the CANONICAL state. Atomic: write to a temp file in the
+        same directory and rename, so a crash mid-write never leaves a
+        corrupt save in place. Raises OSError on I/O failure — callers
+        (bridge / CLI) translate to user-facing messages."""
         if self.state is None:
-            return
-        # Persist the CANONICAL state, not snapshot() — the snapshot is
-        # UI-decorated and reshapes fields (e.g. exam is stripped to a UI view),
-        # which would corrupt round-trips. to_dict() is the serialization
-        # contract that from_dict() inverts exactly.
-        path.write_text(json.dumps(self.state.to_dict(), indent=2, default=str))
+            raise RuntimeError("no active game to save")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # to_dict() is the serialization contract that from_dict() inverts
+        # exactly; snapshot() is UI-decorated and would corrupt round-trips.
+        payload = json.dumps(self.state.to_dict(), indent=2, default=str)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(path)
 
     def load(self, path: Path) -> dict:
-        """Rebuild a full GameState from a canonical state dict on disk."""
+        """Rebuild a full GameState from a canonical state dict on disk.
+        Raises OSError on read failure, ValueError on parse / shape failure."""
+        if not path.exists():
+            raise FileNotFoundError(f"save file not found: {path}")
         raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        self.state = GameState.from_dict(data)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"save file is not valid JSON: {e}") from e
+        try:
+            self.state = GameState.from_dict(data)
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"save file is unreadable (schema mismatch): {e}") from e
         self._broadcast()
         return self.snapshot()

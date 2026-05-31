@@ -50,6 +50,41 @@ def test_save_load_roundtrip_and_deterministic_continuation(tmp_path):
     assert [f.text for f in b.state.feed] == [f.text for f in a.state.feed]
 
 
+def test_save_without_active_game_raises(tmp_path):
+    """Saving before new_game() must fail loudly — silently writing nothing
+    would let the UI think a save exists when it doesn't."""
+    import pytest
+    c = GameController()
+    with pytest.raises(RuntimeError):
+        c.save(tmp_path / "empty.json")
+
+
+def test_load_missing_file_raises(tmp_path):
+    import pytest
+    c = GameController()
+    with pytest.raises(FileNotFoundError):
+        c.load(tmp_path / "does-not-exist.json")
+
+
+def test_load_corrupt_json_raises_valueerror(tmp_path):
+    import pytest
+    bad = tmp_path / "broken.json"
+    bad.write_text("{not valid json")
+    c = GameController()
+    with pytest.raises(ValueError):
+        c.load(bad)
+
+
+def test_save_is_atomic_no_partial_writes(tmp_path):
+    """A successful save() leaves exactly the final file — no .tmp leftover."""
+    save_file = tmp_path / "life.json"
+    c = GameController()
+    c.new_game(seed=1, name="", gender="Male", country="UK", talent="Sports")
+    c.save(save_file)
+    assert save_file.exists()
+    assert not (tmp_path / "life.json.tmp").exists()
+
+
 def test_load_missing_partner_and_weak_ties_survive_roundtrip(tmp_path):
     """A life that has formed a partner / weak ties must reload with them intact."""
     save_file = tmp_path / "life2.json"

@@ -205,20 +205,44 @@ class WebBridge(QObject):
         return _dumps(self._controller.activity(kind))
 
     # ---- Persistence ----
+    #
+    # Save/load talk to the filesystem, which can fail in user-visible ways
+    # (permission denied, disk full, corrupt file, schema mismatch from an
+    # older build). Each slot returns a JSON envelope:
+    #     { "ok": bool, "error": str | None, "snapshot": <snapshot dict> }
+    # so the UI can render the current state on success AND show a toast on
+    # failure without the bridge ever throwing into JS.
 
     @Slot(result=bool)
     def hasSave(self) -> bool:
-        return SAVE_PATH.exists()
+        try:
+            return SAVE_PATH.exists()
+        except OSError:
+            return False
+
+    def _envelope(self, ok: bool, error: str | None = None) -> str:
+        return _dumps({
+            "ok": ok,
+            "error": error,
+            "snapshot": self._controller.snapshot(),
+        })
 
     @Slot(result=str)
     def save(self) -> str:
-        self._controller.save(SAVE_PATH)
-        return _dumps(self._controller.snapshot())
+        try:
+            self._controller.save(SAVE_PATH)
+        except (OSError, RuntimeError, ValueError) as e:
+            return self._envelope(False, f"Save failed: {e}")
+        return self._envelope(True)
 
     @Slot(result=str)
     def load(self) -> str:
-        if SAVE_PATH.exists():
-            return _dumps(self._controller.load(SAVE_PATH))
-        return _dumps(self._controller.snapshot())
+        if not SAVE_PATH.exists():
+            return self._envelope(False, "No save file found.")
+        try:
+            self._controller.load(SAVE_PATH)
+        except (OSError, ValueError) as e:
+            return self._envelope(False, f"Load failed: {e}")
+        return self._envelope(True)
 
 
