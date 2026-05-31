@@ -75,6 +75,20 @@ def test_load_corrupt_json_raises_valueerror(tmp_path):
         c.load(bad)
 
 
+def test_load_non_object_json_root_raises_valueerror(tmp_path):
+    """Valid JSON whose root isn't an object (e.g. `[]`, `"bad"`, `null`) must
+    surface as ValueError, not AttributeError — otherwise the bridge envelope
+    (which only catches OSError/ValueError) throws into JS instead of
+    rendering a clean schema-mismatch toast."""
+    import pytest
+    c = GameController()
+    for content in ("[]", '"bad"', "null", "42"):
+        bad = tmp_path / "root.json"
+        bad.write_text(content)
+        with pytest.raises(ValueError):
+            c.load(bad)
+
+
 def test_save_is_atomic_no_partial_writes(tmp_path):
     """A successful save() leaves exactly the final file — no .tmp leftover."""
     save_file = tmp_path / "life.json"

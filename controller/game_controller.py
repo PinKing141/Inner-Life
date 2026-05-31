@@ -480,9 +480,16 @@ class GameController:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
             raise ValueError(f"save file is not valid JSON: {e}") from e
+        # Valid JSON isn't enough — `from_dict` calls `.get(...)` on the root,
+        # so a JSON array, string, or null would raise AttributeError and slip
+        # past both this layer and the bridge envelope. Pin the contract here.
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"save file root must be a JSON object, got {type(data).__name__}"
+            )
         try:
             self.state = GameState.from_dict(data)
-        except (KeyError, TypeError, ValueError) as e:
+        except (KeyError, TypeError, ValueError, AttributeError) as e:
             raise ValueError(f"save file is unreadable (schema mismatch): {e}") from e
         self._broadcast()
         return self.snapshot()
