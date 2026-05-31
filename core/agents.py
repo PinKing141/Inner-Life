@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from core.content import names as names_mod
+from core import social
 from core.rng import Rng
 from core.state import FeedEntry, GameState, Relationship
 
@@ -141,6 +142,55 @@ def seed_world(state: GameState, rng: Rng) -> None:
         # And refresh the relationship to show the agent's proper name.
         rel.name = agent.name if rel.kind in ("Friend", "Sibling", "Partner", "Coworker") else rel.name
         state.agents.append(agent)
+
+    # --- Phase 2: NPC↔NPC graph ---
+    # Wire up the seed edges every life starts with:
+    #   * parents are spouses (the canonical NPC↔NPC tie)
+    #   * each parent has 1–2 personal friends who DO have their own jobs,
+    #     so triangles like "mum's friend offers you a job" can fire later.
+    # These extra friend agents are NOT added to state.relationships — the
+    # player doesn't know them directly. They surface only through the graph.
+    _seed_family_graph(state, rng)
+
+
+def _seed_family_graph(state: GameState, rng: Rng) -> None:
+    mother = next((a for a in state.agents if a.role == "Mother"), None)
+    father = next((a for a in state.agents if a.role == "Father"), None)
+    if mother is not None and father is not None:
+        social.add_edge(state, mother.npc_id, father.npc_id, social.KIND_SPOUSE, strength=90)
+
+    if state.character is None:
+        return
+    country = state.character.country
+    city = state.character.city
+
+    # Counter for fresh NPC ids: keep stepping past anything that already exists
+    # (parents, siblings, anything seeded before) so we never collide.
+    next_id = max((a.npc_id for a in state.agents), default=0) + 1
+
+    for parent in (mother, father):
+        if parent is None:
+            continue
+        n_friends = 1 + rng.fork(parent.npc_id * 7).randint(0, 1)  # 1 or 2
+        for k in range(n_friends):
+            f_rng = rng.fork(parent.npc_id * 100 + k)
+            gender = f_rng.fork(1).choice(["Male", "Female", "NonBinary"])
+            surname = names_mod.random_surname(country, f_rng.fork(2))
+            friend = _new_npc(
+                next_id, gender, "Family Friend", surname, country, city, f_rng.fork(3),
+            )
+            # Family friends are adults with jobs — that's the whole point of
+            # seeding them; the demo job-referral event needs an employed
+            # third party. Clamp to the parent's generation so the friendship
+            # is plausible.
+            friend.age = max(25, parent.age + f_rng.fork(4).randint(-5, 5))
+            if friend.job_title is None:
+                friend.job_title = f_rng.fork(5).choice(_NPC_JOBS)
+            friend.money = f_rng.fork(6).choice([5_000, 15_000, 30_000, 60_000])
+            state.agents.append(friend)
+            social.add_edge(state, parent.npc_id, friend.npc_id,
+                            social.KIND_FRIEND, strength=f_rng.fork(7).randint(60, 85))
+            next_id += 1
 
 
 def _new_npc(
@@ -412,7 +462,30 @@ def form_incidental_ties(state: GameState, rng: Rng) -> str | None:
         npc_id=npc_id, name=agent.name, kind=role,
         relationship=rng.fork(5).randint(*WEAK_TIE_STRENGTH), alive=True,
     ))
+    # Phase 2: a new friend doesn't appear in a vacuum — they typically have
+    # at least one tie to someone already in the world. Picking from existing
+    # agents (not the player) progressively densifies the graph and lets
+    # triangles form across the years.
+    _link_into_graph(state, agent.npc_id, rng.fork(8))
     return f"You became friendly with {agent.name}, {descr}."
+
+
+def _link_into_graph(state: GameState, npc_id: int, rng: Rng) -> None:
+    """Optionally add one NPC↔NPC friendship from ``npc_id`` to another
+    living agent already in the world. Deterministic given ``rng``."""
+    candidates = [
+        a.npc_id for a in state.agents
+        if a.alive and a.npc_id != npc_id and a.role != "Mother" and a.role != "Father"
+    ]
+    if not candidates:
+        return
+    # ~40% of the time form a new tie — rare enough not to flood the graph,
+    # frequent enough to seed triangles over a few decades.
+    if not rng.fork(1).chance(0.4):
+        return
+    other = rng.fork(2).choice(candidates)
+    social.add_edge(state, npc_id, other,
+                    social.KIND_FRIEND, strength=rng.fork(3).randint(35, 65))
 
 
 # --- Partner formation (producer for an already-consumed edge type) ---

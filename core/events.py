@@ -121,6 +121,42 @@ def _apply_side_effect(state: GameState, name: str) -> None:
                 kind="special",
                 entry_id=f"feed:birth_child:{state.tick}",
             ))
+    elif name == "take_family_friend_job":
+        _take_family_friend_job(state)
+
+
+def _take_family_friend_job(state: GameState) -> None:
+    """Materialise a career when the player accepts the 'mother's/father's
+    friend has a job for you' event. Reads the NPC social graph to find an
+    employed friend of a living parent, then creates a corresponding Job.
+
+    Silently no-ops if the graph state has drifted between event roll and
+    resolution (the friend died, or lost their job). The happiness bump
+    from the effects dict already landed; the player just doesn't get the
+    referral they expected. Trade: a tiny inconsistency now in exchange
+    for not crashing the choice resolver on a stale predicate."""
+    from core import social
+    from core.state import Job
+
+    agent_by_id = {a.npc_id: a for a in state.agents}
+    for kind in ("Mother", "Father"):
+        relative = next((r for r in state.relationships if r.kind == kind and r.alive), None)
+        if relative is None:
+            continue
+        for nb_id in social.neighbors(state, relative.npc_id, kind=social.KIND_FRIEND):
+            friend = agent_by_id.get(nb_id)
+            if friend is None or not friend.alive or not friend.job_title:
+                continue
+            state.career = Job(
+                job_id="family_friend_referral",
+                title=f"Junior {friend.job_title}",
+                salary=22_000,
+                employer=f"{friend.first_name} {friend.last_name}'s firm".strip(),
+                career=friend.job_title,
+                level=0,
+                performance=50,
+            )
+            return
 
 
 def resolve_choice(state: GameState, event_id: str, choice_index: int) -> None:

@@ -161,6 +161,7 @@ class GameState:
     # outgoing life is snapshotted here so legend / family-history UI can
     # read it back. Each entry is a dict (see core.genealogy.snapshot).
     ancestors: list[dict] = field(default_factory=list)
+    social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -262,6 +263,7 @@ class GameState:
             "properties": list(self.properties),
             "rental": self.rental,
             "ancestors": list(self.ancestors),
+            "social_edges": [e.to_dict() for e in self.social_edges],
         }
 
 
@@ -269,6 +271,7 @@ class GameState:
     def from_dict(cls, data: dict) -> "GameState":
         """Inverse of to_dict. Tolerant to missing fields from older snapshots."""
         from core.agents import Agent  # local import to avoid cycle at module-load
+        from core.social import SocialEdge  # ditto
 
         char_d = data.get("character")
         character: Character | None = None
@@ -397,4 +400,5 @@ class GameState:
             properties=list(data.get("properties", [])),
             rental=data.get("rental"),
             ancestors=list(data.get("ancestors", [])),
+            social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
         )

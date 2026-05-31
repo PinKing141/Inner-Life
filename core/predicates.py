@@ -239,6 +239,34 @@ class HasLivingChild:
         return any(a.alive for a in s.agents if a.npc_id in child_ids)
 
 
+# --- Phase 2: graph-shape predicates --------------------------------------
+
+
+@dataclass(frozen=True)
+class RelativeHasEmployedFriend:
+    """True if the player has a living relative of the given kind whose
+    NPC↔NPC social graph contains at least one living, employed friend.
+
+    This is the first event predicate that reads from the Phase 2 social
+    graph rather than the player's direct relationships — it powers things
+    like 'your mother's friend has a job for you' that wouldn't be possible
+    with a star-graph centred on the player."""
+
+    relative_kind: str
+
+    def __call__(self, s: GameState) -> bool:
+        from core import social
+        agent_by_id = {a.npc_id: a for a in s.agents}
+        for r in s.relationships:
+            if r.kind != self.relative_kind or not r.alive:
+                continue
+            for nb_id in social.neighbors(s, r.npc_id, kind=social.KIND_FRIEND):
+                friend = agent_by_id.get(nb_id)
+                if friend is not None and friend.alive and friend.job_title:
+                    return True
+        return False
+
+
 # --- Evaluation -----------------------------------------------------------
 
 def evaluate(preds: list[Predicate] | None, state: GameState) -> bool:
