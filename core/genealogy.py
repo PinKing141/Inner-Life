@@ -597,6 +597,8 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
     # first tick.
     state.pregnancy = PregnancyState()
     state.pending_birth = None
+    state.pending_milestone = None
+    state.milestones_seen = []
     state.feed = []
     # Note: properties don't carry over in MVP — sold at probate, value
     # already counted in `money` would be too much complexity here. Future

@@ -26,6 +26,7 @@
     if (s.education && s.education.degree_award_pending) return "degree:" + s.tick;
     if (s.education && s.education.awaiting_university_choice) return "uni:" + s.tick;
     if (s.pending_birth) return "birth:" + s.pending_birth.npc_id + ":" + s.tick;
+    if (s.pending_milestone) return "milestone:" + s.pending_milestone.id + ":" + s.tick;
     if (s.mode === "DEATH" && !this.deathShown) { this.deathShown = true; return "death"; }
     return null;
   };
@@ -41,6 +42,7 @@
     else if (key.startsWith("degree:"))  this.raiseDegreeModal(s.education);
     else if (key.startsWith("uni:"))     this.raiseUniversityModal(s);
     else if (key.startsWith("birth:"))   this.raiseBirthModal(s.pending_birth);
+    else if (key.startsWith("milestone:")) this.raiseMilestoneModal(s.pending_milestone);
     else if (key === "death")            this.raiseDeathModal(s);
   };
 
@@ -66,6 +68,27 @@
         { label: "Name them", variant: "primary", action: "name-baby",
           payload: { npc_id: b.npc_id } },
       ],
+    });
+  };
+
+  // Icon + accent per milestone "kind" — keeps the visual language tight
+  // without inventing per-id assets. New milestones land here as needed.
+  const MILESTONE_LOOK = {
+    coming_of_age: { icon: "key",         accent: "var(--gold)" },
+    decade:        { icon: "cake",        accent: "var(--accent)" },
+    retirement:    { icon: "rocking",     accent: "var(--accent)" },
+    centenarian:   { icon: "crown",       accent: "var(--gold)" },
+  };
+
+  App.raiseMilestoneModal = function (m) {
+    if (!m) return;
+    const look = MILESTONE_LOOK[m.kind] || { icon: "star", accent: "var(--accent)" };
+    LifeUI.modal({
+      kind: "award", title: m.title || "A milestone", dismissable: true,
+      blocks: [{ type: "award", icon: look.icon,
+        title: m.title || "",
+        subtitle: m.subtitle || "" }],
+      actions: [{ label: "Carry on", variant: "primary", action: "ack-milestone" }],
     });
   };
 

@@ -13,6 +13,7 @@ To add a new event: append a dict here. No engine changes needed.
 from __future__ import annotations
 
 from core.predicates import (
+    OR,
     ChildCountAtMost,
     EducationAtLeast,
     HasJob,
@@ -673,6 +674,488 @@ EVENTS: list[dict] = [
              "log": "By Sunday the kitchen was unrecognisable. Joyful chaos."},
             {"text": "Go back to bed", "effects": {"happiness": 1, "health": 2},
              "log": "You slept until noon. Wisdom."},
+        ],
+    },
+
+    # ===========================================================
+    # ----- Phase 6: content batch (40 events across life phases)
+    # Predicates reuse existing infrastructure; no new gating types.
+    # Grouped by life phase in declaration order for readability.
+    # ===========================================================
+
+    # ----- Childhood (ages 5–11) -----
+    {
+        "id": "school_field_trip",
+        "min_age": 6, "max_age": 11, "prob": 0.18,
+        "text": "Your class is going on a field trip to a museum.",
+        "choices": [
+            {"text": "Pay attention", "effects": {"smarts": 3, "happiness": 2},
+             "log": "You stared at the dinosaur bones for an hour. Something clicked."},
+            {"text": "Mess about with friends", "effects": {"happiness": 4, "smarts": -1},
+             "log": "You barely saw the exhibits, but you laughed until you cried."},
+        ],
+    },
+    {
+        "id": "bully_incident",
+        "min_age": 6, "max_age": 11, "prob": 0.14,
+        "text": "An older kid keeps picking on you in the playground.",
+        "choices": [
+            {"text": "Tell a teacher", "effects": {"happiness": 2},
+             "log": "You spoke to a teacher. The bullying stopped, mostly."},
+            {"text": "Stand up to them", "effects": {"happiness": 3, "health": -2},
+             "log": "You squared up. You got pushed once, but they left you alone after."},
+            {"text": "Avoid them", "effects": {"happiness": -3},
+             "log": "You took long ways to class. It worked, but it weighed on you."},
+        ],
+    },
+    {
+        "id": "lost_a_tooth",
+        "min_age": 5, "max_age": 9, "prob": 0.20,
+        "text": "Your tooth came out at the dinner table.",
+        "choices": [
+            {"text": "Put it under the pillow", "effects": {"happiness": 3, "money": 2},
+             "log": "The Tooth Fairy left you £2 and a feeling of being known."},
+        ],
+    },
+    {
+        "id": "school_play",
+        "min_age": 7, "max_age": 11, "prob": 0.12,
+        "text": "Auditions for the school play are open.",
+        "choices": [
+            {"text": "Try for the lead role", "effects": {"happiness": 5, "looks": 1},
+             "log": "You got a part. People clapped. You'll remember it."},
+            {"text": "Help with the set", "effects": {"happiness": 2, "smarts": 1},
+             "log": "You painted backdrops. Quietly satisfying work."},
+            {"text": "Skip it", "effects": {"happiness": -1},
+             "log": "You didn't try out. You wondered, later, if you should have."},
+        ],
+    },
+    {
+        "id": "got_a_pet",
+        "min_age": 5, "max_age": 11, "prob": 0.10,
+        "text": "Your parents say you can have a pet.",
+        "choices": [
+            {"text": "A dog", "effects": {"happiness": 6, "health": 1},
+             "log": "You named the dog something embarrassing. You loved it."},
+            {"text": "A cat", "effects": {"happiness": 5},
+             "log": "The cat tolerated you. You took what affection it gave."},
+            {"text": "A fish", "effects": {"happiness": 2},
+             "log": "The fish lived a quiet, glassy life."},
+        ],
+    },
+    {
+        "id": "skinned_knee",
+        "min_age": 5, "max_age": 10, "prob": 0.15,
+        "text": "You fell off your bike on the way home.",
+        "choices": [
+            {"text": "Get up and ride on", "effects": {"happiness": -1, "health": -1},
+             "log": "Your knee bled through your jeans. You kept going."},
+        ],
+    },
+    {
+        "id": "sleepover_invite",
+        "min_age": 7, "max_age": 11, "prob": 0.16,
+        "text": "A classmate invited you to a sleepover.",
+        "choices": [
+            {"text": "Go", "effects": {"happiness": 5},
+             "log": "You ate too much pizza and laughed until 2am."},
+            {"text": "Stay home", "effects": {"happiness": -2},
+             "log": "You stayed in. You heard about it for weeks at school."},
+        ],
+    },
+    {
+        "id": "science_fair",
+        "min_age": 8, "max_age": 11, "prob": 0.13,
+        "text": "The science fair is next month.",
+        "choices": [
+            {"text": "Build a project", "effects": {"smarts": 4, "happiness": 2},
+             "log": "Your volcano didn't erupt right, but you learned things."},
+            {"text": "Pass on it", "effects": {"happiness": -1},
+             "log": "You sat in the audience. The winning project was a robot arm."},
+        ],
+    },
+
+    # ----- Teen (12–17) -----
+    {
+        "id": "first_crush",
+        "min_age": 12, "max_age": 17, "prob": 0.18,
+        "text": "There's someone at school you can't stop thinking about.",
+        "choices": [
+            {"text": "Tell them", "effects": {"happiness": 4, "looks": 1},
+             "log": "You said it. It was awkward and electric and worth it."},
+            {"text": "Hold it in", "effects": {"happiness": -3},
+             "log": "You said nothing. The feeling stayed for months."},
+        ],
+    },
+    {
+        "id": "caught_skipping_class",
+        "min_age": 13, "max_age": 17, "prob": 0.12,
+        "predicates": [InSchool()],
+        "text": "You skipped period three. The vice-principal saw you.",
+        "choices": [
+            {"text": "Apologise", "effects": {"happiness": -1, "smarts": 1},
+             "log": "You took the detention quietly. It blew over in a week."},
+            {"text": "Argue", "effects": {"happiness": -3, "smarts": -1},
+             "log": "It went badly. You ended up suspended for two days."},
+        ],
+    },
+    {
+        "id": "school_award",
+        "min_age": 12, "max_age": 17, "prob": 0.10,
+        "predicates": [InSchool(), MinSmarts(60)],
+        "text": "You're up for an academic award at end-of-year assembly.",
+        "choices": [
+            {"text": "Show up and collect it", "effects": {"smarts": 3, "happiness": 5},
+             "log": "Your name came over the speakers. You felt taller for a day."},
+        ],
+    },
+    {
+        "id": "cyberbullying",
+        "min_age": 12, "max_age": 17, "prob": 0.10,
+        "text": "Someone's posting cruel things about you online.",
+        "choices": [
+            {"text": "Tell an adult", "effects": {"happiness": -2},
+             "log": "Your parents took it seriously. It mostly stopped."},
+            {"text": "Block and move on", "effects": {"happiness": -4},
+             "log": "You stopped checking. The bad feeling lingered."},
+            {"text": "Fight back online", "effects": {"happiness": -6, "looks": -1},
+             "log": "You said worse things back. It spiralled. You regretted it."},
+        ],
+    },
+    {
+        "id": "drivers_test",
+        "min_age": 16, "max_age": 17, "prob": 0.30,
+        "text": "Your driving test is next week.",
+        "choices": [
+            {"text": "Practice hard", "effects": {"smarts": 2, "happiness": 4},
+             "log": "You passed. The car feels like a key to the world."},
+            {"text": "Wing it", "effects": {"happiness": -3, "money": -80},
+             "log": "You failed. You'll have to pay to retake it."},
+        ],
+    },
+    {
+        "id": "underage_drinking",
+        "min_age": 14, "max_age": 17, "prob": 0.12,
+        "text": "An older friend offered you a beer at a party.",
+        "choices": [
+            {"text": "Try it", "effects": {"happiness": 4, "health": -2},
+             "log": "You tried it. It was bitter. You felt grown."},
+            {"text": "Pass", "effects": {"happiness": 1, "health": 1},
+             "log": "You said no. It wasn't a big deal."},
+        ],
+    },
+    {
+        "id": "first_concert",
+        "min_age": 14, "max_age": 17, "prob": 0.14,
+        "predicates": [MinMoney(50)],
+        "text": "Your favourite band is playing in town.",
+        "choices": [
+            {"text": "Go", "effects": {"happiness": 8, "money": -60},
+             "log": "You screamed every lyric. Your ears rang for a day."},
+            {"text": "Save the money", "effects": {"happiness": -2, "money": 0},
+             "log": "You watched the highlights online. It wasn't the same."},
+        ],
+    },
+    {
+        "id": "argument_with_parent",
+        "min_age": 12, "max_age": 19, "prob": 0.14,
+        "predicates": [OR(HasLivingRelationship("Mother"), HasLivingRelationship("Father"))],
+        "text": "You and a parent are shouting at each other again.",
+        "choices": [
+            {"text": "Apologise first", "effects": {"happiness": -1, "smarts": 1},
+             "log": "You said sorry. It cost something. It was the right call."},
+            {"text": "Storm out", "effects": {"happiness": -4},
+             "log": "You slammed the door. Dinner was tense for a week."},
+        ],
+    },
+
+    # ----- Young adult / university (18–24) -----
+    {
+        "id": "party_at_uni",
+        "min_age": 18, "max_age": 24, "prob": 0.18,
+        "text": "There's a party at someone's flat tonight.",
+        "choices": [
+            {"text": "Go", "effects": {"happiness": 6, "smarts": -1, "health": -1},
+             "log": "It was loud, sweaty, brilliant. You found your tribe."},
+            {"text": "Stay in and study", "effects": {"smarts": 3, "happiness": -2},
+             "log": "You stayed in. You got real work done."},
+        ],
+    },
+    {
+        "id": "all_nighter",
+        "min_age": 18, "max_age": 24, "prob": 0.15,
+        "predicates": [InSchool()],
+        "text": "A deadline is tomorrow and you've barely started.",
+        "choices": [
+            {"text": "Pull an all-nighter", "effects": {"smarts": 3, "health": -3, "happiness": -2},
+             "log": "You finished at 6am. The submission scraped through."},
+            {"text": "Hand it in late", "effects": {"smarts": -2, "happiness": -1},
+             "log": "You took the late penalty. You slept properly, at least."},
+        ],
+    },
+    {
+        "id": "spring_break",
+        "min_age": 18, "max_age": 24, "prob": 0.08,
+        "predicates": [MinMoney(400)],
+        "text": "Friends are organising a spring-break trip.",
+        "choices": [
+            {"text": "Join them", "effects": {"happiness": 10, "money": -500},
+             "log": "The trip cost more than you planned. You'd do it again."},
+            {"text": "Skip it", "effects": {"happiness": -3},
+             "log": "You watched their photos roll in. Bittersweet."},
+        ],
+    },
+    {
+        "id": "study_group",
+        "min_age": 18, "max_age": 24, "prob": 0.16,
+        "predicates": [InSchool()],
+        "text": "A classmate is starting a study group for finals.",
+        "choices": [
+            {"text": "Join", "effects": {"smarts": 3, "happiness": 2},
+             "log": "You learned things faster, and made a real friend."},
+            {"text": "Pass", "effects": {"smarts": 1},
+             "log": "You preferred to study alone. It worked, slowly."},
+        ],
+    },
+    {
+        "id": "lost_textbook",
+        "min_age": 18, "max_age": 24, "prob": 0.10,
+        "predicates": [InSchool()],
+        "text": "You can't find your textbook anywhere and the lecturer is strict.",
+        "choices": [
+            {"text": "Buy a replacement", "effects": {"money": -80, "smarts": 1},
+             "log": "You forked out for a new copy. Painful."},
+            {"text": "Borrow from a friend", "effects": {"happiness": 1},
+             "log": "You got through term sharing. Not ideal, but free."},
+        ],
+    },
+    {
+        "id": "internship_offer",
+        "min_age": 19, "max_age": 24, "prob": 0.10,
+        "predicates": [NoJob(), MinSmarts(55)],
+        "text": "A summer internship offer just landed in your inbox.",
+        "choices": [
+            {"text": "Take it", "effects": {"smarts": 3, "happiness": 3, "money": 1_500},
+             "log": "You spent the summer in a real office. Money, contacts, a glimpse."},
+            {"text": "Decline", "effects": {"happiness": 1},
+             "log": "You took the summer off. You needed it."},
+        ],
+    },
+
+    # ----- Work (HasJob) -----
+    {
+        "id": "annoying_coworker",
+        "min_age": 18, "max_age": 65, "prob": 0.12,
+        "predicates": [HasJob()],
+        "text": "A coworker keeps interrupting you all day.",
+        "choices": [
+            {"text": "Talk to them directly", "effects": {"happiness": 2, "smarts": 1},
+             "log": "You had the conversation. It mostly worked."},
+            {"text": "Suffer in silence", "effects": {"happiness": -4},
+             "log": "You said nothing. It ate at you for weeks."},
+        ],
+    },
+    {
+        "id": "office_party",
+        "min_age": 18, "max_age": 65, "prob": 0.10,
+        "predicates": [HasJob()],
+        "text": "The office Christmas party is tonight.",
+        "choices": [
+            {"text": "Go and enjoy it", "effects": {"happiness": 4},
+             "log": "It was awkward and warm and you stayed too late."},
+            {"text": "Make a brief appearance", "effects": {"happiness": 1},
+             "log": "Forty minutes, two drinks, gone. Just right."},
+            {"text": "Skip it", "effects": {"happiness": -2},
+             "log": "You skipped. Monday felt slightly colder."},
+        ],
+    },
+    {
+        "id": "difficult_client",
+        "min_age": 18, "max_age": 65, "prob": 0.13,
+        "predicates": [HasJob()],
+        "text": "A client is demanding the impossible by Friday.",
+        "choices": [
+            {"text": "Push back", "effects": {"happiness": -1, "smarts": 2, "money": 200},
+             "log": "You negotiated the scope. They paid the rush fee."},
+            {"text": "Grind it out", "effects": {"happiness": -5, "health": -2, "money": 400},
+             "log": "You delivered by Friday. You owe yourself a weekend."},
+        ],
+    },
+    {
+        "id": "conference_trip",
+        "min_age": 22, "max_age": 65, "prob": 0.08,
+        "predicates": [HasJob(), MinSmarts(55)],
+        "text": "Your employer wants you to attend an industry conference.",
+        "choices": [
+            {"text": "Go", "effects": {"smarts": 4, "happiness": 3},
+             "log": "You came back with three new ideas and one new contact."},
+            {"text": "Pass", "effects": {"happiness": -1},
+             "log": "You stayed home. Caught up on email instead."},
+        ],
+    },
+    {
+        "id": "coffee_spill",
+        "min_age": 18, "max_age": 65, "prob": 0.06,
+        "predicates": [HasJob()],
+        "text": "You knocked a full coffee onto your laptop.",
+        "choices": [
+            {"text": "Pay for a repair", "effects": {"money": -250, "happiness": -3},
+             "log": "Two hundred and fifty quid and three lost hours."},
+        ],
+    },
+    {
+        "id": "mentor_at_work",
+        "min_age": 19, "max_age": 45, "prob": 0.08,
+        "predicates": [HasJob()],
+        "text": "A senior at work has offered to mentor you.",
+        "choices": [
+            {"text": "Accept gratefully", "effects": {"smarts": 4, "happiness": 3},
+             "log": "They opened a door you didn't know existed."},
+            {"text": "Politely decline", "effects": {"happiness": -1},
+             "log": "You said you'd think about it. You never followed up."},
+        ],
+    },
+    {
+        "id": "side_project_idea",
+        "min_age": 20, "max_age": 50, "prob": 0.10,
+        "predicates": [HasJob(), MinSmarts(60)],
+        "text": "You have an idea you can't stop thinking about.",
+        "choices": [
+            {"text": "Build it in the evenings", "effects": {"smarts": 3, "happiness": -3, "health": -1},
+             "log": "You worked weekends for months. The thing exists now."},
+            {"text": "Let it go", "effects": {"happiness": -2},
+             "log": "You wrote it down and moved on. It still nags."},
+        ],
+    },
+    {
+        "id": "coworker_wedding_invite",
+        "min_age": 22, "max_age": 60, "prob": 0.07,
+        "predicates": [HasJob()],
+        "text": "A coworker invited you to their wedding.",
+        "choices": [
+            {"text": "Go and bring a gift", "effects": {"happiness": 3, "money": -120},
+             "log": "Open bar, slow speeches, real joy. £120 well spent."},
+            {"text": "Send a card", "effects": {"happiness": 1, "money": -10},
+             "log": "You sent a thoughtful card. They appreciated it."},
+        ],
+    },
+
+    # ----- Money & misc -----
+    {
+        "id": "found_money_on_street",
+        "min_age": 6, "max_age": 90, "prob": 0.06,
+        "text": "You spotted a twenty on the pavement.",
+        "choices": [
+            {"text": "Pocket it", "effects": {"money": 20, "happiness": 2},
+             "log": "Twenty quid the universe owed you. You took it."},
+            {"text": "Hand it to a stranger", "effects": {"happiness": 3},
+             "log": "An older man thanked you, surprised. You felt lighter."},
+        ],
+    },
+    {
+        "id": "small_lottery_win",
+        "min_age": 18, "max_age": 90, "prob": 0.03,
+        "text": "You checked your numbers. You matched a few.",
+        "choices": [
+            {"text": "Cash it", "effects": {"money": 500, "happiness": 6},
+             "log": "Five hundred quid. Not life-changing, but it bought a week of ease."},
+        ],
+    },
+    {
+        "id": "online_scam_email",
+        "min_age": 14, "max_age": 90, "prob": 0.08,
+        "text": "An urgent email says your bank account is at risk. Click here.",
+        "choices": [
+            {"text": "Click the link", "effects": {"money": -300, "happiness": -5},
+             "log": "It was a scam. They took £300 before you froze the card."},
+            {"text": "Delete it", "effects": {"smarts": 1},
+             "log": "You knew what it was. You deleted it and moved on."},
+        ],
+    },
+    {
+        "id": "subscription_creep",
+        "min_age": 18, "max_age": 90, "prob": 0.10,
+        "text": "Your monthly subscriptions are silently larger than they were last year.",
+        "choices": [
+            {"text": "Audit and cancel a few", "effects": {"money": 60, "smarts": 1},
+             "log": "Forty minutes of admin saved you £60 a month."},
+            {"text": "Ignore it", "effects": {"money": -40, "happiness": -1},
+             "log": "It went up by another tenner. You didn't notice for months."},
+        ],
+    },
+    {
+        "id": "broken_phone",
+        "min_age": 12, "max_age": 90, "prob": 0.07,
+        "text": "Your phone screen shattered against the pavement.",
+        "choices": [
+            {"text": "Repair it", "effects": {"money": -120, "happiness": -2},
+             "log": "Repair shop fixed it in an hour. £120."},
+            {"text": "Live with the cracks", "effects": {"happiness": -3, "money": 0},
+             "log": "Glass shards in your thumb for weeks. You'll deal with it later."},
+        ],
+    },
+
+    # ----- Relationship-flavoured -----
+    {
+        "id": "family_reunion",
+        "min_age": 8, "max_age": 80, "prob": 0.07,
+        "predicates": [OR(HasLivingRelationship("Mother"), HasLivingRelationship("Father"),
+                          HasLivingRelationship("Sibling"))],
+        "text": "There's a family reunion coming up.",
+        "choices": [
+            {"text": "Go", "effects": {"happiness": 4},
+             "log": "You hugged people you hadn't seen in years. Worth the trip."},
+            {"text": "Stay home", "effects": {"happiness": -3},
+             "log": "You stayed in. Your absence was noted."},
+        ],
+    },
+    {
+        "id": "friend_in_trouble",
+        "min_age": 14, "max_age": 70, "prob": 0.10,
+        "predicates": [HasLivingRelationship("Friend"), MinMoney(200)],
+        "text": "A close friend asks if they can borrow £200 — they sound desperate.",
+        "choices": [
+            {"text": "Lend it", "effects": {"money": -200, "happiness": 3},
+             "log": "You handed over the cash. They cried, a little."},
+            {"text": "Say you can't", "effects": {"happiness": -4},
+             "log": "You said no. They understood. Something shifted between you anyway."},
+        ],
+    },
+    {
+        "id": "sibling_needs_favor",
+        "min_age": 14, "max_age": 70, "prob": 0.10,
+        "predicates": [HasLivingRelationship("Sibling")],
+        "text": "Your sibling needs you to help them move this weekend.",
+        "choices": [
+            {"text": "Show up with a van", "effects": {"happiness": 3, "health": -1},
+             "log": "Eight hours of stairs and pizza. They'll owe you."},
+            {"text": "Say you're busy", "effects": {"happiness": -3},
+             "log": "You begged off. They went quiet for a while."},
+        ],
+    },
+    {
+        "id": "partner_anniversary",
+        "min_age": 20, "max_age": 90, "prob": 0.10,
+        "predicates": [HasLivingRelationship("Partner")],
+        "text": "Today's your anniversary with your partner.",
+        "choices": [
+            {"text": "Plan something special", "effects": {"happiness": 6, "money": -150},
+             "log": "Candles, a real dinner, a long walk. You both meant it."},
+            {"text": "Cook at home", "effects": {"happiness": 3, "money": -25},
+             "log": "Pasta and a bottle of wine. Quiet, perfect."},
+            {"text": "Forget it", "effects": {"happiness": -6},
+             "log": "You remembered at midnight. It was a long apology."},
+        ],
+    },
+    {
+        "id": "yearly_checkup",
+        "min_age": 18, "max_age": 90, "prob": 0.08,
+        "text": "It's been a while since you saw a doctor for a routine check.",
+        "choices": [
+            {"text": "Go", "effects": {"health": 3, "money": -50},
+             "log": "Bloods fine. £50 well spent on knowing."},
+            {"text": "Skip it", "effects": {"health": -1, "happiness": -1},
+             "log": "You meant to book. You didn't."},
         ],
     },
 ]

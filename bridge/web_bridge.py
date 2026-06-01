@@ -220,6 +220,11 @@ class WebBridge(QObject):
     def nameBaby(self, npc_id: int, chosen_name: str) -> str:
         return _dumps(self._controller.name_baby(npc_id, chosen_name))
 
+    @Slot(result=str)
+    def acknowledgeMilestone(self) -> str:
+        """Dismiss the life-milestone modal (turning 18 / 30 / 50 / 65 / 100)."""
+        return _dumps(self._controller.acknowledge_milestone())
+
     # ---- Persistence ----
     #
     # Save/load talk to the filesystem, which can fail in user-visible ways

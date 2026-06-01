@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, balance, economy, education, events, genealogy, housing, relationships, world
+from core import agents, balance, economy, education, events, genealogy, housing, milestones, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -300,6 +300,11 @@ def age_up(state: GameState) -> None:
             entry_id=f"feed:death:{state.tick}",
         ))
         return
+
+    # --- Milestone modal (turning 18 / 30 / 50 / 65 / 100) ---
+    # Deterministic: this runs before the random event roll so a milestone
+    # year always queues a popup, regardless of what events roll alongside.
+    milestones.check(state)
 
     # --- Roll for a random event ---
     event = events.roll_event(state, tick_rng.fork(23))
