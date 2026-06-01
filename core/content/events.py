@@ -21,7 +21,9 @@ from core.predicates import (
     HasNoLivingRelationship,
     InDebt,
     InSchool,
+    HasCriminalRecord,
     IsDating,
+    IsIncarcerated,
     IsPregnant,
     IsSingle,
     JobIs,
@@ -1414,6 +1416,78 @@ EVENTS: list[dict] = [
              "log": "Bloods fine. £50 well spent on knowing."},
             {"text": "Skip it", "effects": {"health": -1, "happiness": -1},
              "log": "You meant to book. You didn't."},
+        ],
+    },
+
+    # ===========================================================
+    # ----- Crime v1 — prison drama + post-release record drag
+    # IsIncarcerated events are the only ones eligible to fire while
+    # the player is inside (see core/events.roll_event). The two
+    # HasCriminalRecord events kick in after release.
+    # ===========================================================
+    {
+        "id": "prison_yard_fight",
+        "unique": False,
+        "min_age": 12, "max_age": 90, "prob": 0.20,
+        "predicates": [IsIncarcerated()],
+        "text": "Someone in the yard squared up to you over nothing.",
+        "choices": [
+            {"text": "Throw the first punch", "effects": {"health": -8, "happiness": 2},
+             "log": "You swung first. You held your own. Word got around."},
+            {"text": "Back down", "effects": {"happiness": -4},
+             "log": "You walked away. The yard noticed. Some respected it; some didn't."},
+        ],
+    },
+    {
+        "id": "prison_education_program",
+        "unique": False,
+        "min_age": 16, "max_age": 90, "prob": 0.18,
+        "predicates": [IsIncarcerated()],
+        "text": "A sign-up sheet is going round for the prison education program.",
+        "choices": [
+            {"text": "Sign up", "effects": {"smarts": 4, "happiness": 3},
+             "log": "Two evenings a week with a real tutor. You felt like a person again."},
+            {"text": "Pass", "effects": {"happiness": -1},
+             "log": "You passed. Same routine, same noise."},
+        ],
+    },
+    {
+        "id": "prison_parole_hearing",
+        "unique": False,
+        "min_age": 16, "max_age": 90, "prob": 0.10,
+        "predicates": [IsIncarcerated()],
+        "text": "You've got a parole hearing this week.",
+        "choices": [
+            {"text": "Express genuine remorse", "effects": {"happiness": 4},
+             "log": "You meant what you said. The board wasn't moved enough to release you, but it helped."},
+            {"text": "Refuse to play along", "effects": {"happiness": -3},
+             "log": "You stayed silent through the questions. The hearing was over in ten minutes."},
+        ],
+    },
+    {
+        "id": "ex_con_job_rejection",
+        "unique": False,
+        "min_age": 18, "max_age": 65, "prob": 0.10,
+        "predicates": [HasCriminalRecord(), NoJob()],
+        "text": "The interview went well until they ran the background check.",
+        "choices": [
+            {"text": "Keep applying anyway", "effects": {"happiness": -3, "smarts": 1},
+             "log": "You sent ten more applications that week. Two replied. Neither was great."},
+            {"text": "Go where they don't ask", "effects": {"happiness": -1, "money": 200},
+             "log": "Cash-in-hand work, mostly. £200 this fortnight."},
+        ],
+    },
+    {
+        "id": "parole_officer_check_in",
+        "unique": False,
+        "min_age": 16, "max_age": 80, "prob": 0.12,
+        "predicates": [HasCriminalRecord()],
+        "text": "Your parole officer wants to see you Thursday.",
+        "choices": [
+            {"text": "Show up sober and on time", "effects": {"happiness": 2, "smarts": 1},
+             "log": "You arrived early. The officer noted it. Small steps."},
+            {"text": "Miss the appointment", "effects": {"happiness": -5},
+             "log": "You forgot. They left two messages and a warning."},
         ],
     },
 ]

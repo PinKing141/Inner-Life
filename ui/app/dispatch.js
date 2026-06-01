@@ -73,6 +73,8 @@
       case "go-on-date":        if (b.goOnDate) await b.goOnDate(); break;
       case "become-official":   if (b.becomeOfficial) await b.becomeOfficial(); break;
       case "break-up":          if (b.breakUp) await b.breakUp(); break;
+      case "commit-crime":      if (b.commitCrime) await b.commitCrime(payload); break;
+      case "ack-crime-outcome": if (b.acknowledgeCrimeOutcome) await b.acknowledgeCrimeOutcome(); break;
       case "save-game":
         if (b.save) await this.handleSaveLoad(b.save(), "Game saved");
         break;

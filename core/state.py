@@ -155,6 +155,27 @@ class PregnancyState:
 
 
 @dataclass
+class CriminalRecord:
+    """Phase 6 — Crime v1.
+
+    Tracks active incarceration and a permanent history of convictions.
+    The boolean ``is_incarcerated`` overrides the standard life loop in
+    ``sim.age_up``; ``past_offences`` survives release so predicates
+    like ``HasCriminalRecord`` can gate prestigious jobs and certain
+    events forever.
+
+    ``sentence_years`` and ``years_served`` are both annual counters; on
+    each prison tick ``years_served`` is incremented and when it reaches
+    ``sentence_years`` the player walks out (sim.age_up handles the
+    release transition, not this dataclass).
+    """
+    is_incarcerated: bool = False
+    sentence_years: int = 0
+    years_served: int = 0
+    past_offences: list[str] = field(default_factory=list)
+
+
+@dataclass
 class GameState:
     """The complete simulated world."""
 
@@ -213,6 +234,15 @@ class GameState:
     # Ages at which a milestone has already fired (so post-load + heir
     # transitions don't re-trigger them on the same character).
     milestones_seen: list[int] = field(default_factory=list)
+    # Phase 6 — Crime v1. Tracks active incarceration + past convictions.
+    # While `crime.is_incarcerated` is true, sim.age_up runs a prison
+    # tick (no career/education/economy) and the event engine restricts
+    # candidates to IsIncarcerated-gated events.
+    crime: CriminalRecord = field(default_factory=CriminalRecord)
+    # Outcome modal payload set by crime.attempt_crime ({title, text,
+    # caught, payout}). UI raises a modal; verb acknowledge_crime_outcome
+    # clears it.
+    pending_crime_outcome: dict | None = None
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -329,6 +359,13 @@ class GameState:
             "dating": self.dating,
             "pending_milestone": self.pending_milestone,
             "milestones_seen": list(self.milestones_seen),
+            "crime": {
+                "is_incarcerated": self.crime.is_incarcerated,
+                "sentence_years": self.crime.sentence_years,
+                "years_served": self.crime.years_served,
+                "past_offences": list(self.crime.past_offences),
+            },
+            "pending_crime_outcome": self.pending_crime_outcome,
         }
 
 
@@ -475,4 +512,10 @@ class GameState:
             dating=data.get("dating"),
             pending_milestone=data.get("pending_milestone"),
             milestones_seen=list(data.get("milestones_seen", [])),
+            crime=(
+                CriminalRecord(**data["crime"])
+                if isinstance(data.get("crime"), dict)
+                else CriminalRecord()
+            ),
+            pending_crime_outcome=data.get("pending_crime_outcome"),
         )

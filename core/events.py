@@ -40,12 +40,25 @@ def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
         return None
     age = state.character.age
     seen = set(state.fired_events)
-    candidates = [
-        e for e in EVENTS
-        if e["min_age"] <= age <= e["max_age"]
-        and not (_is_unique(e) and e["id"] in seen)
-        and evaluate_predicates(e.get("predicates"), state)
-    ]
+    # Crime v1: while incarcerated, restrict the candidate pool to events
+    # whose predicates contain IsIncarcerated — otherwise the 100+
+    # free-world events would fire absurdly from a cell. The check is by
+    # class name to avoid an import cycle (events->predicates already
+    # exists; this just keeps the filter declarative).
+    incarcerated = state.crime.is_incarcerated
+    def _eligible(e: dict) -> bool:
+        if not (e["min_age"] <= age <= e["max_age"]):
+            return False
+        if _is_unique(e) and e["id"] in seen:
+            return False
+        if not evaluate_predicates(e.get("predicates"), state):
+            return False
+        if incarcerated:
+            preds = e.get("predicates") or []
+            if not any(p.__class__.__name__ == "IsIncarcerated" for p in preds):
+                return False
+        return True
+    candidates = [e for e in EVENTS if _eligible(e)]
     if not candidates:
         return None
     shuffled = list(candidates)
