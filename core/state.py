@@ -162,6 +162,14 @@ class GameState:
     # read it back. Each entry is a dict (see core.genealogy.snapshot).
     ancestors: list[dict] = field(default_factory=list)
     social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
+    # Phase 6 — Love/Dating v1. Current dating prospect (None when single
+    # or already committed). Shape: {npc_id, name, age, gender, chemistry,
+    # dates_been_on, started_tick}. The same NPC also lives as a
+    # Relationship with kind="Dating"; the dict is a fast accessor so
+    # event predicates / UI panels don't have to scan relationships.
+    # On commitment (become_official), the Relationship flips to
+    # kind="Partner" and this field clears.
+    dating: dict | None = None
     # Milestone popups for life moments (turning 18, 30, 50, 65, 100). Set
     # by sim.age_up when the player crosses a threshold; the UI raises a
     # modal and the bridge clears it via acknowledgeMilestone. Shape:
@@ -272,6 +280,7 @@ class GameState:
             "rental": self.rental,
             "ancestors": list(self.ancestors),
             "social_edges": [e.to_dict() for e in self.social_edges],
+            "dating": self.dating,
             "pending_milestone": self.pending_milestone,
             "milestones_seen": list(self.milestones_seen),
         }
@@ -411,6 +420,7 @@ class GameState:
             rental=data.get("rental"),
             ancestors=list(data.get("ancestors", [])),
             social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
+            dating=data.get("dating"),
             pending_milestone=data.get("pending_milestone"),
             milestones_seen=list(data.get("milestones_seen", [])),
         )

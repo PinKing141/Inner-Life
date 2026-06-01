@@ -210,6 +210,24 @@ class WebBridge(QObject):
         character after the current one dies."""
         return _dumps(self._controller.continue_as_heir(npc_id))
 
+    # ---- Love/Dating v1 ----
+
+    @Slot(result=str)
+    def askSomeoneOut(self) -> str:
+        return _dumps(self._controller.ask_someone_out())
+
+    @Slot(result=str)
+    def goOnDate(self) -> str:
+        return _dumps(self._controller.go_on_date())
+
+    @Slot(result=str)
+    def becomeOfficial(self) -> str:
+        return _dumps(self._controller.become_official())
+
+    @Slot(result=str)
+    def breakUp(self) -> str:
+        return _dumps(self._controller.break_up())
+
     @Slot(result=str)
     def acknowledgeMilestone(self) -> str:
         """Dismiss the life-milestone modal (turning 18 / 30 / 50 / 65 / 100)."""

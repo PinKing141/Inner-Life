@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import activities, economy, education, genealogy, housing, milestones, relationships, sim
+from core import activities, dating, economy, education, genealogy, housing, milestones, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -463,6 +463,46 @@ class GameController:
         genealogy.continue_as_heir(self.state, npc_id)
         self._broadcast()
         return self.snapshot()
+
+    # ---- Love/Dating v1 ----
+
+    def _dating_verb(self, fn_name: str) -> dict:
+        """Dispatcher for the four dating verbs. Each verb runs the core
+        function with a forked RNG, writes a feed entry, and broadcasts.
+        Refusals (ok=False) still surface in the feed as 'neutral' so the
+        player sees why the tap didn't work."""
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        fn = getattr(dating, fn_name)
+        # Fork off the current tick so repeated calls in one year still
+        # diverge (date #2 isn't a re-roll of date #1).
+        rng_seed_extra = len(self.state.feed)
+        rng = Rng(self.state.seed).fork(self.state.tick).fork(rng_seed_extra).fork(0xDA1E)
+        # `become_official` and `break_up` take no rng.
+        if fn_name in ("become_official", "break_up"):
+            ok, msg = fn(self.state)
+        else:
+            ok, msg = fn(self.state, rng)
+        self.state.feed.append(FeedEntry(
+            age=self.state.character.age,
+            text=msg,
+            kind="good" if ok else "neutral",
+            entry_id=f"feed:dating:{fn_name}:{self.state.tick}:{rng_seed_extra}",
+        ))
+        self._broadcast()
+        return self.snapshot()
+
+    def ask_someone_out(self) -> dict:
+        return self._dating_verb("ask_someone_out")
+
+    def go_on_date(self) -> dict:
+        return self._dating_verb("go_on_date")
+
+    def become_official(self) -> dict:
+        return self._dating_verb("become_official")
+
+    def break_up(self) -> dict:
+        return self._dating_verb("break_up")
 
     def activity(self, kind: str) -> dict:
         s = self.state

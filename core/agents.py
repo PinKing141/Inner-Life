@@ -504,6 +504,12 @@ PARTNER_BREAKUP_CHANCE = 0.04
 def tick_partner(state: GameState, rng: Rng) -> str | None:
     if state.character is None or state.character.age < PARTNER_MIN_AGE:
         return None
+    # Love/Dating v1: when the player is actively pursuing someone, the
+    # random partner pathway steps aside so a surprise NPC pairing doesn't
+    # displace their prospect. Partner breakup still rolls — the player
+    # might lose a long-term partner regardless of any new dating arc.
+    if state.dating is not None:
+        return None
     partner = next((r for r in state.relationships if r.kind == "Partner" and r.alive), None)
     if partner is not None:
         if rng.fork(1).chance(PARTNER_BREAKUP_CHANCE):
