@@ -107,19 +107,31 @@ def _apply_side_effect(state: GameState, name: str) -> None:
     elif name == "leave_school":
         state.education.in_school = False
     elif name == "have_child":
-        # Phase 5: route the birth through genealogy.have_child so the
-        # child Agent, Relationship, and Character.children list all
-        # update through one well-tested path. RNG forks off the event
-        # tick so the same seed produces the same child.
+        # Phase 6 — Pregnancy v1: "start a family" now registers a
+        # guaranteed pregnancy that resolves next tick, instead of
+        # spawning a baby out of nowhere. The deliberate-choice path
+        # bypasses the probability roll so the player isn't denied a
+        # baby they explicitly asked for.
         from core import genealogy
-        rng = Rng(state.seed).fork(state.tick).fork(0xC4112D)
-        note = genealogy.have_child(state, rng)
-        if note:
+        ok = genealogy.begin_pregnancy(state)
+        if ok and state.character is not None:
             state.feed.append(FeedEntry(
-                age=state.character.age if state.character else 0,
-                text=note,
+                age=state.character.age,
+                text="You and your partner started trying for a baby.",
                 kind="special",
-                entry_id=f"feed:birth_child:{state.tick}",
+                entry_id=f"feed:pregnancy_begin:{state.tick}",
+            ))
+    elif name == "attempt_conception":
+        # Probabilistic conception (e.g. broken_condom event). Result
+        # leaks to the feed only on success — silent failures are kinder.
+        from core import genealogy
+        rng = Rng(state.seed).fork(state.tick).fork(0xC0E1CE)
+        if genealogy.attempt_conception(state, rng) and state.character is not None:
+            state.feed.append(FeedEntry(
+                age=state.character.age,
+                text="Something tells you this isn't over.",
+                kind="special",
+                entry_id=f"feed:pregnancy_attempt:{state.tick}",
             ))
     elif name == "take_family_friend_job":
         _take_family_friend_job(state)

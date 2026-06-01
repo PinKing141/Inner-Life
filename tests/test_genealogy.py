@@ -110,15 +110,18 @@ def test_child_count_at_most_caps_the_birth_event():
 
 
 def test_consider_child_event_routes_through_genealogy_side_effect():
-    """Choosing 'Yes — start a family' on the catalogue event must mint
-    a child through the same code path as the direct call."""
+    """Choosing 'Yes — start a family' on the catalogue event must
+    register a pregnancy. The baby itself is minted next tick via
+    sim.resolve_pregnancy — see test_pregnancy.py for the full cycle."""
     s = _new()
     _give_partner(s)
     ev = event_engine.get_event("consider_child")
     assert ev is not None
     s.pending_event_id = ev["id"]
     event_engine.resolve_choice(s, ev["id"], 0)
-    assert s.character.children, "side_effect should have minted a child"
+    assert s.pregnancy.is_active is True
+    # Child shouldn't exist yet — that's the whole point of the gestation tick.
+    assert not s.character.children
 
 
 def test_consider_child_decline_does_not_mint():

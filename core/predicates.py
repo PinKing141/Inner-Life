@@ -239,6 +239,18 @@ class HasLivingChild:
         return any(a.alive for a in s.agents if a.npc_id in child_ids)
 
 
+# --- Phase 6: Pregnancy v1 -------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IsPregnant:
+    """True while the player has an active gestation. Used to gate
+    pregnancy-only events (morning sickness, maternity-leave question)."""
+
+    def __call__(self, s: GameState) -> bool:
+        return s.pregnancy.is_active
+
+
 # --- Phase 2: graph-shape predicates --------------------------------------
 
 

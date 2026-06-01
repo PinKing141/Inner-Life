@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, balance, economy, education, events, housing, relationships, world
+from core import agents, balance, economy, education, events, genealogy, housing, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -263,6 +263,12 @@ def age_up(state: GameState) -> None:
     # Guarantee the agent/relationship liveness invariant before the player's
     # year resolves, so event predicates and the UI see a consistent graph.
     agents.sync_relationship_liveness(state)
+    # Phase 6: resolve a registered pregnancy *before* the year's random
+    # event roll. Either a miscarriage feed entry lands (no modal) or a
+    # pending_birth payload is set — which the modal layer prioritises
+    # above the regular event modal. Birth always takes precedence over
+    # other drama in the same year.
+    genealogy.resolve_pregnancy(state, tick_rng.fork(43))
 
     summary_parts: list[str] = [f"You are now {age} years old."]
     edu_msg = education.tick(state)

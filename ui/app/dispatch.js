@@ -53,6 +53,21 @@
         this.loggedFeedCount = 0;
         if (b.continueAsHeir) await b.continueAsHeir(payload);
         break;
+      case "try-for-baby":
+        if (b.tryForBaby) await b.tryForBaby();
+        break;
+      case "name-baby": {
+        // Read the user's name from the modal's text-input block, then
+        // send it through nameBaby. Falls back to the suggested name if
+        // they cleared the field.
+        const input = document.querySelector('[data-modal-input="babyName"]');
+        const raw = input ? input.value : "";
+        const npcId = payload && payload.npc_id;
+        if (b.nameBaby && typeof npcId === "number") {
+          await b.nameBaby(npcId, raw);
+        }
+        break;
+      }
       case "save-game":
         if (b.save) await this.handleSaveLoad(b.save(), "Game saved");
         break;

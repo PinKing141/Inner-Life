@@ -210,6 +210,16 @@ class WebBridge(QObject):
         character after the current one dies."""
         return _dumps(self._controller.continue_as_heir(npc_id))
 
+    # ---- Pregnancy v1 ----
+
+    @Slot(result=str)
+    def tryForBaby(self) -> str:
+        return _dumps(self._controller.try_for_baby())
+
+    @Slot(int, str, result=str)
+    def nameBaby(self, npc_id: int, chosen_name: str) -> str:
+        return _dumps(self._controller.name_baby(npc_id, chosen_name))
+
     # ---- Persistence ----
     #
     # Save/load talk to the filesystem, which can fail in user-visible ways

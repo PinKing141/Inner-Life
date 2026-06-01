@@ -139,6 +139,17 @@ const LifeUI = (function () {
     }
     if (b.type === 'section')
       return section(b.label, b.count);
+    if (b.type === 'text-input') {
+      // Modal text input. Read at action dispatch time via
+      // document.querySelector('[data-modal-input="<key>"]').value.
+      const key = b.key || 'value';
+      const label = b.label ? `<span class="mi-label">${esc(b.label)}</span>` : '';
+      return `<div class="ui-input">${label}` +
+             `<input class="cr-input" type="text" data-modal-input="${esc(key)}" ` +
+             `maxlength="${b.maxLength || 40}" ` +
+             `placeholder="${esc(b.placeholder || '')}" ` +
+             `value="${esc(b.value || '')}"></div>`;
+    }
     return '';
   }
 
