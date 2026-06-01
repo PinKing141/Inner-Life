@@ -279,6 +279,43 @@ class RelativeHasEmployedFriend:
         return False
 
 
+# --- Love/Dating v1 -------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IsDating:
+    """True when the player has a current dating prospect (pre-commitment).
+    Used to gate dating-arc drama events (met-their-friends, jealousy, …).
+    """
+
+    def __call__(self, s: GameState) -> bool:
+        return s.dating is not None
+
+
+@dataclass(frozen=True)
+class IsSingle:
+    """True when the player has neither a Partner nor a dating prospect.
+    Gates events that only make sense for the romantically unattached."""
+
+    def __call__(self, s: GameState) -> bool:
+        if s.dating is not None:
+            return False
+        return not any(r.kind == "Partner" and r.alive for r in s.relationships)
+
+
+@dataclass(frozen=True)
+class MinChemistry:
+    """Player's dating chemistry is at or above the given threshold.
+    False when not dating at all — chemistry only exists with a prospect."""
+
+    value: int
+
+    def __call__(self, s: GameState) -> bool:
+        if s.dating is None:
+            return False
+        return s.dating.get("chemistry", 0) >= self.value
+
+
 # --- Evaluation -----------------------------------------------------------
 
 def evaluate(preds: list[Predicate] | None, state: GameState) -> bool:

@@ -197,6 +197,14 @@ class GameState:
     # lives here until the player picks a name. Shape: {npc_id, gender,
     # suggested_name, last_name}. The UI raises a modal with a text input.
     pending_birth: dict | None = None
+    # Phase 6 — Love/Dating v1. Current dating prospect (None when single
+    # or already committed). Shape: {npc_id, name, age, gender, chemistry,
+    # dates_been_on, started_tick}. The same NPC also lives as a
+    # Relationship with kind="Dating"; the dict is a fast accessor so
+    # event predicates / UI panels don't have to scan relationships.
+    # On commitment (become_official), the Relationship flips to
+    # kind="Partner" and this field clears.
+    dating: dict | None = None
     # Milestone popups for life moments (turning 18, 30, 50, 65, 100). Set
     # by sim.age_up when the player crosses a threshold; the UI raises a
     # modal and the bridge clears it via acknowledgeMilestone. Shape:
@@ -318,6 +326,7 @@ class GameState:
                 "partner_name": self.pregnancy.partner_name,
             },
             "pending_birth": self.pending_birth,
+            "dating": self.dating,
             "pending_milestone": self.pending_milestone,
             "milestones_seen": list(self.milestones_seen),
         }
@@ -463,6 +472,7 @@ class GameState:
                 else PregnancyState()
             ),
             pending_birth=data.get("pending_birth"),
+            dating=data.get("dating"),
             pending_milestone=data.get("pending_milestone"),
             milestones_seen=list(data.get("milestones_seen", [])),
         )

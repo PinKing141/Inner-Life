@@ -69,6 +69,10 @@
         }
         break;
       }
+      case "ask-someone-out":   if (b.askSomeoneOut) await b.askSomeoneOut(); break;
+      case "go-on-date":        if (b.goOnDate) await b.goOnDate(); break;
+      case "become-official":   if (b.becomeOfficial) await b.becomeOfficial(); break;
+      case "break-up":          if (b.breakUp) await b.breakUp(); break;
       case "save-game":
         if (b.save) await this.handleSaveLoad(b.save(), "Game saved");
         break;
