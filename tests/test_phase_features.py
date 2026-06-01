@@ -336,8 +336,12 @@ def test_university_plan_major_and_dropout_flow():
             c.choose(0)
     assert c.state.education.level == "University"
     assert c.state.education.in_school is True
-    assert "You graduated secondary school." in c.state.feed[-1].text
-    assert "You enrolled in Computer Science course at university." in c.state.feed[-1].text
+    # Scan the feed instead of asserting against [-1]: with the Phase 6
+    # content batch, other events (yearly_checkup, etc.) may legitimately
+    # write later entries at age 18.
+    feed_text = " ".join(e.text for e in c.state.feed)
+    assert "You graduated secondary school." in feed_text
+    assert "You enrolled in Computer Science course at university." in feed_text
     c.drop_out_university()
     assert c.state.education.university_dropped_out is True
     assert c.state.education.in_school is False

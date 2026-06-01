@@ -210,6 +210,11 @@ class WebBridge(QObject):
         character after the current one dies."""
         return _dumps(self._controller.continue_as_heir(npc_id))
 
+    @Slot(result=str)
+    def acknowledgeMilestone(self) -> str:
+        """Dismiss the life-milestone modal (turning 18 / 30 / 50 / 65 / 100)."""
+        return _dumps(self._controller.acknowledge_milestone())
+
     # ---- Persistence ----
     #
     # Save/load talk to the filesystem, which can fail in user-visible ways
