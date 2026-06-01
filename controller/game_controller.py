@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import activities, dating, economy, education, genealogy, housing, milestones, relationships, sim
+from core import activities, crime as crime_mod, dating, economy, education, genealogy, housing, milestones, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -69,6 +69,10 @@ class GameController:
         # outgoing lives so a future family-history UI can browse them.
         snap["eligible_heirs"] = genealogy.eligible_heirs(self.state)
         snap["ancestors"] = list(self.state.ancestors)
+        # Crime v1: the Activities/Crime screen reads this to render the
+        # crime ladder with live success chances. Includes computed
+        # availability flag so under-age / incarcerated rows render greyed.
+        snap["crimes"] = crime_mod.list_crimes_for_ui(self.state)
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -538,9 +542,45 @@ class GameController:
     def break_up(self) -> dict:
         return self._dating_verb("break_up")
 
+    # ---- Crime v1 ----
+
+    def commit_crime(self, crime_id: str) -> dict:
+        """Attempt a crime from the catalogue. Routes through
+        ``crime.attempt_crime`` with a forked rng; the outcome modal
+        payload lands on ``state.pending_crime_outcome`` for the UI to
+        raise. Refuses politely if the player is already incarcerated."""
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        rng = Rng(self.state.seed).fork(self.state.tick).fork(
+            len(self.state.feed)
+        ).fork(0xC2114E)
+        crime_mod.attempt_crime(self.state, crime_id, rng)
+        self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_crime_outcome(self) -> dict:
+        """Dismiss the crime outcome modal (clean getaway or busted).
+        Just clears ``pending_crime_outcome`` so the modal closes."""
+        if self.state is not None:
+            self.state.pending_crime_outcome = None
+            self._broadcast()
+        return self.snapshot()
+
     def activity(self, kind: str) -> dict:
         s = self.state
         if s is None or s.character is None:
+            return self.snapshot()
+        # Crime v1: most free-world verbs make no sense from a cell. The
+        # refusal feed line is visible to the player so they know why
+        # the tap didn't work.
+        if s.crime.is_incarcerated:
+            s.feed.append(FeedEntry(
+                age=s.character.age,
+                text="You can't do that from a prison cell.",
+                kind="neutral",
+                entry_id=f"feed:act_blocked:{s.tick}:{kind}",
+            ))
+            self._broadcast()
             return self.snapshot()
         fn = activities.BY_KIND.get(kind)
         if fn is None:

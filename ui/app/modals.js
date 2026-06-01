@@ -27,6 +27,7 @@
     if (s.education && s.education.awaiting_university_choice) return "uni:" + s.tick;
     if (s.pending_birth) return "birth:" + s.pending_birth.npc_id + ":" + s.tick;
     if (s.pending_milestone) return "milestone:" + s.pending_milestone.id + ":" + s.tick;
+    if (s.pending_crime_outcome) return "crime:" + (s.pending_crime_outcome.crime_id || "?") + ":" + s.tick + ":" + (s.feed ? s.feed.length : 0);
     if (s.mode === "DEATH" && !this.deathShown) { this.deathShown = true; return "death"; }
     return null;
   };
@@ -43,6 +44,7 @@
     else if (key.startsWith("uni:"))     this.raiseUniversityModal(s);
     else if (key.startsWith("birth:"))   this.raiseBirthModal(s.pending_birth);
     else if (key.startsWith("milestone:")) this.raiseMilestoneModal(s.pending_milestone);
+    else if (key.startsWith("crime:")) this.raiseCrimeOutcomeModal(s.pending_crime_outcome);
     else if (key === "death")            this.raiseDeathModal(s);
   };
 
@@ -89,6 +91,27 @@
         title: m.title || "",
         subtitle: m.subtitle || "" }],
       actions: [{ label: "Carry on", variant: "primary", action: "ack-milestone" }],
+    });
+  };
+
+  // Crime v1 outcome modal — same shell for clean-getaway and busted,
+  // differentiated by `caught` (red vs gold accent + handcuffs vs sack icon).
+  App.raiseCrimeOutcomeModal = function (o) {
+    if (!o) return;
+    const caught = !!o.caught;
+    LifeUI.modal({
+      kind: caught ? "notice" : "award",
+      title: o.title || (caught ? "Busted" : "Clean Getaway"),
+      dismissable: true,
+      blocks: [{ type: "award",
+        icon: caught ? "handcuffs" : "sack",
+        title: o.title || "",
+        subtitle: o.text || "" }],
+      actions: [{
+        label: caught ? "Take it on the chin" : "Get out of here",
+        variant: caught ? "ghost" : "primary",
+        action: "ack-crime-outcome",
+      }],
     });
   };
 

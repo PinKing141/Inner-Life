@@ -251,6 +251,29 @@ class IsPregnant:
         return s.pregnancy.is_active
 
 
+# --- Crime v1 ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IsIncarcerated:
+    """True while the player is doing time. Used to flag events that
+    should ONLY fire in prison (yard fight, parole hearing) and to
+    short-circuit the event roll otherwise."""
+
+    def __call__(self, s: GameState) -> bool:
+        return s.crime.is_incarcerated
+
+
+@dataclass(frozen=True)
+class HasCriminalRecord:
+    """True if the player has any past conviction, even after release.
+    Use to gate prestigious-job events, distrust drama, parole-officer
+    visits etc. that should react to the player's permanent record."""
+
+    def __call__(self, s: GameState) -> bool:
+        return len(s.crime.past_offences) > 0
+
+
 # --- Phase 2: graph-shape predicates --------------------------------------
 
 

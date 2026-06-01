@@ -599,6 +599,11 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
     state.pending_birth = None
     state.pending_milestone = None
     state.milestones_seen = []
+    # Crime v1: heirs start with a clean record — the dead never carry
+    # their convictions into the next life.
+    from core.state import CriminalRecord
+    state.crime = CriminalRecord()
+    state.pending_crime_outcome = None
     state.feed = []
     # Note: properties don't carry over in MVP — sold at probate, value
     # already counted in `money` would be too much complexity here. Future

@@ -238,6 +238,16 @@ class WebBridge(QObject):
     def breakUp(self) -> str:
         return _dumps(self._controller.break_up())
 
+    # ---- Crime v1 ----
+
+    @Slot(str, result=str)
+    def commitCrime(self, crime_id: str) -> str:
+        return _dumps(self._controller.commit_crime(crime_id))
+
+    @Slot(result=str)
+    def acknowledgeCrimeOutcome(self) -> str:
+        return _dumps(self._controller.acknowledge_crime_outcome())
+
     @Slot(result=str)
     def acknowledgeMilestone(self) -> str:
         """Dismiss the life-milestone modal (turning 18 / 30 / 50 / 65 / 100)."""

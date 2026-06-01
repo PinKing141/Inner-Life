@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, balance, economy, education, events, genealogy, housing, milestones, relationships, world
+from core import agents, balance, crime as crime_mod, economy, education, events, genealogy, housing, milestones, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -263,22 +263,34 @@ def age_up(state: GameState) -> None:
     # Guarantee the agent/relationship liveness invariant before the player's
     # year resolves, so event predicates and the UI see a consistent graph.
     agents.sync_relationship_liveness(state)
-    # Phase 6: resolve a registered pregnancy *before* the year's random
-    # event roll. Either a miscarriage feed entry lands (no modal) or a
-    # pending_birth payload is set — which the modal layer prioritises
-    # above the regular event modal. Birth always takes precedence over
-    # other drama in the same year.
-    genealogy.resolve_pregnancy(state, tick_rng.fork(43))
 
-    summary_parts: list[str] = [f"You are now {age} years old."]
-    edu_msg = education.tick(state)
-    if edu_msg:
-        summary_parts.append(edu_msg)
-    _tick_economy(state, tick_rng, summary_parts)
-    housing.annual_update(state, tick_rng.fork(9))
-    _tick_career(state, tick_rng, summary_parts)
-    _tick_social(state, tick_rng, summary_parts)
-    _tick_drift(state, tick_rng, summary_parts)
+    # --- Crime v1: prison year overrides the standard life loop ---
+    # While incarcerated, the player has no job ticks, no education, no
+    # economy/social drift. The world keeps turning around them. Pregnancy
+    # gestation still resolves (biology doesn't pause); the random event
+    # roll still happens but is filtered by core.events to prison-only
+    # events (see roll_event).
+    if state.crime.is_incarcerated:
+        genealogy.resolve_pregnancy(state, tick_rng.fork(43))
+        crime_mod.prison_tick(state)
+        summary_parts: list[str] = [f"You are now {age} years old."]
+    else:
+        # Phase 6: resolve a registered pregnancy *before* the year's
+        # random event roll. Either a miscarriage feed entry lands (no
+        # modal) or a pending_birth payload is set — which the modal
+        # layer prioritises above the regular event modal. Birth always
+        # takes precedence over other drama in the same year.
+        genealogy.resolve_pregnancy(state, tick_rng.fork(43))
+
+        summary_parts = [f"You are now {age} years old."]
+        edu_msg = education.tick(state)
+        if edu_msg:
+            summary_parts.append(edu_msg)
+        _tick_economy(state, tick_rng, summary_parts)
+        housing.annual_update(state, tick_rng.fork(9))
+        _tick_career(state, tick_rng, summary_parts)
+        _tick_social(state, tick_rng, summary_parts)
+        _tick_drift(state, tick_rng, summary_parts)
 
     # --- Feed entry for the year ---
     state.feed.append(FeedEntry(
