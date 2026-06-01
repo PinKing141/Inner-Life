@@ -464,6 +464,40 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    # ---- Pregnancy v1 ----
+
+    def try_for_baby(self) -> dict:
+        """Player-initiated conception attempt. Routes through
+        ``genealogy.attempt_conception`` (probabilistic, like the
+        broken_condom event) so the outcome is age/health-weighted.
+        Writes a feed entry either way so the player gets feedback."""
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        rng = Rng(self.state.seed).fork(self.state.tick).fork(len(self.state.feed)).fork(0x7B7B)
+        ok = genealogy.attempt_conception(self.state, rng)
+        msg = (
+            "You and your partner began trying. Now you wait."
+            if ok else
+            "You and your partner tried this month. Nothing yet."
+        )
+        self.state.feed.append(FeedEntry(
+            age=self.state.character.age,
+            text=msg,
+            kind="special" if ok else "neutral",
+            entry_id=f"feed:try_baby:{self.state.tick}:{len(self.state.feed)}",
+        ))
+        self._broadcast()
+        return self.snapshot()
+
+    def name_baby(self, npc_id: int, chosen_name: str) -> dict:
+        """Apply the player's chosen name to a newly-born child.
+        Clears the ``pending_birth`` modal payload on success."""
+        if self.state is None:
+            return self.snapshot()
+        genealogy.name_child(self.state, npc_id, chosen_name)
+        self._broadcast()
+        return self.snapshot()
+
     # ---- Love/Dating v1 ----
 
     def _dating_verb(self, fn_name: str) -> dict:

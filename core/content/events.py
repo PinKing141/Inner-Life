@@ -22,6 +22,7 @@ from core.predicates import (
     InDebt,
     InSchool,
     IsDating,
+    IsPregnant,
     IsSingle,
     JobIs,
     MaxMoney,
@@ -30,6 +31,7 @@ from core.predicates import (
     MinMoney,
     MinSmarts,
     NoJob,
+    NOT,
     DuringRecession,
     DuringWar,
     MinInflationIndex,
@@ -597,6 +599,84 @@ EVENTS: list[dict] = [
             {"text": "No — you'll find your own way", "effects": {"happiness": -4},
              "log": "You thanked your mother but didn't follow up. "
                     "She tried not to look hurt."},
+        ],
+    },
+
+    # ===========================================================
+    # ----- Pregnancy v1 — probabilistic conception + gestation drama
+    # `attempt_conception` rolls age/health-weighted odds; success
+    # registers a pregnancy that resolves in next tick's age_up.
+    # ===========================================================
+    {
+        "id": "broken_condom",
+        "unique": False,
+        "min_age": 18, "max_age": 45, "prob": 0.05,
+        "predicates": [
+            HasLivingRelationship("Partner"),
+            ChildCountAtMost(3),
+            NOT(IsPregnant()),
+        ],
+        "text": "Mid-evening with your partner: something didn't go as planned.",
+        "choices": [
+            {"text": "Get the morning-after pill", "effects": {"happiness": -2, "money": -30},
+             "log": "You sorted it the next morning. £30, no fuss."},
+            {"text": "Let it ride", "effects": {"happiness": 1},
+             "log": "You shrugged. Whatever happens, happens.",
+             "side_effect": "attempt_conception"},
+        ],
+    },
+    {
+        "id": "morning_sickness",
+        "unique": False,
+        "min_age": 16, "max_age": 50, "prob": 0.30,
+        "predicates": [IsPregnant()],
+        "text": "The mornings have been brutal. You can barely look at toast.",
+        "choices": [
+            {"text": "Push through the workday", "effects": {"happiness": -3, "health": -2},
+             "log": "You went in. The smell of someone's coffee nearly did you in."},
+            {"text": "Take a sick day", "effects": {"happiness": 2, "health": 1, "money": -50},
+             "log": "You stayed home. The sofa cradled you for ten hours."},
+        ],
+    },
+    {
+        "id": "pregnant_doctor_visit",
+        "unique": False,
+        "min_age": 16, "max_age": 50, "prob": 0.20,
+        "predicates": [IsPregnant()],
+        "text": "Your antenatal appointment is today.",
+        "choices": [
+            {"text": "Go and ask every question", "effects": {"happiness": 3, "health": 2, "money": -40},
+             "log": "The midwife was reassuring. You left with a printed list."},
+            {"text": "Reschedule — work's mad", "effects": {"happiness": -3, "health": -2},
+             "log": "You bumped it. You shouldn't have."},
+        ],
+    },
+    {
+        "id": "maternity_leave_question",
+        "unique": False,
+        "min_age": 18, "max_age": 50, "prob": 0.18,
+        "predicates": [IsPregnant(), HasJob()],
+        "text": "HR is asking how long you want to take off for the baby.",
+        "choices": [
+            {"text": "Six months", "effects": {"happiness": 4, "money": -2_000},
+             "log": "Six months on a reduced rate. Worth every penny."},
+            {"text": "Just the statutory minimum", "effects": {"happiness": -2, "money": -500},
+             "log": "You took the minimum. The pace of work didn't soften."},
+            {"text": "A full year, unpaid if needed", "effects": {"happiness": 7, "money": -8_000},
+             "log": "A whole year. Painful for the bank account, priceless for you both."},
+        ],
+    },
+    {
+        "id": "nesting_instinct",
+        "unique": False,
+        "min_age": 16, "max_age": 50, "prob": 0.15,
+        "predicates": [IsPregnant()],
+        "text": "You woke up at 5am needing — urgently — to reorganise the kitchen.",
+        "choices": [
+            {"text": "Lean into it", "effects": {"happiness": 4, "money": -120},
+             "log": "By Sunday the kitchen was unrecognisable. Joyful chaos."},
+            {"text": "Go back to bed", "effects": {"happiness": 1, "health": 2},
+             "log": "You slept until noon. Wisdom."},
         ],
     },
 

@@ -33,9 +33,12 @@ Design rules:
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from core.content import names as names_mod
+
+if TYPE_CHECKING:
+    from core.agents import Agent
 from core.rng import Rng
 from core.state import (
     Character,
@@ -43,6 +46,7 @@ from core.state import (
     FeedEntry,
     GameState,
     Job,
+    PregnancyState,
     Relationship,
     Stats,
 )
@@ -78,28 +82,34 @@ def _find_agent(state: GameState, npc_id: int):
 # --- Birth -----------------------------------------------------------------
 
 
-def have_child(state: GameState, rng: Rng) -> Optional[str]:
-    """Mint a child Agent for the player, age 0. Returns a feed-worthy
-    sentence ("You and your partner welcomed a baby girl, Helena.") or
-    None if conditions can't be satisfied (no character, no partner).
+def _mint_child(
+    state: GameState,
+    rng: Rng,
+    *,
+    partner_npc_id: int | None,
+    partner_name: str,
+    partner_looks: int,
+    partner_smarts: int,
+) -> tuple[Optional["Agent"], Optional[str]]:
+    """Shared internal: spawn a baby Agent + Relationship + Character.children
+    record, with genetic stats blended from BOTH parents.
 
-    Side effects:
-      - new Agent appended to state.agents with role="Child"
-      - new Relationship appended (kind="Child") so the UI can surface
-        the child on the Relations screen immediately
-      - player's Character.children list gains the new npc_id
-      - a small happiness bump (the verb is happy news)
+    Genetic model
+    -------------
+    Smarts and looks are heritable: child's stat = average(player, partner)
+    ± 10 jitter. Health is rolled fresh (modelling environment + lottery,
+    not lineage). The partner's stats are read at call time — callers that
+    care about determinism (pregnancy resolution) snapshot them at
+    conception and pass them in here.
+
+    Returns the new Agent (or None if no character) and a feed sentence.
+    Callers decide whether to suppress the sentence (e.g. when the naming
+    modal is going to print its own).
     """
     from core.agents import Agent  # local to dodge cycle
 
     if state.character is None:
-        return None
-    partner = next(
-        (r for r in state.relationships if r.kind == "Partner" and r.alive),
-        None,
-    )
-    if partner is None:
-        return None
+        return None, None
 
     surname = state.character.last_name
     country = state.character.country
@@ -109,15 +119,10 @@ def have_child(state: GameState, rng: Rng) -> Optional[str]:
     first_name = names_mod.random_forename(country, gender, rng.fork(2))
     npc_id = _next_npc_id(state)
 
-    # Light Mendelian-flavoured rolls — bias toward the average of the
-    # two parents on visible stats, then jitter. Smarts/looks are the
-    # heritable ones; health is rolled fresh. Player's stats stand in
-    # for one parent; the partner's are unknown to us at this level so
-    # we approximate with 60 (a typical adult midpoint).
     p_smarts = state.stats.smarts
     p_looks = state.stats.looks
-    smarts = max(0, min(100, (p_smarts + 60) // 2 + rng.fork(3).randint(-10, 10)))
-    looks = max(0, min(100, (p_looks + 60) // 2 + rng.fork(4).randint(-10, 10)))
+    smarts = max(0, min(100, (p_smarts + partner_smarts) // 2 + rng.fork(3).randint(-10, 10)))
+    looks = max(0, min(100, (p_looks + partner_looks) // 2 + rng.fork(4).randint(-10, 10)))
     health = 80 + rng.fork(5).randint(0, 20)
 
     child = Agent(
@@ -148,7 +153,235 @@ def have_child(state: GameState, rng: Rng) -> Optional[str]:
 
     state.stats.happiness = min(100, state.stats.happiness + 6)
     descriptor = {"Male": "baby boy", "Female": "baby girl"}.get(gender, "baby")
-    return f"You and {partner.name} welcomed a {descriptor}, {first_name}."
+    parent_phrase = partner_name or "your partner"
+    return child, f"You and {parent_phrase} welcomed a {descriptor}, {first_name}."
+
+
+def have_child(state: GameState, rng: Rng) -> Optional[str]:
+    """Instant-birth path (used by the `have_child` event side_effect in
+    legacy / tests). Reads the player's living Partner's Agent stats so
+    genetics are two-parent. Returns the feed sentence or None.
+
+    Most births should go through ``begin_pregnancy`` /
+    ``resolve_pregnancy`` instead — this helper exists for backwards
+    compatibility and as the fallback when callers don't need a one-year
+    gestation cycle.
+    """
+    if state.character is None:
+        return None
+    partner = next(
+        (r for r in state.relationships if r.kind == "Partner" and r.alive),
+        None,
+    )
+    if partner is None:
+        return None
+    partner_agent = _find_agent(state, partner.npc_id)
+    _, msg = _mint_child(
+        state, rng,
+        partner_npc_id=partner.npc_id,
+        partner_name=partner.name,
+        partner_looks=partner_agent.looks if partner_agent else 60,
+        partner_smarts=partner_agent.smarts if partner_agent else 60,
+    )
+    return msg
+
+
+# --- Pregnancy v1 ----------------------------------------------------------
+
+
+# Age fertility band for the carrier. Conception probability falls off
+# sharply past 35 (modelling real-life fertility curves at a coarse level).
+CARRIER_MIN_AGE = 16
+CARRIER_MAX_AGE = 50
+# Per-call probability when attempt_conception goes through the random
+# pathway (e.g. broken_condom event). Modulated by health.
+BASE_CONCEPTION_PROB_YOUNG = 0.80   # under 30
+BASE_CONCEPTION_PROB_MID = 0.40     # 30–34
+BASE_CONCEPTION_PROB_OLDER = 0.15   # 35–50
+# Complication rate at birth. Stays explicitly low to keep v1 forgiving.
+MISCARRIAGE_PROB = 0.05
+
+
+def _snapshot_partner(state: GameState) -> tuple[int | None, str, int, int]:
+    """Return (npc_id, name, looks, smarts) for the player's living Partner,
+    falling back to midpoint stats if there's no Agent record. Used to
+    freeze the partner's genetic contribution at conception time."""
+    partner = next(
+        (r for r in state.relationships if r.kind == "Partner" and r.alive),
+        None,
+    )
+    if partner is None:
+        return None, "", 60, 60
+    agent = _find_agent(state, partner.npc_id)
+    looks = agent.looks if agent else 60
+    smarts = agent.smarts if agent else 60
+    return partner.npc_id, partner.name, looks, smarts
+
+
+def begin_pregnancy(state: GameState, *, player_is_carrier: bool = True) -> bool:
+    """Unconditional pregnancy registration. Returns False only when the
+    state is incoherent (no character, already pregnant, no living
+    partner). The deliberate-choice path (consider_child "yes") goes
+    through here so the player isn't denied by a probability roll after
+    explicitly opting in.
+    """
+    if state.character is None or state.pregnancy.is_active:
+        return False
+    npc_id, name, looks, smarts = _snapshot_partner(state)
+    if npc_id is None:
+        return False
+    state.pregnancy = PregnancyState(
+        is_active=True,
+        carrier_is_player=player_is_carrier,
+        partner_npc_id=npc_id,
+        conception_age=state.character.age,
+        conception_tick=state.tick,
+        partner_looks=looks,
+        partner_smarts=smarts,
+        partner_name=name,
+    )
+    return True
+
+
+def attempt_conception(state: GameState, rng: Rng, *, player_is_carrier: bool = True) -> bool:
+    """Probabilistic pregnancy roll. Returns True if conception happened.
+
+    Refuses (returns False without rolling) when the carrier is outside
+    the fertility band, the player already has an active pregnancy, or
+    there's no living partner to attribute parentage to.
+
+    The probability curve is age-banded and health-modulated. Health < 50
+    drags the chance down linearly.
+    """
+    if state.character is None or state.pregnancy.is_active:
+        return False
+    carrier_age = state.character.age  # v1: player carries OR carrier age == player age (modelled simply)
+    if carrier_age < CARRIER_MIN_AGE or carrier_age > CARRIER_MAX_AGE:
+        return False
+    npc_id, name, looks, smarts = _snapshot_partner(state)
+    if npc_id is None:
+        return False
+
+    if carrier_age < 30:
+        base = BASE_CONCEPTION_PROB_YOUNG
+    elif carrier_age < 35:
+        base = BASE_CONCEPTION_PROB_MID
+    else:
+        base = BASE_CONCEPTION_PROB_OLDER
+    health_factor = max(0.3, state.stats.health / 100.0)
+    final = base * health_factor
+
+    if not rng.chance(final):
+        return False
+
+    state.pregnancy = PregnancyState(
+        is_active=True,
+        carrier_is_player=player_is_carrier,
+        partner_npc_id=npc_id,
+        conception_age=state.character.age,
+        conception_tick=state.tick,
+        partner_looks=looks,
+        partner_smarts=smarts,
+        partner_name=name,
+    )
+    return True
+
+
+def resolve_pregnancy(state: GameState, rng: Rng) -> Optional[dict]:
+    """Called from sim.age_up the year AFTER conception. Either:
+      - rolls a miscarriage (small chance) and writes a feed entry, or
+      - mints the child via ``_mint_child`` and sets ``state.pending_birth``
+        for the UI naming modal.
+
+    Returns the pending_birth payload on a successful birth, None on
+    miscarriage or no-op. Always clears ``state.pregnancy.is_active``.
+    """
+    if not state.pregnancy.is_active or state.character is None:
+        return None
+    # Only resolve when at least one tick has passed since conception —
+    # callers (sim.age_up) increment tick before calling, so the very
+    # tick of conception doesn't immediately resolve.
+    if state.tick <= state.pregnancy.conception_tick:
+        return None
+
+    preg = state.pregnancy
+    state.pregnancy = PregnancyState()  # reset before any return
+
+    if rng.fork(1).chance(MISCARRIAGE_PROB):
+        # Miscarriage path. The feed line is intentionally restrained —
+        # the player can read more into it than the engine spells out.
+        state.stats.happiness = max(0, state.stats.happiness - 25)
+        state.stats.health = max(0, state.stats.health - 5)
+        state.feed.append(FeedEntry(
+            age=state.character.age,
+            text="You lost the pregnancy. It took a long time to find words for it.",
+            kind="bad",
+            entry_id=f"feed:miscarriage:{state.tick}",
+        ))
+        return None
+
+    child, msg = _mint_child(
+        state, rng.fork(2),
+        partner_npc_id=preg.partner_npc_id,
+        partner_name=preg.partner_name or "your partner",
+        partner_looks=preg.partner_looks,
+        partner_smarts=preg.partner_smarts,
+    )
+    if child is None:
+        return None
+
+    state.pending_birth = {
+        "npc_id": child.npc_id,
+        "gender": child.gender,
+        "suggested_name": child.first_name,
+        "last_name": child.last_name,
+        "partner_name": preg.partner_name,
+    }
+    # Feed line gets a placeholder using the suggested name; if the player
+    # picks a different name via the modal, name_child() patches the feed
+    # entry in place.
+    state.feed.append(FeedEntry(
+        age=state.character.age,
+        text=msg or "Your baby was born.",
+        kind="special",
+        entry_id=f"feed:birth:{state.tick}:{child.npc_id}",
+    ))
+    return state.pending_birth
+
+
+def name_child(state: GameState, npc_id: int, chosen_name: str) -> bool:
+    """Apply the player-picked name to a newly-born child. Returns False
+    if the npc_id doesn't match the pending birth or the name is blank.
+
+    Updates the Agent.first_name, the Relationship.name, and the
+    most-recent feed entry (the auto-generated "you welcomed a baby"
+    line) so the narrative reads consistently. Clears state.pending_birth.
+    """
+    if state.pending_birth is None or state.pending_birth.get("npc_id") != npc_id:
+        return False
+    clean = chosen_name.strip()
+    if not clean:
+        return False
+    agent = _find_agent(state, npc_id)
+    if agent is None:
+        return False
+    old_first = agent.first_name
+    agent.first_name = clean
+    # Refresh the matching Relationship's display name (Child.name mirrors
+    # the agent — the player-facing list should not lag).
+    for r in state.relationships:
+        if r.npc_id == npc_id:
+            r.name = agent.name
+            break
+    # Patch the feed entry that announced the birth so the chosen name
+    # appears in the player's life log. Search from the tail because
+    # birth lines land at the end of the year.
+    for entry in reversed(state.feed):
+        if entry.entry_id.startswith(f"feed:birth:") and old_first in entry.text:
+            entry.text = entry.text.replace(old_first, clean)
+            break
+    state.pending_birth = None
+    return True
 
 
 # --- Eligibility & estate --------------------------------------------------
@@ -359,6 +592,11 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
     state.job_application_error = None
     state.fired_events = []
     state.causal_chain = []
+    # Pregnancy v1: a new generation never inherits the deceased's
+    # gestation state — that'd cause a phantom resolve on the heir's
+    # first tick.
+    state.pregnancy = PregnancyState()
+    state.pending_birth = None
     state.pending_milestone = None
     state.milestones_seen = []
     state.feed = []

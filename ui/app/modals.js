@@ -25,6 +25,7 @@
     if (s.exam && s.exam.current && !s.exam.finished) return "exam:" + s.exam.index;
     if (s.education && s.education.degree_award_pending) return "degree:" + s.tick;
     if (s.education && s.education.awaiting_university_choice) return "uni:" + s.tick;
+    if (s.pending_birth) return "birth:" + s.pending_birth.npc_id + ":" + s.tick;
     if (s.pending_milestone) return "milestone:" + s.pending_milestone.id + ":" + s.tick;
     if (s.mode === "DEATH" && !this.deathShown) { this.deathShown = true; return "death"; }
     return null;
@@ -40,8 +41,34 @@
     else if (key.startsWith("exam:"))    this.raiseExamModal(s.exam);
     else if (key.startsWith("degree:"))  this.raiseDegreeModal(s.education);
     else if (key.startsWith("uni:"))     this.raiseUniversityModal(s);
+    else if (key.startsWith("birth:"))   this.raiseBirthModal(s.pending_birth);
     else if (key.startsWith("milestone:")) this.raiseMilestoneModal(s.pending_milestone);
     else if (key === "death")            this.raiseDeathModal(s);
+  };
+
+  App.raiseBirthModal = function (b) {
+    if (!b) return;
+    const descriptor = (b.gender === "Female") ? "girl"
+                     : (b.gender === "Male") ? "boy" : "child";
+    const partner = b.partner_name || "your partner";
+    LifeUI.modal({
+      kind: "award", title: "It's a baby!", dismissable: false,
+      blocks: [
+        { type: "award", icon: "heart",
+          title: `You and ${partner} welcomed a baby ${descriptor}.`,
+          subtitle: "What will you name them?" },
+        { type: "text-input",
+          key: "babyName",
+          label: "First name",
+          value: b.suggested_name || "",
+          placeholder: "Their name",
+          maxLength: 32 },
+      ],
+      actions: [
+        { label: "Name them", variant: "primary", action: "name-baby",
+          payload: { npc_id: b.npc_id } },
+      ],
+    });
   };
 
   // Icon + accent per milestone "kind" — keeps the visual language tight

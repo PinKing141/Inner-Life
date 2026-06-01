@@ -129,6 +129,32 @@ class FeedEntry:
 
 
 @dataclass
+class PregnancyState:
+    """Phase 6 — Pregnancy v1.
+
+    Tracks an in-progress gestation. Resolution happens one tick after
+    conception in ``sim.age_up`` -> ``genealogy.resolve_pregnancy``, so the
+    birth event always lands on the year after the player chose to try.
+
+    ``carrier_is_player`` matters for future maternity-leave / health
+    events (queued for v2). In v1 both code paths land in the same
+    ``pending_birth`` modal, but the field lets later events gate cleanly.
+
+    Partner stats are snapshotted at conception so the child's inherited
+    looks/smarts don't shift if the partner trains or ages between
+    conception and birth.
+    """
+    is_active: bool = False
+    carrier_is_player: bool = True
+    partner_npc_id: int | None = None
+    conception_age: int = 0
+    conception_tick: int = 0
+    partner_looks: int = 50   # snapshot for genetic blend
+    partner_smarts: int = 50  # snapshot for genetic blend
+    partner_name: str = ""    # for narrative consistency if partner agent vanishes
+
+
+@dataclass
 class GameState:
     """The complete simulated world."""
 
@@ -162,6 +188,15 @@ class GameState:
     # read it back. Each entry is a dict (see core.genealogy.snapshot).
     ancestors: list[dict] = field(default_factory=list)
     social_edges: list = field(default_factory=list)  # list[SocialEdge]; typed via core.social
+    # Phase 6 — Pregnancy v1. An active gestation registered by either
+    # the consider_child event (guaranteed) or attempt_conception
+    # (probabilistic, e.g. broken_condom event). Resolves one tick later
+    # in sim.age_up via genealogy.resolve_pregnancy.
+    pregnancy: PregnancyState = field(default_factory=PregnancyState)
+    # When a pregnancy resolves successfully, the naming modal payload
+    # lives here until the player picks a name. Shape: {npc_id, gender,
+    # suggested_name, last_name}. The UI raises a modal with a text input.
+    pending_birth: dict | None = None
     # Phase 6 — Love/Dating v1. Current dating prospect (None when single
     # or already committed). Shape: {npc_id, name, age, gender, chemistry,
     # dates_been_on, started_tick}. The same NPC also lives as a
@@ -280,6 +315,17 @@ class GameState:
             "rental": self.rental,
             "ancestors": list(self.ancestors),
             "social_edges": [e.to_dict() for e in self.social_edges],
+            "pregnancy": {
+                "is_active": self.pregnancy.is_active,
+                "carrier_is_player": self.pregnancy.carrier_is_player,
+                "partner_npc_id": self.pregnancy.partner_npc_id,
+                "conception_age": self.pregnancy.conception_age,
+                "conception_tick": self.pregnancy.conception_tick,
+                "partner_looks": self.pregnancy.partner_looks,
+                "partner_smarts": self.pregnancy.partner_smarts,
+                "partner_name": self.pregnancy.partner_name,
+            },
+            "pending_birth": self.pending_birth,
             "dating": self.dating,
             "pending_milestone": self.pending_milestone,
             "milestones_seen": list(self.milestones_seen),
@@ -420,6 +466,12 @@ class GameState:
             rental=data.get("rental"),
             ancestors=list(data.get("ancestors", [])),
             social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
+            pregnancy=(
+                PregnancyState(**data["pregnancy"])
+                if isinstance(data.get("pregnancy"), dict)
+                else PregnancyState()
+            ),
+            pending_birth=data.get("pending_birth"),
             dating=data.get("dating"),
             pending_milestone=data.get("pending_milestone"),
             milestones_seen=list(data.get("milestones_seen", [])),

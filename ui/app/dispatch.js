@@ -54,6 +54,21 @@
         this.loggedFeedCount = 0;
         if (b.continueAsHeir) await b.continueAsHeir(payload);
         break;
+      case "try-for-baby":
+        if (b.tryForBaby) await b.tryForBaby();
+        break;
+      case "name-baby": {
+        // Read the user's name from the modal's text-input block, then
+        // send it through nameBaby. Falls back to the suggested name if
+        // they cleared the field.
+        const input = document.querySelector('[data-modal-input="babyName"]');
+        const raw = input ? input.value : "";
+        const npcId = payload && payload.npc_id;
+        if (b.nameBaby && typeof npcId === "number") {
+          await b.nameBaby(npcId, raw);
+        }
+        break;
+      }
       case "ask-someone-out":   if (b.askSomeoneOut) await b.askSomeoneOut(); break;
       case "go-on-date":        if (b.goOnDate) await b.goOnDate(); break;
       case "become-official":   if (b.becomeOfficial) await b.becomeOfficial(); break;
