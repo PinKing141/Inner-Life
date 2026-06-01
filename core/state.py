@@ -170,6 +170,14 @@ class GameState:
     # On commitment (become_official), the Relationship flips to
     # kind="Partner" and this field clears.
     dating: dict | None = None
+    # Milestone popups for life moments (turning 18, 30, 50, 65, 100). Set
+    # by sim.age_up when the player crosses a threshold; the UI raises a
+    # modal and the bridge clears it via acknowledgeMilestone. Shape:
+    # {"id": "milestone:18", "age": 18, "title": "...", "subtitle": "..."}
+    pending_milestone: dict | None = None
+    # Ages at which a milestone has already fired (so post-load + heir
+    # transitions don't re-trigger them on the same character).
+    milestones_seen: list[int] = field(default_factory=list)
 
     # --- Serialization (for save/load and JS bridge) ---
 
@@ -273,6 +281,8 @@ class GameState:
             "ancestors": list(self.ancestors),
             "social_edges": [e.to_dict() for e in self.social_edges],
             "dating": self.dating,
+            "pending_milestone": self.pending_milestone,
+            "milestones_seen": list(self.milestones_seen),
         }
 
 
@@ -411,4 +421,6 @@ class GameState:
             ancestors=list(data.get("ancestors", [])),
             social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
             dating=data.get("dating"),
+            pending_milestone=data.get("pending_milestone"),
+            milestones_seen=list(data.get("milestones_seen", [])),
         )

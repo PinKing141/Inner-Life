@@ -38,6 +38,7 @@
       case "ack-setback":         await b.acknowledgeCareerSetback(); break;
       case "clear-rejection":     await b.clearApplicationError(); break;
       case "ack-degree":          await b.acknowledgeDegree(); break;
+      case "ack-milestone":       if (b.acknowledgeMilestone) await b.acknowledgeMilestone(); break;
       case "apply-university":    await b.applyUniversity(); break;
       case "uni-attend":          await b.setUniversityPlan(true, payload); break;
       case "uni-skip":            await b.setUniversityPlan(false, ""); break;

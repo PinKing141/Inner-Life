@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import activities, dating, economy, education, genealogy, housing, relationships, sim
+from core import activities, dating, economy, education, genealogy, housing, milestones, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -342,6 +342,13 @@ class GameController:
     def clear_application_error(self) -> dict:
         if self.state is not None:
             self.state.job_application_error = None
+            self._broadcast()
+        return self.snapshot()
+
+    def acknowledge_milestone(self) -> dict:
+        """Dismiss the current life-milestone modal (turning 18 / 30 / 50 …)."""
+        if self.state is not None:
+            milestones.acknowledge(self.state)
             self._broadcast()
         return self.snapshot()
 
