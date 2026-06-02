@@ -30,6 +30,22 @@ def _is_unique(event: dict) -> bool:
     return event.get("unique", True)
 
 
+# Per-tick "no event this year" floor. The engine fires at most one event
+# per age_up tick, but without a skip floor it tries EVERY tick — and as the
+# catalogue grows, the probability that AT LEAST ONE candidate's chance roll
+# succeeds approaches 1 (`1 - prod(1 - p_i)` over in-window candidates).
+# That saturation compresses cumulative life variance (death-age stdev
+# collapses, archetype distributions homogenise) — see
+# tests/test_observatory_invariants.py.
+#
+# This constant guarantees a baseline fraction of event-free years regardless
+# of how many events end up in the catalogue, unblocking content expansion
+# toward the roadmap's 300+ events without re-tuning every existing event's
+# probability. The skip only applies in free-world ticks; prison ticks
+# already filter to a tiny IsIncarcerated-gated pool that we want to fire.
+NO_EVENT_TICK_PROB = 0.30
+
+
 def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
     """Try to fire one event this tick. Returns the chosen event dict, or None.
 
@@ -46,6 +62,9 @@ def roll_event(state: GameState, rng: Rng) -> Optional[dict]:
     # class name to avoid an import cycle (events->predicates already
     # exists; this just keeps the filter declarative).
     incarcerated = state.crime.is_incarcerated
+    # Per-tick skip floor (free-world only — see NO_EVENT_TICK_PROB).
+    if not incarcerated and rng.fork(0xBEEF).chance(NO_EVENT_TICK_PROB):
+        return None
     def _eligible(e: dict) -> bool:
         if not (e["min_age"] <= age <= e["max_age"]):
             return False
