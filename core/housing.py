@@ -37,8 +37,14 @@ def list_market(state: GameState) -> list[dict]:
 
 
 def net_worth(state: GameState) -> int:
-    return state.money + sum(
-        p.get("value", 0) - p.get("mortgage_balance", 0) for p in state.properties
+    # Cars/Assets v1: vehicles are a second asset class. Local import
+    # avoids a circular dependency at module load — core.cars itself
+    # doesn't need housing.
+    from core import cars
+    return (
+        state.money
+        + sum(p.get("value", 0) - p.get("mortgage_balance", 0) for p in state.properties)
+        + cars.total_value(state)
     )
 
 

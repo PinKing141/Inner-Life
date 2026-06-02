@@ -610,6 +610,10 @@ def continue_as_heir(state: GameState, heir_npc_id: int) -> bool:
     # work can route real estate through estate distribution.
     state.properties = []
     state.rental = None
+    # Cars/Assets v1: vehicles, like properties, are sold off at probate
+    # in this MVP — their value is implicitly included in the estate
+    # share. v2 could route specific vehicles through inheritance.
+    state.vehicles = []
     state.last_help_tick = -100
     # tick keeps going; we're in the same world, just at a new life.
 

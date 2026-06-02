@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from core import agents, balance, crime as crime_mod, economy, education, events, genealogy, housing, milestones, relationships, world
+from core import agents, balance, cars as cars_mod, crime as crime_mod, economy, education, events, genealogy, housing, milestones, relationships, world
 from core.content import countries as countries_mod
 from core.content import names as names_mod
 from core.rng import Rng
@@ -288,6 +288,8 @@ def age_up(state: GameState) -> None:
             summary_parts.append(edu_msg)
         _tick_economy(state, tick_rng, summary_parts)
         housing.annual_update(state, tick_rng.fork(9))
+        # Cars/Assets v1: vehicles depreciate every free-world year.
+        cars_mod.annual_depreciation(state, tick_rng.fork(57))
         _tick_career(state, tick_rng, summary_parts)
         _tick_social(state, tick_rng, summary_parts)
         _tick_drift(state, tick_rng, summary_parts)

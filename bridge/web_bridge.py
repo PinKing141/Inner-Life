@@ -136,6 +136,16 @@ class WebBridge(QObject):
     def stopRenting(self) -> str:
         return _dumps(self._controller.stop_renting())
 
+    # ---- Cars / Assets v1 ----
+
+    @Slot(str, result=str)
+    def buyCar(self, car_id: str) -> str:
+        return _dumps(self._controller.buy_car(car_id))
+
+    @Slot(int, result=str)
+    def sellCar(self, instance_id: int) -> str:
+        return _dumps(self._controller.sell_car(instance_id))
+
     @Slot(result=str)
     def workHarder(self) -> str:
         return _dumps(self._controller.work_harder())

@@ -203,6 +203,10 @@ class GameState:
     job_application_error: str | None = None  # last rejected application message
     properties: list = field(default_factory=list)  # owned homes [{id,name,value,purchase_price}]
     rental: dict | None = None  # current rental {id,name,rent}
+    # Phase 6 — Cars/Assets v1. Owned vehicles; each is a dict with
+    # instance_id, car_id, current_value, age_years, depreciation_rate.
+    # See core.cars for the catalogue and verbs.
+    vehicles: list = field(default_factory=list)
     # Phase 5 — genealogy. `ancestors` is the archive of prior playable
     # characters: when the player dies and continues as a child, the
     # outgoing life is snapshotted here so legend / family-history UI can
@@ -342,6 +346,7 @@ class GameState:
             "pending_career_setback": self.pending_career_setback,
             "job_application_error": self.job_application_error,
             "properties": list(self.properties),
+            "vehicles": list(self.vehicles),
             "rental": self.rental,
             "ancestors": list(self.ancestors),
             "social_edges": [e.to_dict() for e in self.social_edges],
@@ -500,6 +505,7 @@ class GameState:
             pending_career_setback=data.get("pending_career_setback"),
             job_application_error=data.get("job_application_error"),
             properties=list(data.get("properties", [])),
+            vehicles=list(data.get("vehicles", [])),
             rental=data.get("rental"),
             ancestors=list(data.get("ancestors", [])),
             social_edges=[SocialEdge.from_dict(e) for e in data.get("social_edges", [])],
