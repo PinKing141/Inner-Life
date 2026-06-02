@@ -1490,4 +1490,97 @@ EVENTS: list[dict] = [
              "log": "You forgot. They left two messages and a warning."},
         ],
     },
+
+    # ===========================================================
+    # ----- Phase 6 slice 5: cross-cutting drama (variance-shaped)
+    # An iterative content slice: I tried 50 then 20 mild-effect events
+    # and the observatory invariants (tests/test_observatory_invariants
+    # .py) flagged variance collapse — too many small drifts compress
+    # outcomes toward stable-middle / a narrow death age band. The
+    # answer that worked: small number of events with BIG swings that
+    # actually pull lives apart instead of pushing them together.
+    # See PR description for the full investigation.
+    # ===========================================================
+
+    # ----- Unexpected wealth — pulls some lives upward sharply -----
+    {
+        "id": "unexpected_inheritance",
+        "min_age": 25, "max_age": 60, "prob": 0.015,
+        "text": "A solicitor's letter: a relative you barely knew left you something.",
+        "choices": [
+            {"text": "Invest it sensibly", "effects": {"money": 35_000, "smarts": 3, "happiness": 6},
+             "log": "Thirty-five thousand pounds. You spoke to an advisor. It changed the next decade."},
+            {"text": "Spend it on a year of joy", "effects": {"money": 30_000, "happiness": 15, "health": -2},
+             "log": "Travel, restaurants, generous gifts. The year you'll never forget."},
+        ],
+    },
+
+    # ----- Big setback — pulls some lives downward sharply -----
+    {
+        "id": "financial_disaster",
+        "min_age": 25, "max_age": 65, "prob": 0.015,
+        "predicates": [MinMoney(2_000)],
+        "text": "A bad decision and worse timing have wiped out your savings.",
+        "choices": [
+            {"text": "Take the hit and rebuild", "effects": {"money": -15_000, "happiness": -8, "smarts": 3},
+             "log": "Painful. You learned things about yourself you'd rather not have."},
+        ],
+    },
+
+    # ----- Narrow childhood moment, big sad swing -----
+    {
+        "id": "pet_passed_away",
+        "min_age": 7, "max_age": 11, "prob": 0.025,
+        "text": "You found your pet curled up and still in the morning.",
+        "choices": [
+            {"text": "Bury them in the garden together", "effects": {"happiness": -8, "smarts": 4},
+             "log": "Your dad dug the hole. You said something you'd been practising. You learned something."},
+        ],
+    },
+
+    # ----- One-year teen high — big positive happiness for some -----
+    {
+        "id": "learned_an_instrument",
+        "min_age": 12, "max_age": 14, "prob": 0.03,
+        "text": "You picked up an instrument and got serious about it.",
+        "choices": [
+            {"text": "Practice every day for years", "effects": {"smarts": 10, "happiness": 8},
+             "log": "Two years in, you played a recital. Your parents cried."},
+            {"text": "Give up after a month", "effects": {"happiness": -3},
+             "log": "The case stayed under your bed. Maybe one day."},
+        ],
+    },
+
+    # ----- Late-life pivot — diverges lives near retirement -----
+    {
+        "id": "late_career_reinvention",
+        "min_age": 50, "max_age": 58, "prob": 0.02,
+        "text": "Something needs to change. You feel it in your bones.",
+        "choices": [
+            {"text": "Switch career entirely", "effects": {"happiness": 10, "money": -5_000, "smarts": 5},
+             "log": "Massive risk, two years rough. Year three you barely recognised your old self."},
+            {"text": "Stay the course", "effects": {"happiness": -8},
+             "log": "You buried the impulse. It came back, every winter."},
+        ],
+    },
+
+    # ----- Mortality-affecting choice — actively widens the death-age band -----
+    # The observatory's `test_variance_has_not_collapsed` checks that
+    # death-age stdev stays >= 4.0. Without an event that can meaningfully
+    # extend OR shorten lifespan, adding any content gently compresses
+    # the band. This event has both directions: serious health upside
+    # for the disciplined, real downside for the reckless.
+    {
+        "id": "midlife_health_reckoning",
+        "min_age": 45, "max_age": 55, "prob": 0.04,
+        "text": "A scare at the doctor's. They want lifestyle changes — properly.",
+        "choices": [
+            {"text": "Overhaul everything — diet, sleep, exercise",
+             "effects": {"happiness": 4, "health": 25, "money": -800},
+             "log": "Eighteen months in, your bloods were the best they'd been since you were 25."},
+            {"text": "Promise to do better, mostly don't",
+             "effects": {"happiness": -2, "health": -15},
+             "log": "You meant to. The takeaways crept back. Things accelerated."},
+        ],
+    },
 ]
