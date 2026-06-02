@@ -104,7 +104,7 @@
       title: o.title || (caught ? "Busted" : "Clean Getaway"),
       dismissable: true,
       blocks: [{ type: "award",
-        icon: caught ? "handcuffs" : "sack",
+        icon: caught ? "lock" : "gem",
         title: o.title || "",
         subtitle: o.text || "" }],
       actions: [{

@@ -218,6 +218,7 @@ const LifeUI = (function () {
     { id: 'assets',     label: 'Assets',    icon: 'assets' },
     { id: 'relations',  label: 'Relations', icon: 'heart'  },
     { id: 'activities', label: 'Activities',icon: 'dots'   },
+    { id: 'crime',      label: 'Crime',     icon: 'sack'   },
   ];
 
   function registerScreen(id, opts) {

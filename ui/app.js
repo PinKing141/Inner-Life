@@ -62,6 +62,7 @@ Object.assign(window.App, {
     this.renderCareer();
     this.renderRelations();
     this.renderAssets();
+    this.renderCrime();
     this.appendNewFeedEntries();
     this.syncModal();
   },
