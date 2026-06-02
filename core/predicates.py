@@ -274,6 +274,18 @@ class HasCriminalRecord:
         return len(s.crime.past_offences) > 0
 
 
+# --- Cars / Assets v1 -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OwnsAVehicle:
+    """True when the player owns at least one car. Used to gate
+    car-related drama events (breakdown, theft, road trip)."""
+
+    def __call__(self, s: GameState) -> bool:
+        return len(s.vehicles) > 0
+
+
 # --- Phase 2: graph-shape predicates --------------------------------------
 
 

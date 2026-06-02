@@ -22,6 +22,7 @@ from core.predicates import (
     InDebt,
     InSchool,
     HasCriminalRecord,
+    OwnsAVehicle,
     IsDating,
     IsIncarcerated,
     IsPregnant,
@@ -1581,6 +1582,36 @@ EVENTS: list[dict] = [
             {"text": "Promise to do better, mostly don't",
              "effects": {"happiness": -2, "health": -15},
              "log": "You meant to. The takeaways crept back. Things accelerated."},
+        ],
+    },
+
+    # ===========================================================
+    # ----- Cars / Assets v1 — vehicle-gated drama
+    # ===========================================================
+    {
+        "id": "car_broke_down",
+        "unique": False,
+        "min_age": 17, "max_age": 90, "prob": 0.06,
+        "predicates": [OwnsAVehicle()],
+        "text": "Smoke from under the bonnet on the way home. Not good.",
+        "choices": [
+            {"text": "Pay for a proper repair", "effects": {"happiness": -2, "money": -1_200},
+             "log": "Twelve hundred quid and three days at the garage. It's running again."},
+            {"text": "Cobble it back together yourself", "effects": {"happiness": -4, "smarts": 2, "money": -200},
+             "log": "Spanners, swearing, YouTube. £200 and a Saturday. Holding for now."},
+        ],
+    },
+    {
+        "id": "speeding_ticket",
+        "unique": False,
+        "min_age": 17, "max_age": 70, "prob": 0.05,
+        "predicates": [OwnsAVehicle()],
+        "text": "Blue lights in the rear-view. You were doing 22 over.",
+        "choices": [
+            {"text": "Accept the fine", "effects": {"happiness": -3, "money": -300},
+             "log": "Three hundred quid and points. Painful, deserved."},
+            {"text": "Contest it", "effects": {"happiness": -2, "money": -150, "smarts": 1},
+             "log": "Court reduced it to a smaller fine. The day off work cost almost as much."},
         ],
     },
 ]

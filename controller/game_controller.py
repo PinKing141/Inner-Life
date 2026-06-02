@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from core import activities, crime as crime_mod, dating, economy, education, genealogy, housing, milestones, relationships, sim
+from core import activities, cars as cars_mod, crime as crime_mod, dating, economy, education, genealogy, housing, milestones, relationships, sim
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -63,6 +63,10 @@ class GameController:
         snap["activities"] = activities.list_descriptors()
         snap["exam"] = self._exam_for_ui()
         snap["housing_market"] = housing.list_market(self.state)
+        # Cars/Assets v1: catalogue rows for the UI (availability per
+        # age + money) + owned vehicles list.
+        snap["car_market"] = cars_mod.list_market(self.state)
+        snap["vehicles"] = cars_mod.list_owned(self.state)
         snap["net_worth"] = housing.net_worth(self.state)
         # Phase 5: the death modal reads eligible_heirs to decide whether
         # to offer "continue as [child]" buttons; ancestors carries the
@@ -429,6 +433,24 @@ class GameController:
             return self.snapshot()
         ok, msg = housing.stop_renting(self.state)
         self._feed(msg, "neutral" if ok else "bad", "stop_rent")
+        self._broadcast()
+        return self.snapshot()
+
+    # ---- Cars / Assets v1 ----
+
+    def buy_car(self, car_id: str) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = cars_mod.buy_car(self.state, car_id)
+        self._feed(msg, "good" if ok else "bad", "buy_car")
+        self._broadcast()
+        return self.snapshot()
+
+    def sell_car(self, instance_id: int) -> dict:
+        if self.state is None or self.state.character is None:
+            return self.snapshot()
+        ok, msg = cars_mod.sell_car(self.state, instance_id)
+        self._feed(msg, "good" if ok else "bad", "sell_car")
         self._broadcast()
         return self.snapshot()
 

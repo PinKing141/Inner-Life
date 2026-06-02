@@ -29,6 +29,8 @@
       case "rent-listing":        await b.rentHome(payload); break;
       case "sell-home":           await b.sellHome(payload); break;
       case "stop-renting":        await b.stopRenting(); break;
+      case "buy-car":             if (b.buyCar) await b.buyCar(payload); break;
+      case "sell-car":            if (b.sellCar && typeof payload === "number") await b.sellCar(payload); break;
       case "event-choice":        await b.choose(payload.choiceId); break;
       case "exam-answer":         await b.answerExam(payload.choiceId); break;
       case "exam-cheat":          await b.cheatExam(); break;
