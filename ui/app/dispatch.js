@@ -83,6 +83,27 @@
       case "load-game":
         if (b.load) await this.handleSaveLoad(b.load(), "Game loaded");
         break;
+      case "open-save-slot-actions":
+        this.openSaveSlotActions(payload);
+        break;
+      case "save-to-slot":
+        if (b.saveToSlot) {
+          await this.handleSaveLoad(b.saveToSlot(payload), `Saved to slot ${payload}`);
+          // Refresh the menu so the slot's metadata updates immediately.
+          await this.openSaveLoadMenu();
+        }
+        break;
+      case "load-from-slot":
+        if (b.loadFromSlot) {
+          await this.handleSaveLoad(b.loadFromSlot(payload), `Loaded slot ${payload}`);
+        }
+        break;
+      case "delete-save-slot":
+        if (b.deleteSaveSlot) {
+          await this.handleSaveLoad(b.deleteSaveSlot(payload), `Slot ${payload} deleted`);
+          await this.openSaveLoadMenu();
+        }
+        break;
     }
   };
 
@@ -105,22 +126,79 @@
   };
 
   App.openSaveLoadMenu = async function () {
-    let hasSave = false;
-    if (this.bridge && this.bridge.hasSave) {
-      try { hasSave = await this.bridge.hasSave(); } catch (e) { hasSave = false; }
+    // Save-slot picker: one row per slot showing live metadata.
+    // Tapping a row routes to an action picker (Save / Load / Delete).
+    let slots = [];
+    if (this.bridge && this.bridge.listSaveSlots) {
+      try {
+        const raw = await this.bridge.listSaveSlots();
+        slots = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch (e) { slots = []; }
     }
+    // Cache so the per-slot action submenu can render without a second bridge call.
+    this._lastSlotsList = slots;
+
+    const fmtRow = (slot) => {
+      if (!slot.exists) {
+        return {
+          icon: "box", accent: "var(--ink-faint)",
+          title: `Slot ${slot.slot_id}`, subtitle: "Empty",
+          trailing: { kind: "chevron" },
+          action: "open-save-slot-actions", payload: slot.slot_id,
+        };
+      }
+      const money = (slot.money || 0).toLocaleString();
+      const country = slot.country ? ` · ${slot.country}` : "";
+      const when = slot.saved_at ? slot.saved_at.slice(0, 10) : "";
+      const wherePart = when ? ` · ${when}` : "";
+      return {
+        icon: "save", accent: "var(--gold)",
+        title: `${slot.character_name || "Unknown"}, age ${slot.age || 0}`,
+        subtitle: `Slot ${slot.slot_id}${country} · £${money}${wherePart}`,
+        trailing: { kind: "chevron" },
+        action: "open-save-slot-actions", payload: slot.slot_id,
+      };
+    };
+
     LifeUI.modal({
       kind: "picker", title: "Save & Load", dismissable: true,
-      blocks: [{ type: "list", items: [
-        { icon: "save", accent: "var(--gold)", title: "Save Game",
-          subtitle: "Write the current life to disk",
-          trailing: { kind: "chevron" }, action: "save-game" },
-        { icon: "box", accent: hasSave ? "var(--ink-dim)" : "var(--ink-faint)",
-          title: hasSave ? "Load Game" : "Load Game (no save found)",
-          subtitle: hasSave ? "Restore a saved life" : "Save one first",
-          trailing: { kind: "chevron" },
-          action: hasSave ? "load-game" : null, locked: !hasSave },
-      ] }],
+      blocks: [{ type: "list", items: slots.map(fmtRow) }],
+      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+    });
+  };
+
+  // Per-slot action picker (Save Here / Load / Delete).
+  App.openSaveSlotActions = function (slotId) {
+    const slots = this._lastSlotsList || [];
+    const slot = slots.find(s => s.slot_id === slotId) || { exists: false, slot_id: slotId };
+
+    const items = [
+      { icon: "save", accent: "var(--gold)",
+        title: slot.exists ? "Overwrite with current life" : "Save current life here",
+        subtitle: slot.exists ? `Replaces ${slot.character_name || "the existing save"}` : "Write to this slot",
+        trailing: { kind: "chevron" },
+        action: "save-to-slot", payload: slotId },
+    ];
+    if (slot.exists) {
+      items.push({
+        icon: "box", accent: "var(--accent)",
+        title: "Load this life",
+        subtitle: `${slot.character_name || "Unknown"}, age ${slot.age || 0}`,
+        trailing: { kind: "chevron" },
+        action: "load-from-slot", payload: slotId,
+      });
+      items.push({
+        icon: "x", accent: "var(--c-bad)",
+        title: "Delete this save",
+        subtitle: "Permanent. Can't be undone.",
+        trailing: { kind: "chevron" },
+        action: "delete-save-slot", payload: slotId,
+      });
+    }
+
+    LifeUI.modal({
+      kind: "picker", title: `Slot ${slotId}`, dismissable: true,
+      blocks: [{ type: "list", items }],
       actions: [{ label: "Close", variant: "ghost", action: "__close" }],
     });
   };

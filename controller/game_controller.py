@@ -649,9 +649,54 @@ class GameController:
             raise ValueError(
                 f"save file root must be a JSON object, got {type(data).__name__}"
             )
+        # Save-slot files embed _slot_meta — strip it (mirror of the
+        # save_slots.load_from_slot stripper) so legacy load(path) on a
+        # slot file Just Works without polluting GameState.from_dict.
+        data.pop("_slot_meta", None)
         try:
             self.state = GameState.from_dict(data)
         except (KeyError, TypeError, ValueError, AttributeError) as e:
             raise ValueError(f"save file is unreadable (schema mismatch): {e}") from e
         self._broadcast()
         return self.snapshot()
+
+    # ---- Save slots (5 numbered slots; orthogonal to the legacy single save) ----
+
+    def list_save_slots(self) -> list[dict]:
+        """Peek-only view of all save slots for the UI picker. Safe to
+        call when there's no active game (used at the main menu)."""
+        from controller import save_slots
+        return save_slots.list_slots()
+
+    def save_to_slot(self, slot_id: int) -> dict:
+        """Persist the current state into slot ``slot_id`` (1..N).
+        Raises if no active game or slot_id out of range — callers
+        (bridge) translate to user-visible errors."""
+        from controller import save_slots
+        if self.state is None:
+            raise RuntimeError("no active game to save")
+        save_slots.save_to_slot(slot_id, self.state.to_dict())
+        return self.snapshot()
+
+    def load_from_slot(self, slot_id: int) -> dict:
+        """Load slot ``slot_id`` into the current controller. Raises
+        FileNotFoundError if the slot is empty, ValueError on schema
+        mismatch."""
+        from controller import save_slots
+        data = save_slots.load_from_slot(slot_id)
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"slot {slot_id} contents must be a JSON object"
+            )
+        try:
+            self.state = GameState.from_dict(data)
+        except (KeyError, TypeError, ValueError, AttributeError) as e:
+            raise ValueError(f"slot {slot_id} unreadable (schema mismatch): {e}") from e
+        self._broadcast()
+        return self.snapshot()
+
+    def delete_save_slot(self, slot_id: int) -> bool:
+        """Wipe slot ``slot_id``. No-op if already empty. Returns True
+        on success."""
+        from controller import save_slots
+        return save_slots.delete_slot(slot_id)
