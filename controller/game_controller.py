@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from core import activities, cars as cars_mod, crime as crime_mod, dating, economy, education, genealogy, housing, milestones, relationships, sim
+from core.settings import Settings
 from core.content import countries as countries_mod
 from core.content import courses as courses_mod
 from core.rng import Rng
@@ -27,6 +28,12 @@ class GameController:
         self.state: GameState | None = None
         # Subscribers receive the full state-as-dict after each mutation.
         self._listeners: list[Callable[[dict], None]] = []
+        # Settings v1: load user-level prefs (font size, motion, contrast,
+        # risky-action confirms, stat-deltas). Lives outside GameState so
+        # a new life or load doesn't reset accessibility choices. Stored
+        # via controller.settings to mirror the save_slots IO pattern.
+        from controller import settings as settings_io
+        self.settings: Settings = settings_io.load()
 
     # ---- Subscription ----
 
@@ -45,7 +52,13 @@ class GameController:
     def snapshot(self) -> dict:
         """The single source of truth that gets sent to the UI."""
         if self.state is None:
-            return {"mode": "CREATION", "countries": self._countries_for_ui()}
+            # Even on the creation screen the UI needs settings so font
+            # size / motion / contrast apply during character setup.
+            return {
+                "mode": "CREATION",
+                "countries": self._countries_for_ui(),
+                "settings": self.settings.to_dict(),
+            }
         snap = self.state.to_dict()
         snap["pending_event"] = sim.get_pending_event(self.state)
         snap["jobs"] = [
@@ -82,6 +95,10 @@ class GameController:
         # crime ladder with live success chances. Includes computed
         # availability flag so under-age / incarcerated rows render greyed.
         snap["crimes"] = crime_mod.list_crimes_for_ui(self.state)
+        # Settings v1: every snapshot carries the live settings dict
+        # so the UI can apply font size / contrast / motion on each
+        # render without a separate bridge call.
+        snap["settings"] = self.settings.to_dict()
         snap["countries"] = self._countries_for_ui()
         if self.state.character is not None:
             country = countries_mod.resolve(self.state.character.country)
@@ -709,3 +726,15 @@ class GameController:
         on success."""
         from controller import save_slots
         return save_slots.delete_slot(slot_id)
+
+    # ---- Settings v1 (user-level prefs, persisted to disk) ----
+
+    def set_setting(self, key: str, value) -> dict:
+        """Mutate one setting field, persist to disk, broadcast.
+        Refuses (no-op + snapshot) on unknown key or wrong value type
+        so a JS bug can't write garbage settings."""
+        if self.settings.update(key, value):
+            from controller import settings as settings_io
+            settings_io.save(self.settings)
+            self._broadcast()
+        return self.snapshot()
