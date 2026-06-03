@@ -457,7 +457,11 @@ class GameController:
     def relationship_action(self, npc_id: int, action: str) -> dict:
         if self.state is None or self.state.character is None:
             return self.snapshot()
-        ok, msg = relationships.interact(self.state, npc_id, action)
+        # NPC verbs v1: some actions (deep_talk / ask_advice /
+        # borrow_money) have rng-driven outcomes. Fork off the tick +
+        # feed length so repeated interactions in one year diverge.
+        rng = Rng(self.state.seed).fork(self.state.tick).fork(len(self.state.feed)).fork(0x47C)
+        ok, msg = relationships.interact(self.state, npc_id, action, rng=rng)
         self._feed(msg, "good" if ok else "bad", f"rel:{npc_id}:{action}")
         self._broadcast()
         return self.snapshot()

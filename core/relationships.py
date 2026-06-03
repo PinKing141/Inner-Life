@@ -92,14 +92,37 @@ def loneliness_tick(state: GameState) -> str | None:
 
 
 GIFT_COST = 50
+LAVISH_GIFT_COST = 500
+DINNER_COST = 80
+# Borrow gates: NPC needs to be close enough AND have money to lend.
+BORROW_MIN_RELATIONSHIP = 50
+BORROW_NPC_MIN_MONEY = 1_000
+# Ask-for-advice gate: shallow ties don't share useful counsel.
+ADVICE_MIN_RELATIONSHIP = 30
 
-INTERACTIONS = ("talk", "compliment", "argue", "gift")
+INTERACTIONS = (
+    "talk", "compliment", "argue", "gift",
+    "apologize", "deep_talk", "ask_advice", "borrow_money",
+    "insult", "lavish_gift", "take_to_dinner",
+)
 
 
-def interact(state: GameState, npc_id: int, action: str) -> ActionResult:
+def _find_agent(state: GameState, npc_id: int):
+    for a in state.agents:
+        if a.npc_id == npc_id:
+            return a
+    return None
+
+
+def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResult:
     """Player-initiated interaction with a known NPC. Returns (ok, message).
 
-    State is only mutated on success. Effects are deterministic for now."""
+    State is only mutated on success. Some verbs (``deep_talk``,
+    ``ask_advice``, ``borrow_money``) use the passed-in ``rng`` for
+    rng-driven outcomes; deterministic verbs ignore it. The controller
+    forks an rng off the current tick + feed length per call so repeated
+    interactions in one year still diverge.
+    """
     rel = next((r for r in state.relationships if r.npc_id == npc_id), None)
     if rel is None:
         return ActionResult(False, "You don't know that person.")
@@ -124,4 +147,106 @@ def interact(state: GameState, npc_id: int, action: str) -> ActionResult:
         state.money -= GIFT_COST
         rel.relationship = min(100, rel.relationship + 10)
         return ActionResult(True, f"You gave {name} a gift. It cost £{GIFT_COST}.")
+
+    # --- New verbs (Phase 6 — NPC verbs v1) -----------------------------
+
+    if action == "apologize":
+        # Big lift when the relationship is hurt (rel < 50), small
+        # acknowledgement otherwise. Models real apologies: meaningful
+        # when there's something to fix, performative when there isn't.
+        if rel.relationship < 50:
+            rel.relationship = min(100, rel.relationship + 12)
+            state.stats.happiness = min(100, state.stats.happiness + 2)
+            return ActionResult(True, f"You apologised to {name}. They softened.")
+        rel.relationship = min(100, rel.relationship + 2)
+        return ActionResult(True, f"You said sorry. {name} wasn't sure what for.")
+
+    if action == "deep_talk":
+        # Heart-to-heart. ~70% of the time it lands; the rest it surfaces
+        # something harder and costs a little emotional reserve.
+        good_roll = rng.fork(0xD1A).chance(0.70) if rng is not None else True
+        if good_roll:
+            rel.relationship = min(100, rel.relationship + 6)
+            state.stats.happiness = min(100, state.stats.happiness + 4)
+            state.stats.health = max(0, state.stats.health - 1)
+            return ActionResult(True, f"A real conversation with {name}. You both meant it.")
+        rel.relationship = min(100, rel.relationship + 2)
+        state.stats.happiness = max(0, state.stats.happiness - 2)
+        return ActionResult(True, f"You opened up to {name}. It got heavy, briefly.")
+
+    if action == "ask_advice":
+        if rel.relationship < ADVICE_MIN_RELATIONSHIP:
+            return ActionResult(False,
+                f"You don't know {name} well enough to ask for real advice.")
+        # Advice quality scales with the NPC's own smarts (read from
+        # the Agent record). Better counsel from sharper people. A
+        # bad roll surfaces unhelpful guidance.
+        agent = _find_agent(state, npc_id)
+        npc_smarts = agent.smarts if agent is not None else 50
+        # Chance scales with NPC smarts: 50 smarts = 60% useful, 100 = 95%.
+        useful_chance = 0.40 + (npc_smarts / 100.0) * 0.55
+        useful = rng.fork(0xADC).chance(useful_chance) if rng is not None else True
+        if useful:
+            state.stats.smarts = min(100, state.stats.smarts + 3)
+            rel.relationship = min(100, rel.relationship + 4)
+            return ActionResult(True,
+                f"You asked {name} for advice. Their take stuck with you.")
+        rel.relationship = min(100, rel.relationship + 1)
+        return ActionResult(True,
+            f"You asked {name} for advice. It wasn't what you needed.")
+
+    if action == "borrow_money":
+        if rel.relationship < BORROW_MIN_RELATIONSHIP:
+            return ActionResult(False,
+                f"Your relationship with {name} isn't close enough to ask for money.")
+        agent = _find_agent(state, npc_id)
+        npc_money = agent.money if agent is not None else 0
+        if npc_money < BORROW_NPC_MIN_MONEY:
+            return ActionResult(False, f"{name} doesn't have it to lend right now.")
+        # Lend chance scales with relationship strength. Even close ties
+        # sometimes say no — there's real social cost in the ask.
+        lend_chance = 0.30 + (rel.relationship / 100.0) * 0.55
+        will_lend = rng.fork(0xB07).chance(lend_chance) if rng is not None else True
+        if will_lend:
+            # Amount scales with both: closer ties + richer lenders give more.
+            base = min(npc_money, 2_000)
+            amount = int(base * (0.5 + rel.relationship / 200.0))
+            amount = max(100, min(amount, npc_money))
+            state.money += amount
+            if agent is not None:
+                agent.money = max(0, agent.money - amount)
+            rel.relationship = max(0, rel.relationship - 5)
+            return ActionResult(True,
+                f"{name} lent you £{amount:,}. They didn't make it a thing.")
+        rel.relationship = max(0, rel.relationship - 8)
+        state.stats.happiness = max(0, state.stats.happiness - 3)
+        return ActionResult(True,
+            f"{name} said no. It was awkward for weeks.")
+
+    if action == "insult":
+        rel.relationship = max(0, rel.relationship - 15)
+        state.stats.happiness = max(0, state.stats.happiness - 4)
+        state.stats.looks = max(0, state.stats.looks - 1)
+        return ActionResult(True, f"You said something cruel to {name}. It stuck.")
+
+    if action == "lavish_gift":
+        if state.money < LAVISH_GIFT_COST:
+            return ActionResult(False,
+                f"You can't afford a serious gift for {name} (£{LAVISH_GIFT_COST}).")
+        state.money -= LAVISH_GIFT_COST
+        rel.relationship = min(100, rel.relationship + 20)
+        state.stats.happiness = min(100, state.stats.happiness + 3)
+        return ActionResult(True,
+            f"You gave {name} something genuinely thoughtful. £{LAVISH_GIFT_COST}.")
+
+    if action == "take_to_dinner":
+        if state.money < DINNER_COST:
+            return ActionResult(False,
+                f"You can't afford to take {name} out (£{DINNER_COST}).")
+        state.money -= DINNER_COST
+        rel.relationship = min(100, rel.relationship + 8)
+        state.stats.happiness = min(100, state.stats.happiness + 3)
+        return ActionResult(True,
+            f"You took {name} for a long dinner. Worth £{DINNER_COST}.")
+
     return ActionResult(False, "You can't do that.")
