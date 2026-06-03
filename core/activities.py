@@ -92,6 +92,14 @@ def gym(state: GameState) -> tuple[bool, str]:
     return True, "You went to the gym. It cost £30."
 
 
+def school_nurse(state: GameState) -> tuple[bool, str]:
+    """Free clinic visit at school — small health bump, no cost.
+    Only useful while in school (the controller / UI gates this), but
+    the activity itself doesn't care; the engine is permissive."""
+    state.stats.health = min(100, state.stats.health + 5)
+    return True, "You went to the school nurse. Quick rest, plaster on, sent back."
+
+
 def doctor(state: GameState) -> tuple[bool, str]:
     if state.money < DOCTOR_COST:
         return False, "You cannot afford a private doctor."
@@ -285,6 +293,7 @@ BY_KIND = {
     "study": study,
     "gym": gym,
     "doctor": doctor,
+    "school_nurse": school_nurse,
     "spend_time": family_time,
     "meditate": meditate,
     "read_book": read_book,

@@ -47,8 +47,146 @@
     LifeUI.renderScreen("activities", [{ label: "Things To Do", items }]);
   };
 
-  App.renderCareer = function () {
+  // Life-tab presentation cascade. Returns the tab label + icon +
+  // locked flag and the panel "kind" the renderer should use.
+  //   kind = "infant"     — too young for school/work
+  //   kind = "school"     — in school (any level, including uni)
+  //   kind = "occupation" — out of school, working-age
+  App.lifeTabInfo = function (s) {
+    const ch = s.character || {};
+    const edu = s.education || {};
+    const age = ch.age || 0;
+    if (edu.in_school) {
+      return { kind: "school", label: "School", icon: "cap", locked: false };
+    }
+    // School age in most countries is 5+. Anything under is the
+    // grey/locked infant phase. The threshold matches sim's nursery
+    // age window (nursery_bully fires from 4).
+    if (age < 5) {
+      return { kind: "infant", label: "Infant", icon: "infant", locked: true };
+    }
+    return { kind: "occupation", label: "Occupation", icon: "brief", locked: false };
+  };
+
+  // Convert player smarts to a letter grade for the school panel.
+  // 6 tiers: F < D < C < B < A < A+ so progression is visible without
+  // being grade-inflation-y.
+  App._gradeForSmarts = function (smarts) {
+    if (smarts >= 96) return "A+";
+    if (smarts >= 86) return "A";
+    if (smarts >= 71) return "B";
+    if (smarts >= 56) return "C";
+    if (smarts >= 36) return "D";
+    return "F";
+  };
+
+  // The school name string — currently driven by edu.level since the
+  // sim doesn't model specific named schools yet. Uni uses the real
+  // university_name. Future: per-edu-tier school catalogue.
+  App._schoolName = function (edu) {
+    if (edu.level === "University") {
+      return edu.university_name || "University";
+    }
+    if (edu.level === "Secondary Education") return "Secondary School";
+    if (edu.level === "Primary School") return "Primary School";
+    return "School";
+  };
+
+  // Build the grade-bar HTML block. Pure markup — no event handlers.
+  // Tiers map to fill percentages so the bar visibly grows with smarts.
+  App._gradeBarHTML = function (smarts) {
+    const grade = App._gradeForSmarts(smarts);
+    const pct = Math.max(0, Math.min(100, smarts));
+    const tone = smarts >= 71 ? "good" : smarts >= 36 ? "warn" : "bad";
+    return `<div class="ui-grade">` +
+           `<div class="g-row"><span class="g-label">Grades</span>` +
+           `<span class="g-value g-${tone}">${grade}</span></div>` +
+           `<div class="g-bar"><div class="g-fill g-${tone}" ` +
+                `style="width:${pct}%"></div></div>` +
+           `</div>`;
+  };
+
+  // Shared job filter — same logic the snapshot would apply, lifted so
+  // the Occupation panel can show the eligible list without a round-trip.
+  App._eligibleJobs = function (s) {
+    const age = (s.character && s.character.age) || 0;
+    const smarts = (s.stats && s.stats.smarts) || 0;
+    const edu = s.education || {};
+    const order = ["None", "Primary School", "Secondary School",
+                   "Secondary Education", "University"];
+    const meets = (need) =>
+      order.indexOf(edu.level || "None") >= order.indexOf(need);
+    return (s.jobs || []).filter(j => {
+      if (age < j.min_age) return false;
+      if (smarts < j.min_smarts) return false;
+      if (!meets(j.min_education)) return false;
+      if (j.required_field &&
+          (!edu.degree_completed || edu.degree_field !== j.required_field)) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  // The Life-tab panel renderer. Lives ABOVE the timeline; chooses the
+  // content shape from lifeTabInfo's kind.
+  App.renderLifeStage = function () {
     const s = this.state;
+    const info = App.lifeTabInfo(s);
+    const edu = s.education || {};
+    const ch = s.character || {};
+    const age = ch.age || 0;
+
+    if (info.kind === "infant") {
+      LifeUI.renderStagePanel([{
+        label: "Too young",
+        items: [{
+          icon: "infant", accent: "var(--ink-faint)",
+          title: "Nothing to do here yet",
+          subtitle: "Age up to start school and unlock this tab.",
+          locked: true,
+        }],
+      }]);
+      return;
+    }
+
+    if (info.kind === "school") {
+      const groups = [];
+      const inUni = edu.level === "University";
+      groups.push({
+        items: [{
+          icon: "cap", accent: "var(--cat-education)",
+          title: App._schoolName(edu),
+          subtitle: inUni
+            ? `${edu.university_major || "Undeclared"} · ${edu.study_years_left || 0}y left`
+            : `In session · grade ${App._gradeForSmarts(s.stats.smarts || 0)}`,
+        }],
+      });
+      groups.push({
+        label: "Activities",
+        items: [
+          { icon: "book", accent: "var(--c-smarts)", title: "Study Harder",
+            subtitle: "Push your grades up",
+            trailing: { kind: "chevron" },
+            action: "do-activity", payload: "study" },
+          { icon: "doctor", accent: "var(--c-health)", title: "Visit the Nurse",
+            subtitle: "Free clinic at school",
+            trailing: { kind: "chevron" },
+            action: "do-activity", payload: "school_nurse" },
+          { icon: "x", accent: "var(--c-bad)", title: "Drop Out",
+            subtitle: inUni
+              ? "Leave university without a degree"
+              : "Leave school early — affects your job options later",
+            trailing: { kind: "chevron" },
+            action: inUni ? "drop-out-university" : "drop-out-school" },
+        ],
+      });
+      LifeUI.renderStagePanel(groups, App._gradeBarHTML(s.stats.smarts || 0));
+      return;
+    }
+
+    // info.kind === "occupation" — current job + career actions when
+    // employed, eligible-jobs list, and education re-entry options.
     const job = s.career;
     const groups = [];
 
@@ -58,7 +196,7 @@
         items: [{
           icon: "brief", accent: "var(--gold)",
           title: job.title,
-          subtitle: `${job.employer || "Employer"} · £${(job.salary || 0).toLocaleString()}/yr · Performance ${job.performance}`,
+          subtitle: `${job.employer || "Employer"} · £${(job.salary || 0).toLocaleString()}/yr · Perf ${job.performance}`,
         }],
       });
       groups.push({
@@ -78,31 +216,12 @@
             trailing: { kind: "chevron" }, action: "quit-job" },
         ],
       });
-    } else {
-      groups.push({
-        label: "Current Job",
-        emptyText: "You are unemployed. Browse jobs below.",
-        items: [],
-      });
     }
 
-    const age = (s.character && s.character.age) || 0;
-    const smarts = (s.stats && s.stats.smarts) || 0;
-    const edu = s.education || {};
-    const meetsEducation = (need) => {
-      const order = ["None", "Primary School", "Secondary School", "Secondary Education", "University"];
-      return order.indexOf(edu.level || "None") >= order.indexOf(need);
-    };
-    const jobs = (s.jobs || []).filter(j => {
-      if (age < j.min_age) return false;
-      if (smarts < j.min_smarts) return false;
-      if (!meetsEducation(j.min_education)) return false;
-      if (j.required_field && (!edu.degree_completed || edu.degree_field !== j.required_field)) return false;
-      return true;
-    });
+    const jobs = App._eligibleJobs(s);
     groups.push({
       label: "Available Jobs",
-      emptyText: "No jobs you qualify for. Study to unlock more.",
+      emptyText: "No jobs you qualify for yet — study to unlock more.",
       items: jobs.map(j => ({
         icon: "brief", accent: "var(--cat-money)",
         title: j.title,
@@ -112,68 +231,38 @@
       })),
     });
 
-    if (!edu.in_school && edu.degree_completed && !edu.masters_completed) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Enrol in a Master's Degree",
-          subtitle: "Deepen your field; two years.",
-          trailing: { kind: "chevron" },
-          action: "enroll-postgrad", payload: "Master's Degree",
-        }],
+    // Education re-entry options — the user's "if you don't apply straight
+    // out of school" path lives here.
+    const eduItems = [];
+    if (!edu.degree_completed && age >= 18) {
+      eduItems.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Apply to University",
+        subtitle: "Open a course picker",
+        trailing: { kind: "chevron" }, action: "apply-university",
       });
-    } else if (!edu.in_school && edu.masters_completed && !edu.doctorate_completed) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Enrol in a Doctorate",
-          subtitle: "Three or more years of research.",
-          trailing: { kind: "chevron" },
-          action: "enroll-postgrad", payload: "Doctorate",
-        }],
-      });
-    } else if (!edu.in_school && !edu.degree_completed && age >= 18) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Apply to University",
-          subtitle: "Open a course picker",
-          trailing: { kind: "chevron" },
-          action: "apply-university",
-        }],
-      });
-    }
-    if (edu.in_school && edu.level === "University") {
-      groups.push({
-        label: "Currently Studying",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: `${edu.university_name || "University"} — ${edu.university_major || "Undeclared"}`,
-          subtitle: `${edu.study_years_left || 0} years remaining`,
-        }, {
-          icon: "x", accent: "var(--c-bad)", title: "Drop Out",
-          subtitle: "Leave university without a degree",
-          trailing: { kind: "chevron" },
-          action: "drop-out-university",
-        }],
-      });
-    }
-
-    groups.push({
-      label: "Wealth",
-      items: [{
-        icon: "house", accent: "var(--gold)",
-        title: "Property & Assets",
-        subtitle: `Net worth £${(s.net_worth || 0).toLocaleString()}`,
+    } else if (edu.degree_completed && !edu.masters_completed) {
+      eduItems.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Enrol in a Master's Degree",
+        subtitle: "Deepen your field; two years.",
         trailing: { kind: "chevron" },
-        action: "view-assets",
-      }],
-    });
+        action: "enroll-postgrad", payload: "Master's Degree",
+      });
+    } else if (edu.masters_completed && !edu.doctorate_completed) {
+      eduItems.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Enrol in a Doctorate",
+        subtitle: "Three or more years of research.",
+        trailing: { kind: "chevron" },
+        action: "enroll-postgrad", payload: "Doctorate",
+      });
+    }
+    if (eduItems.length) {
+      groups.push({ label: "Education", items: eduItems });
+    }
 
-    LifeUI.renderScreen("career", groups);
+    LifeUI.renderStagePanel(groups);
   };
 
   App.renderRelations = function () {

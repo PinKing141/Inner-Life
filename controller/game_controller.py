@@ -401,6 +401,26 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
+    def drop_out_school(self) -> dict:
+        """Pre-university drop-out. Distinct from drop_out_university —
+        flips in_school off without setting the uni-specific flag.
+        Refuses silently if the player isn't actually in pre-uni
+        school (uni dropouts go through drop_out_university)."""
+        s = self.state
+        if s is None or s.character is None:
+            return self.snapshot()
+        if not s.education.in_school or s.education.level == "University":
+            return self.snapshot()
+        s.education.in_school = False
+        s.feed.append(FeedEntry(
+            age=s.character.age,
+            text="You dropped out of school.",
+            kind="bad",
+            entry_id=f"feed:school_dropout:{s.tick}",
+        ))
+        self._broadcast()
+        return self.snapshot()
+
     def drop_out_university(self) -> dict:
         s = self.state
         if s is None or s.character is None:

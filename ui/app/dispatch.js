@@ -60,6 +60,7 @@
       case "uni-attend":          await b.setUniversityPlan(true, payload); break;
       case "uni-skip":            await b.setUniversityPlan(false, ""); break;
       case "drop-out-university": await b.dropOutUniversity(); break;
+      case "drop-out-school":     if (b.dropOutSchool) await b.dropOutSchool(); break;
       case "enroll-postgrad":     await b.enrollPostgrad(payload); break;
       case "continue-as-heir":
         // Phase 5: crossing a generational boundary. Reset the latches
