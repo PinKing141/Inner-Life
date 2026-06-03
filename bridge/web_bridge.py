@@ -304,4 +304,42 @@ class WebBridge(QObject):
             return self._envelope(False, f"Load failed: {e}")
         return self._envelope(True)
 
+    # ---- Save slots (numbered 1..N; legacy save/load above untouched) ----
+
+    @Slot(result=str)
+    def listSaveSlots(self) -> str:
+        """Peek metadata for every slot. Returns a JSON array the UI
+        can render directly without further bridge calls. Safe to call
+        at any time."""
+        try:
+            return _dumps(self._controller.list_save_slots())
+        except Exception as e:  # noqa: BLE001 — filesystem can fail anywhere
+            return _dumps([{"error": f"Could not list slots: {e}"}])
+
+    @Slot(int, result=str)
+    def saveToSlot(self, slot_id: int) -> str:
+        try:
+            self._controller.save_to_slot(slot_id)
+        except (OSError, ValueError, RuntimeError) as e:
+            return self._envelope(False, f"Save to slot {slot_id} failed: {e}")
+        return self._envelope(True)
+
+    @Slot(int, result=str)
+    def loadFromSlot(self, slot_id: int) -> str:
+        try:
+            self._controller.load_from_slot(slot_id)
+        except FileNotFoundError:
+            return self._envelope(False, f"Slot {slot_id} is empty.")
+        except (OSError, ValueError) as e:
+            return self._envelope(False, f"Load from slot {slot_id} failed: {e}")
+        return self._envelope(True)
+
+    @Slot(int, result=str)
+    def deleteSaveSlot(self, slot_id: int) -> str:
+        try:
+            ok = self._controller.delete_save_slot(slot_id)
+        except ValueError as e:
+            return self._envelope(False, f"Delete slot {slot_id} failed: {e}")
+        return self._envelope(ok, None if ok else f"Could not delete slot {slot_id}.")
+
 
