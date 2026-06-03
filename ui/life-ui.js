@@ -103,6 +103,11 @@ const LifeUI = (function () {
   function blockHTML(b, accent) {
     if (b.type === 'text')
       return `<p class="ui-mtext">${b.text == null ? '' : b.text}</p>`;
+    if (b.type === 'html')
+      // Caller-controlled raw HTML — used for grade bars, custom panels,
+      // anything the standard block types don't cover. Callers are
+      // responsible for escaping.
+      return b.html == null ? '' : b.html;
     if (b.type === 'divider')
       return `<div class="ui-mdiv"></div>`;
     if (b.type === 'choices') {
@@ -214,11 +219,17 @@ const LifeUI = (function () {
   }
 
   const BUILTIN = [
-    { id: 'life',       label: 'Infant',    icon: 'infant' },
-    { id: 'assets',     label: 'Assets',    icon: 'assets' },
-    { id: 'relations',  label: 'Relations', icon: 'heart'  },
-    { id: 'activities', label: 'Activities',icon: 'dots'   },
-    { id: 'crime',      label: 'Crime',     icon: 'sack'   },
+    // 'life' is the record (timeline). Stays a registered screen so
+    // showScreen('life') works from the age button + dispatch, but
+    // has no nav slot — buildScreensAndNav filters out hidden:true.
+    { id: 'life',       label: '',           icon: '',       hidden: true },
+    // Nav slots, left-to-right around the center age button:
+    //   [Occupation] [Assets] [AGE] [Relations] [Activities]
+    { id: 'occupation', label: 'Occupation', icon: 'brief' },
+    { id: 'assets',     label: 'Assets',     icon: 'assets' },
+    { id: 'relations',  label: 'Relations',  icon: 'heart' },
+    { id: 'activities', label: 'Activities', icon: 'dots' },
+    { id: 'crime',      label: 'Crime',      icon: 'sack' },
   ];
 
   function registerScreen(id, opts) {
@@ -244,26 +255,6 @@ const LifeUI = (function () {
       return head + inner;
     }).join('');
     sc.el.innerHTML = intro + body;
-  }
-
-  // Render groups into the Life screen's stage panel (above the timeline).
-  // Same group/item shape as renderScreen, but preserves .ui-timeline.
-  // Pass optional `extraHTML` (e.g. the grade-bar block) prepended ABOVE
-  // the groups inside the stage panel.
-  function renderStagePanel(groups, extraHTML) {
-    const panel = $('.app-screens .screen[data-screen="life"] .ui-stage-panel');
-    if (!panel) return;
-    const head = extraHTML || '';
-    const body = (groups || []).map(g => {
-      const h = g.label
-        ? section(g.label, g.count != null ? g.count : (g.items ? g.items.length : 0))
-        : '';
-      const inner = (g.items && g.items.length)
-        ? g.items.map(item).join('')
-        : (g.emptyText ? empty(g.emptyText) : '');
-      return h + inner;
-    }).join('');
-    panel.innerHTML = head + body;
   }
 
   function showScreen(id) {
@@ -423,25 +414,16 @@ const LifeUI = (function () {
     d = d || {};
     if (d.name != null) $('.app-identity .nm').textContent = d.name;
     if (d.stage != null) {
-      // Identity-area sub-label only (Toddler / Teenager / Mature Adult).
-      // The Life-tab label is a separate, simpler 3-state token — see
-      // `tabLabel` / `tabIcon` below — so the identity can stay nuanced
-      // while the tab cycles Infant → School → Occupation.
+      // Identity-area sub-label (Toddler / Teenager / Mature Adult).
+      // The Occupation tab label is fixed; stage info lives here.
       $('.app-identity .stage .txt').textContent = d.stage;
     }
-    // Life-tab presentation: 3-state Infant / School / Occupation label,
-    // matching icon, and a locked flag for the infant phase.
-    if (d.tabLabel != null) {
-      const span = S.root.querySelector('.app-nav button[data-screen="life"] span');
-      if (span) span.textContent = d.tabLabel;
-    }
-    if (d.tabIcon != null) {
-      const btn = S.root.querySelector('.app-nav button[data-screen="life"] svg');
-      if (btn) btn.innerHTML = ICONS[d.tabIcon] || ICONS.infant;
-    }
-    if (d.tabLocked != null) {
-      const btn = S.root.querySelector('.app-nav button[data-screen="life"]');
-      if (btn) btn.toggleAttribute('data-stage-locked', !!d.tabLocked);
+    // Greyed Occupation tab when the player is too young for jobs or
+    // school. CSS hooks data-stage-locked on the button. Kept as a
+    // separate flag so tests/callers can opt out without rebuilding nav.
+    if (d.occupationLocked != null) {
+      const btn = S.root.querySelector('.app-nav button[data-screen="occupation"]');
+      if (btn) btn.toggleAttribute('data-stage-locked', !!d.occupationLocked);
     }
     if (d.location != null) $('.app-identity .stage .loc').textContent = d.location;
     if (d.balance != null) $('.app-identity .bal .v').textContent = money(d.balance);
@@ -507,23 +489,26 @@ const LifeUI = (function () {
       div.className = 'screen';
       div.dataset.screen = s.id;
       if (s.id === 'life') {
-        // Life screen has two stacked regions:
-        //   .ui-stage-panel — stage-aware content (Infant / School /
-        //                     Occupation). Rendered by App.renderLifeStage.
-        //   .ui-timeline    — the feed/life log, appended via logEvent.
-        div.innerHTML = '<div class="ui-stage-panel"></div>' +
-                        '<div class="ui-timeline"></div>';
+        // Life screen is purely the timeline (record). The age button
+        // returns here from anywhere; sub-pages (Occupation, Assets,
+        // etc.) live on their own screens.
+        div.innerHTML = '<div class="ui-timeline"></div>';
       }
       s.el = div;
       screensEl.appendChild(div);
     });
-    const navScreens = S.screens.slice(0, 4);
+    // Nav only shows non-hidden screens, first four. Current order
+    // (set in BUILTIN): occupation, assets | age | relations, activities.
+    const navScreens = S.screens.filter(s => !s.hidden).slice(0, 4);
     const cells = [];
     navScreens.slice(0, 2).forEach(s => cells.push(navBtn(s)));
     cells.push('<div class="nav-spacer"></div>');
     navScreens.slice(2, 4).forEach(s => cells.push(navBtn(s)));
     navEl.innerHTML = cells.join('');
-    if (S.screens[0]) showScreen(S.screens[0].id);
+    // Default landing is 'life' (the record). If something replaces or
+    // removes the life screen, fall back to the first registered.
+    const landing = S.screens.find(s => s.id === 'life') || S.screens[0];
+    if (landing) showScreen(landing.id);
   }
   function navBtn(s) {
     return `<button data-screen="${s.id}"><svg viewBox="0 0 24 24" fill="none" ` +
@@ -597,6 +582,10 @@ const LifeUI = (function () {
     $('.age-btn').addEventListener('click', () => {
       $('.age-btn').classList.toggle('flip');
       fire('ageup');
+      // Always return to the record (life timeline) after ageing — the
+      // age button is the "read your story" button as well as the
+      // step-forward verb.
+      showScreen('life');
     });
     $('.app-menu').addEventListener('click', () => fire('menu'));
     $('.app-screens').addEventListener('click', e => {
@@ -628,7 +617,7 @@ const LifeUI = (function () {
 
   return {
     mount, setIdentity, setStats, logEvent, clearLife,
-    registerScreen, renderScreen, renderStagePanel, showScreen,
+    registerScreen, renderScreen, showScreen,
     modal, confirm, closeModal,
     scene, creationShow,
     on, toast,

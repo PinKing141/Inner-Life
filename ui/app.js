@@ -55,22 +55,19 @@ Object.assign(window.App, {
     const country = (s.countries || []).find(c => c.name === ch.country) || {};
     const flag = country.flag_svg ? this.imgTag(country.flag_svg) : "";
     // Identity-area "stage" keeps its nuanced label (Toddler / Teen /
-    // Mature Adult). The Life tab itself uses a separate 3-state
-    // (Infant / School / Occupation) cycle — see App.lifeTabInfo.
-    const tab = this.lifeTabInfo(s);
+    // Mature Adult). The Occupation tab is always labelled "Occupation"
+    // but goes greyed when the player is too young to use it.
     LifeUI.setIdentity({
       name: ch.name || "—",
       flag,
       stage: s.career ? s.career.title : this.stageFor(ch.age || 0, s.education),
-      tabLabel: tab.label,
-      tabIcon: tab.icon,
-      tabLocked: tab.locked,
+      occupationLocked: this.occupationLocked(s),
       location: ch.city ? `${ch.city}, ${ch.country}` : (ch.country || "—"),
       balance: s.money || 0,
     });
     LifeUI.setStats(s.stats || {});
     this.renderActivities();
-    this.renderLifeStage();
+    this.renderOccupation();
     this.renderRelations();
     this.renderAssets();
     this.renderCrime();
