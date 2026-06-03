@@ -67,6 +67,11 @@ class GameController:
         # age + money) + owned vehicles list.
         snap["car_market"] = cars_mod.list_market(self.state)
         snap["vehicles"] = cars_mod.list_owned(self.state)
+        # NPC verbs v1: expose the gift + money-gift catalogues so the
+        # picker modals can render them without hard-coding the lists
+        # in JS. UI filters by `state.money >= price` per row.
+        snap["gift_catalogue"] = [dict(g) for g in relationships.GIFTS]
+        snap["money_gift_tiers"] = [dict(m) for m in relationships.MONEY_GIFTS]
         snap["net_worth"] = housing.net_worth(self.state)
         # Phase 5: the death modal reads eligible_heirs to decide whether
         # to offer "continue as [child]" buttons; ancestors carries the
@@ -454,10 +459,14 @@ class GameController:
         self._broadcast()
         return self.snapshot()
 
-    def relationship_action(self, npc_id: int, action: str) -> dict:
+    def relationship_action(self, npc_id: int, action: str, param: str | None = None) -> dict:
         if self.state is None or self.state.character is None:
             return self.snapshot()
-        ok, msg = relationships.interact(self.state, npc_id, action)
+        # NPC verbs v1: some actions (conversation / ask_advice /
+        # borrow_money) have rng-driven outcomes. Fork off the tick +
+        # feed length so repeated interactions in one year diverge.
+        rng = Rng(self.state.seed).fork(self.state.tick).fork(len(self.state.feed)).fork(0x47C)
+        ok, msg = relationships.interact(self.state, npc_id, action, rng=rng, param=param)
         self._feed(msg, "good" if ok else "bad", f"rel:{npc_id}:{action}")
         self._broadcast()
         return self.snapshot()

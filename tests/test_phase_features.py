@@ -518,16 +518,18 @@ def test_relationship_interactions_move_the_bar():
     assert c.state.relationships[0].relationship > after_argue
 
     # A gift you can't afford is rejected and changes nothing.
+    # NPC verbs v1: "give_gift" now takes a picker param. A gift you
+    # can't afford is rejected and changes nothing.
     c.state.money = 0
     before = c.state.relationships[0].relationship
-    c.relationship_action(nid, "gift")
+    c.relationship_action(nid, "give_gift", param="watch")  # £450
     assert c.state.relationships[0].relationship == before
     assert "afford" in c.state.feed[-1].text
 
     # With cash, the gift lands and costs money.
     c.state.money = 500
-    c.relationship_action(nid, "gift")
-    assert c.state.money == 450
+    c.relationship_action(nid, "give_gift", param="watch")
+    assert c.state.money == 50  # 500 - 450
     assert c.state.relationships[0].relationship > before
 
 

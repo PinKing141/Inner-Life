@@ -116,6 +116,14 @@ class WebBridge(QObject):
     def relationshipAction(self, npc_id: int, action: str) -> str:
         return _dumps(self._controller.relationship_action(npc_id, action))
 
+    @Slot(int, str, str, result=str)
+    def relationshipActionWithParam(self, npc_id: int, action: str, param: str) -> str:
+        """NPC verbs v1: give_gift / give_money need a picker selection
+        passed through. JS sends the empty string when no param applies."""
+        return _dumps(self._controller.relationship_action(
+            npc_id, action, param=(param or None),
+        ))
+
     @Slot(str, result=str)
     def buyHome(self, listing_id: str) -> str:
         return _dumps(self._controller.buy_home(listing_id))

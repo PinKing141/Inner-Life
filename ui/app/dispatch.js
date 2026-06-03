@@ -22,6 +22,21 @@
         await b.relationshipAction(payload.npc_id, payload.action);
         this.openRelationProfile(payload.npc_id);
         break;
+      case "rel-interact-param":
+        // NPC verbs with a picker param (give_gift, give_money).
+        // Bridge has a dedicated 3-arg slot; old 2-arg slot is unused
+        // for these paths.
+        if (b.relationshipActionWithParam) {
+          await b.relationshipActionWithParam(
+            payload.npc_id, payload.action, payload.param || "",
+          );
+        } else {
+          await b.relationshipAction(payload.npc_id, payload.action);
+        }
+        this.openRelationProfile(payload.npc_id);
+        break;
+      case "open-gift-picker":       this.openGiftPicker(payload.npc_id); break;
+      case "open-money-gift-picker": this.openMoneyGiftPicker(payload.npc_id); break;
       case "view-assets":         LifeUI.showScreen("assets"); break;
       case "view-listing":        this.openListingOptions(payload); break;
       case "buy-listing":         await b.buyHome(payload); break;
