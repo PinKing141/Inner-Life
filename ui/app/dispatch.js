@@ -38,6 +38,8 @@
       case "open-gift-picker":       this.openGiftPicker(payload.npc_id); break;
       case "open-money-gift-picker": this.openMoneyGiftPicker(payload.npc_id); break;
       case "view-assets":         LifeUI.showScreen("assets"); break;
+      case "open-jobs-modal":     this.openJobsModal(); break;
+      case "open-education-modal": this.openEducationModal(); break;
       case "view-listing":        this.openListingOptions(payload); break;
       case "buy-listing":         await b.buyHome(payload); break;
       case "mortgage-listing":    await b.buyHomeMortgage(payload); break;

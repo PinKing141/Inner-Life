@@ -78,89 +78,33 @@
             trailing: { kind: "chevron" }, action: "quit-job" },
         ],
       });
-    } else {
-      groups.push({
-        label: "Current Job",
-        emptyText: "You are unemployed. Browse jobs below.",
-        items: [],
-      });
     }
 
-    const age = (s.character && s.character.age) || 0;
-    const smarts = (s.stats && s.stats.smarts) || 0;
-    const edu = s.education || {};
-    const meetsEducation = (need) => {
-      const order = ["None", "Primary School", "Secondary School", "Secondary Education", "University"];
-      return order.indexOf(edu.level || "None") >= order.indexOf(need);
-    };
-    const jobs = (s.jobs || []).filter(j => {
-      if (age < j.min_age) return false;
-      if (smarts < j.min_smarts) return false;
-      if (!meetsEducation(j.min_education)) return false;
-      if (j.required_field && (!edu.degree_completed || edu.degree_field !== j.required_field)) return false;
-      return true;
-    });
+    // Occupation landing — two drill-down rows. Replaces the old long
+    // "Available Jobs" + "Further Study" blocks; sub-pages are modals
+    // (see openJobsModal / openEducationModal). The subtitles surface
+    // the headline state so the player doesn't need to open the
+    // sub-page just to glance.
+    const eligibleJobsCount = App._eligibleJobs(s).length;
     groups.push({
-      label: "Available Jobs",
-      emptyText: "No jobs you qualify for. Study to unlock more.",
-      items: jobs.map(j => ({
-        icon: "brief", accent: "var(--cat-money)",
-        title: j.title,
-        subtitle: `${j.employer || ""} · £${(j.salary || 0).toLocaleString()}/yr`,
-        trailing: { kind: "chevron" },
-        action: "apply-for-job", payload: j.job_id,
-      })),
+      label: "Occupation",
+      items: [
+        { icon: "brief", accent: "var(--cat-money)",
+          title: "Jobs",
+          subtitle: job
+            ? `Browse other listings · ${eligibleJobsCount} you qualify for`
+            : (eligibleJobsCount > 0
+                ? `${eligibleJobsCount} positions you qualify for`
+                : "No jobs you qualify for yet — study to unlock more"),
+          trailing: { kind: "chevron" },
+          action: "open-jobs-modal" },
+        { icon: "cap", accent: "var(--cat-education)",
+          title: "Education",
+          subtitle: App._educationSummary(s),
+          trailing: { kind: "chevron" },
+          action: "open-education-modal" },
+      ],
     });
-
-    if (!edu.in_school && edu.degree_completed && !edu.masters_completed) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Enrol in a Master's Degree",
-          subtitle: "Deepen your field; two years.",
-          trailing: { kind: "chevron" },
-          action: "enroll-postgrad", payload: "Master's Degree",
-        }],
-      });
-    } else if (!edu.in_school && edu.masters_completed && !edu.doctorate_completed) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Enrol in a Doctorate",
-          subtitle: "Three or more years of research.",
-          trailing: { kind: "chevron" },
-          action: "enroll-postgrad", payload: "Doctorate",
-        }],
-      });
-    } else if (!edu.in_school && !edu.degree_completed && age >= 18) {
-      groups.push({
-        label: "Further Study",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: "Apply to University",
-          subtitle: "Open a course picker",
-          trailing: { kind: "chevron" },
-          action: "apply-university",
-        }],
-      });
-    }
-    if (edu.in_school && edu.level === "University") {
-      groups.push({
-        label: "Currently Studying",
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: `${edu.university_name || "University"} — ${edu.university_major || "Undeclared"}`,
-          subtitle: `${edu.study_years_left || 0} years remaining`,
-        }, {
-          icon: "x", accent: "var(--c-bad)", title: "Drop Out",
-          subtitle: "Leave university without a degree",
-          trailing: { kind: "chevron" },
-          action: "drop-out-university",
-        }],
-      });
-    }
 
     groups.push({
       label: "Wealth",
@@ -174,6 +118,152 @@
     });
 
     LifeUI.renderScreen("career", groups);
+  };
+
+  // --- Career sub-page helpers ----------------------------------------
+
+  // Shared: filter the snapshot's job catalogue by everything the engine
+  // would gate on (age, smarts, education level, required field). Same
+  // logic the old in-line list used; lifted out so the landing-row
+  // subtitle and the modal stay in sync.
+  App._eligibleJobs = function (s) {
+    const age = (s.character && s.character.age) || 0;
+    const smarts = (s.stats && s.stats.smarts) || 0;
+    const edu = s.education || {};
+    const order = ["None", "Primary School", "Secondary School",
+                   "Secondary Education", "University"];
+    const meets = (need) =>
+      order.indexOf(edu.level || "None") >= order.indexOf(need);
+    return (s.jobs || []).filter(j => {
+      if (age < j.min_age) return false;
+      if (smarts < j.min_smarts) return false;
+      if (!meets(j.min_education)) return false;
+      if (j.required_field &&
+          (!edu.degree_completed || edu.degree_field !== j.required_field)) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  // One-line state summary for the Education row's subtitle.
+  App._educationSummary = function (s) {
+    const edu = s.education || {};
+    const age = (s.character && s.character.age) || 0;
+    if (edu.in_school && edu.level === "University") {
+      return `Studying ${edu.university_major || "an undeclared course"} · `
+           + `${edu.study_years_left || 0}y left`;
+    }
+    if (edu.in_school) return "In school";
+    if (!edu.degree_completed && age >= 18) return "Go back to school";
+    if (edu.degree_completed && !edu.masters_completed) {
+      return "Degree complete — Master's available";
+    }
+    if (edu.masters_completed && !edu.doctorate_completed) {
+      return "Master's complete — Doctorate available";
+    }
+    if (edu.doctorate_completed) return "Doctorate complete";
+    return "School in session";
+  };
+
+  // Jobs sub-page modal — the full eligible-job list. Replaces the
+  // old "Available Jobs" group on the Career screen.
+  App.openJobsModal = function () {
+    const s = this.state;
+    const jobs = App._eligibleJobs(s);
+    const items = jobs.length === 0
+      ? [{
+          icon: "lock", accent: "var(--ink-faint)",
+          title: "Nothing you qualify for yet",
+          subtitle: "Bump your smarts or finish a degree to unlock more roles.",
+          locked: true,
+        }]
+      : jobs.map(j => ({
+          icon: "brief", accent: "var(--cat-money)",
+          title: j.title,
+          subtitle: `${j.employer || ""} · £${(j.salary || 0).toLocaleString()}/yr`,
+          trailing: { kind: "chevron" },
+          action: "apply-for-job", payload: j.job_id,
+        }));
+    LifeUI.modal({
+      kind: "picker", title: "Jobs", dismissable: true,
+      blocks: [{ type: "list", items }],
+      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+    });
+  };
+
+  // Education sub-page modal — currently a single category (general
+  // schooling + further study). Designed as a list so v2 can drop in
+  // Community College / Medical School / Law School / Post-grad
+  // tracks as additional rows without restructuring the modal.
+  App.openEducationModal = function () {
+    const s = this.state;
+    const edu = s.education || {};
+    const age = (s.character && s.character.age) || 0;
+    const items = [];
+
+    // Currently studying — descriptive row + drop-out.
+    if (edu.in_school && edu.level === "University") {
+      items.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: `${edu.university_name || "University"} — ${edu.university_major || "Undeclared"}`,
+        subtitle: `${edu.study_years_left || 0} years remaining`,
+      });
+      items.push({
+        icon: "x", accent: "var(--c-bad)",
+        title: "Drop Out",
+        subtitle: "Leave university without a degree",
+        trailing: { kind: "chevron" },
+        action: "drop-out-university",
+      });
+    }
+
+    // Not in school yet, but eligible to apply.
+    if (!edu.in_school && !edu.degree_completed && age >= 18) {
+      items.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Apply to University",
+        subtitle: "Open a course picker",
+        trailing: { kind: "chevron" },
+        action: "apply-university",
+      });
+    }
+
+    // Postgrad path — gated on degree level.
+    if (!edu.in_school && edu.degree_completed && !edu.masters_completed) {
+      items.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Enrol in a Master's Degree",
+        subtitle: "Deepen your field; two years.",
+        trailing: { kind: "chevron" },
+        action: "enroll-postgrad", payload: "Master's Degree",
+      });
+    } else if (!edu.in_school && edu.masters_completed && !edu.doctorate_completed) {
+      items.push({
+        icon: "cap", accent: "var(--cat-education)",
+        title: "Enrol in a Doctorate",
+        subtitle: "Three or more years of research.",
+        trailing: { kind: "chevron" },
+        action: "enroll-postgrad", payload: "Doctorate",
+      });
+    }
+
+    if (items.length === 0) {
+      items.push({
+        icon: "book", accent: "var(--ink-faint)",
+        title: "No education options right now",
+        subtitle: edu.in_school
+          ? "You're in school. Age up to progress."
+          : "Come back when you've aged up further.",
+        locked: true,
+      });
+    }
+
+    LifeUI.modal({
+      kind: "picker", title: "Education", dismissable: true,
+      blocks: [{ type: "list", items }],
+      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+    });
   };
 
   App.renderRelations = function () {
