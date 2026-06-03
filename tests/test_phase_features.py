@@ -347,6 +347,62 @@ def test_university_plan_major_and_dropout_flow():
     assert c.state.education.in_school is False
 
 
+def test_drop_out_school_only_acts_on_pre_university_schooling():
+    """drop_out_school flips in_school off WITHOUT setting the uni-specific
+    dropout flag. Refuses (silent no-op) if the player is in university —
+    that's drop_out_university's territory."""
+    c = GameController()
+    c.new_game(seed=11, name="", gender="Male", country="US", talent="Sports")
+    assert c.state is not None
+    # Force into pre-university schooling so we can verify the verb.
+    # (new_game starts at age 0 with `in_school=False`; the sim flips
+    # it on later.)
+    c.state.education.in_school = True
+    c.state.education.level = "Primary School"
+    c.drop_out_school()
+    assert c.state.education.in_school is False
+    assert c.state.education.university_dropped_out is False
+    assert c.state.education.level == "Primary School"  # level unchanged
+    feed_text = " ".join(e.text for e in c.state.feed)
+    assert "dropped out of school" in feed_text.lower()
+
+    # And the safety: if the player is in university, drop_out_school
+    # must NOT touch their state — that's drop_out_university's job.
+    c2 = GameController()
+    c2.new_game(seed=11, name="", gender="Male", country="US", talent="Sports")
+    assert c2.state is not None
+    c2.state.education.in_school = True
+    c2.state.education.level = "University"
+    c2.drop_out_school()
+    assert c2.state.education.in_school is True  # untouched
+
+
+def test_drop_out_school_refuses_when_already_out():
+    """No-op when not in school. The verb must not crash or log a
+    second drop-out feed line if tapped twice."""
+    c = GameController()
+    c.new_game(seed=12, name="", gender="Female", country="US", talent="Sports")
+    assert c.state is not None
+    c.state.education.in_school = False
+    feed_count_before = len(c.state.feed)
+    c.drop_out_school()
+    assert len(c.state.feed) == feed_count_before
+
+
+def test_school_nurse_activity_is_free_and_lifts_health():
+    """school_nurse routes through activities.BY_KIND, so the standard
+    `activity` controller verb hits it. Verifies the free-clinic
+    behaviour (no money cost, +5 health)."""
+    c = GameController()
+    c.new_game(seed=13, name="", gender="Female", country="US", talent="Sports")
+    assert c.state is not None
+    c.state.money = 100
+    c.state.stats.health = 50
+    c.activity("school_nurse")
+    assert c.state.money == 100  # free
+    assert c.state.stats.health == 55  # +5
+
+
 def test_university_skip_plan_is_serialized():
     c = GameController()
     c.new_game(seed=7, name="", gender="Male", country="US", talent="Sports")

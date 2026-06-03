@@ -19,14 +19,30 @@ def _new(seed: int = 1) -> GameState:
 
 
 def test_descriptor_and_dispatch_tables_are_in_sync():
-    """Every UI descriptor must map to a real verb, and every verb must
-    surface to the UI — otherwise the player taps a button that no-ops,
-    or a working verb is unreachable."""
+    """Every UI descriptor must map to a real verb. Verbs are allowed in
+    BY_KIND without a descriptor if they're context-only (invoked from
+    a specific screen rather than the general Activities tab) — see the
+    `CONTEXT_ONLY` set below. The forbidden direction is the other way:
+    a descriptor with no dispatch entry is a button that no-ops."""
     descriptor_ids = {d["id"] for d in activities.DESCRIPTORS}
     dispatch_ids = set(activities.BY_KIND.keys())
-    assert descriptor_ids == dispatch_ids, (
-        f"unmatched: in descriptors only={descriptor_ids - dispatch_ids}, "
-        f"in dispatch only={dispatch_ids - descriptor_ids}"
+
+    # Verbs that exist in BY_KIND but are intentionally NOT in DESCRIPTORS.
+    # Each one must have a clear owning UI surface that routes to it.
+    CONTEXT_ONLY = {
+        # School panel exposes this directly (Visit the Nurse). Keeping
+        # it off the Activities tab prevents free-health-bump abuse
+        # outside school.
+        "school_nurse",
+    }
+
+    descriptor_only = descriptor_ids - dispatch_ids
+    dispatch_only = dispatch_ids - descriptor_ids - CONTEXT_ONLY
+    assert not descriptor_only, (
+        f"descriptors with no dispatch entry (would no-op): {descriptor_only}"
+    )
+    assert not dispatch_only, (
+        f"dispatch entries with no descriptor and not in CONTEXT_ONLY: {dispatch_only}"
     )
 
 

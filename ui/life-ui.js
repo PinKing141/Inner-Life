@@ -246,6 +246,26 @@ const LifeUI = (function () {
     sc.el.innerHTML = intro + body;
   }
 
+  // Render groups into the Life screen's stage panel (above the timeline).
+  // Same group/item shape as renderScreen, but preserves .ui-timeline.
+  // Pass optional `extraHTML` (e.g. the grade-bar block) prepended ABOVE
+  // the groups inside the stage panel.
+  function renderStagePanel(groups, extraHTML) {
+    const panel = $('.app-screens .screen[data-screen="life"] .ui-stage-panel');
+    if (!panel) return;
+    const head = extraHTML || '';
+    const body = (groups || []).map(g => {
+      const h = g.label
+        ? section(g.label, g.count != null ? g.count : (g.items ? g.items.length : 0))
+        : '';
+      const inner = (g.items && g.items.length)
+        ? g.items.map(item).join('')
+        : (g.emptyText ? empty(g.emptyText) : '');
+      return h + inner;
+    }).join('');
+    panel.innerHTML = head + body;
+  }
+
   function showScreen(id) {
     S.screens.forEach(s => {
       if (s.el) s.el.classList.toggle('is-active', s.id === id);
@@ -403,9 +423,25 @@ const LifeUI = (function () {
     d = d || {};
     if (d.name != null) $('.app-identity .nm').textContent = d.name;
     if (d.stage != null) {
+      // Identity-area sub-label only (Toddler / Teenager / Mature Adult).
+      // The Life-tab label is a separate, simpler 3-state token — see
+      // `tabLabel` / `tabIcon` below — so the identity can stay nuanced
+      // while the tab cycles Infant → School → Occupation.
       $('.app-identity .stage .txt').textContent = d.stage;
-      const lifeTab = S.root.querySelector('.app-nav button[data-screen="life"] span');
-      if (lifeTab) lifeTab.textContent = d.stage;
+    }
+    // Life-tab presentation: 3-state Infant / School / Occupation label,
+    // matching icon, and a locked flag for the infant phase.
+    if (d.tabLabel != null) {
+      const span = S.root.querySelector('.app-nav button[data-screen="life"] span');
+      if (span) span.textContent = d.tabLabel;
+    }
+    if (d.tabIcon != null) {
+      const btn = S.root.querySelector('.app-nav button[data-screen="life"] svg');
+      if (btn) btn.innerHTML = ICONS[d.tabIcon] || ICONS.infant;
+    }
+    if (d.tabLocked != null) {
+      const btn = S.root.querySelector('.app-nav button[data-screen="life"]');
+      if (btn) btn.toggleAttribute('data-stage-locked', !!d.tabLocked);
     }
     if (d.location != null) $('.app-identity .stage .loc').textContent = d.location;
     if (d.balance != null) $('.app-identity .bal .v').textContent = money(d.balance);
@@ -423,7 +459,11 @@ const LifeUI = (function () {
       const row = S.root.querySelector(`.ui-stat[data-stat="${key}"]`);
       if (!row) return;
       const v = Math.max(0, Math.min(100, Math.round(stats[key])));
-      row.querySelector('.num').textContent = v;
+      row.querySelector('.num').textContent = v + "%";
+      // Fill the BitLife-style horizontal bar. Sits between .name and
+      // .num — CSS makes the row a grid so the bar can flex.
+      const fill = row.querySelector('.fill');
+      if (fill) fill.style.width = v + "%";
     });
   }
 
@@ -466,7 +506,14 @@ const LifeUI = (function () {
       const div = document.createElement('div');
       div.className = 'screen';
       div.dataset.screen = s.id;
-      if (s.id === 'life') div.innerHTML = '<div class="ui-timeline"></div>';
+      if (s.id === 'life') {
+        // Life screen has two stacked regions:
+        //   .ui-stage-panel — stage-aware content (Infant / School /
+        //                     Occupation). Rendered by App.renderLifeStage.
+        //   .ui-timeline    — the feed/life log, appended via logEvent.
+        div.innerHTML = '<div class="ui-stage-panel"></div>' +
+                        '<div class="ui-timeline"></div>';
+      }
       s.el = div;
       screensEl.appendChild(div);
     });
@@ -534,7 +581,8 @@ const LifeUI = (function () {
             return `<div class="ui-stat" data-stat="${k}" style="--accent:${m.color}">` +
                    `<span class="ico">${svg(m.icon, 2)}</span>` +
                    `<span class="name">${m.label}</span>` +
-                   `<span class="num">0</span></div>`;
+                   `<span class="bar"><span class="fill"></span></span>` +
+                   `<span class="num">0%</span></div>`;
           }).join('')}
         </div>
       </div>
@@ -580,7 +628,7 @@ const LifeUI = (function () {
 
   return {
     mount, setIdentity, setStats, logEvent, clearLife,
-    registerScreen, renderScreen, showScreen,
+    registerScreen, renderScreen, renderStagePanel, showScreen,
     modal, confirm, closeModal,
     scene, creationShow,
     on, toast,
