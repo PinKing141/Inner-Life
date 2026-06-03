@@ -98,6 +98,23 @@
       case "load-game":
         if (b.load) await this.handleSaveLoad(b.load(), "Game loaded");
         break;
+      case "open-saves-menu":
+        await this.openSaveLoadMenu();
+        break;
+      case "open-settings-menu":
+        this.openSettingsMenu();
+        break;
+      case "set-setting":
+        // Settings v1: payload is {key, value}. The snapshot returned
+        // by setSetting carries the updated settings dict; onSnapshot
+        // applies them to <html> and the settings modal repaints with
+        // the new toggle states.
+        if (b.setSetting && payload && payload.key !== undefined) {
+          await b.setSetting(payload.key, String(payload.value));
+          // Reopen so the modal reflects the new ON/OFF state.
+          this.openSettingsMenu();
+        }
+        break;
       case "open-save-slot-actions":
         this.openSaveSlotActions(payload);
         break;
@@ -138,6 +155,81 @@
     } catch (e) {
       LifeUI.toast("Operation failed: " + (e && e.message ? e.message : e));
     }
+  };
+
+  // Top-level menu — Saves + Settings. Routes from the LifeUI "menu"
+  // hook (the menu button in the chrome).
+  App.openMenu = function () {
+    LifeUI.modal({
+      kind: "picker", title: "Menu", dismissable: true,
+      blocks: [{ type: "list", items: [
+        { icon: "save", accent: "var(--gold)", title: "Save & Load",
+          subtitle: "5 slots for parallel lives",
+          trailing: { kind: "chevron" }, action: "open-saves-menu" },
+        { icon: "dots", accent: "var(--accent)", title: "Settings",
+          subtitle: "Font size · motion · contrast · prompts",
+          trailing: { kind: "chevron" }, action: "open-settings-menu" },
+      ] }],
+      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+    });
+  };
+
+  // Settings v1: live toggles for the five user-level prefs. Tapping
+  // any row fires `set-setting` with the field key + the next value;
+  // the controller persists and broadcasts, so the modal text updates
+  // when we reopen.
+  App.openSettingsMenu = function () {
+    const s = (this.state && this.state.settings) || {};
+    const fontSizes = ["small", "medium", "large"];
+    const currentFont = s.font_size || "medium";
+    const nextFont = fontSizes[(fontSizes.indexOf(currentFont) + 1) % fontSizes.length];
+
+    const items = [
+      { icon: "pen", accent: "var(--accent)",
+        title: "Font size",
+        subtitle: `Current: ${currentFont}. Tap to cycle.`,
+        trailing: { kind: "badge", text: currentFont.toUpperCase() },
+        action: "set-setting",
+        payload: { key: "font_size", value: nextFont } },
+      { icon: "moon", accent: s.reduced_motion ? "var(--c-good)" : "var(--ink-faint)",
+        title: "Reduced motion",
+        subtitle: s.reduced_motion
+          ? "On — modal/screen animations are minimal."
+          : "Off — full animations.",
+        trailing: { kind: "badge", text: s.reduced_motion ? "ON" : "OFF" },
+        action: "set-setting",
+        payload: { key: "reduced_motion", value: s.reduced_motion ? "false" : "true" } },
+      { icon: "spark", accent: s.high_contrast ? "var(--c-good)" : "var(--ink-faint)",
+        title: "High contrast",
+        subtitle: s.high_contrast
+          ? "On — text and accents have stronger contrast."
+          : "Off — default palette.",
+        trailing: { kind: "badge", text: s.high_contrast ? "ON" : "OFF" },
+        action: "set-setting",
+        payload: { key: "high_contrast", value: s.high_contrast ? "false" : "true" } },
+      { icon: "check", accent: s.confirm_risky_actions ? "var(--c-good)" : "var(--ink-faint)",
+        title: "Confirm risky actions",
+        subtitle: s.confirm_risky_actions
+          ? "On — prompt before destructive verbs."
+          : "Off — actions land immediately.",
+        trailing: { kind: "badge", text: s.confirm_risky_actions ? "ON" : "OFF" },
+        action: "set-setting",
+        payload: { key: "confirm_risky_actions", value: s.confirm_risky_actions ? "false" : "true" } },
+      { icon: "book", accent: s.show_stat_deltas ? "var(--c-good)" : "var(--ink-faint)",
+        title: "Show stat deltas in feed",
+        subtitle: s.show_stat_deltas
+          ? "On — events annotate stat changes inline."
+          : "Off — feed shows narrative only.",
+        trailing: { kind: "badge", text: s.show_stat_deltas ? "ON" : "OFF" },
+        action: "set-setting",
+        payload: { key: "show_stat_deltas", value: s.show_stat_deltas ? "false" : "true" } },
+    ];
+
+    LifeUI.modal({
+      kind: "picker", title: "Settings", dismissable: true,
+      blocks: [{ type: "list", items }],
+      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+    });
   };
 
   App.openSaveLoadMenu = async function () {

@@ -27,6 +27,10 @@ Object.assign(window.App, {
   onSnapshot(snap) {
     const prevMode = this.state ? this.state.mode : null;
     this.state = snap;
+    // Settings v1: every snapshot carries the live settings. Apply the
+    // display flags to <html> so CSS can react before the next render
+    // pass paints. Works even during character creation.
+    this.applySettingsToDOM(snap.settings);
     if (snap.mode === "CREATION") {
       if (prevMode !== "CREATION") this.startCreation();
       return;
@@ -74,7 +78,17 @@ LifeUI.on("ageup", () => { if (App.bridge) App.bridge.ageUp(); });
 
 LifeUI.on("action", ({ action, payload }) => App.dispatch(action, payload));
 
-LifeUI.on("menu", () => App.openSaveLoadMenu());
+LifeUI.on("menu", () => App.openMenu());
+
+// Apply Settings v1 display flags to <html> so CSS attribute selectors
+// react. Idempotent — safe to call on every snapshot.
+App.applySettingsToDOM = function (settings) {
+  if (!settings) return;
+  const html = document.documentElement;
+  if (settings.font_size) html.setAttribute("data-font-size", settings.font_size);
+  html.toggleAttribute("data-reduced-motion", !!settings.reduced_motion);
+  html.toggleAttribute("data-high-contrast", !!settings.high_contrast);
+};
 
 LifeUI.on("creation-submit", ({ stepId, values }) => {
   Object.assign(App.creation, values);

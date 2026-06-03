@@ -775,3 +775,45 @@ body{
   background:var(--bg-1);display:flex;gap:9px;
 }
 .creation .cr-foot .ui-btn.primary{flex:1}
+
+/* ============================================================
+   SETTINGS v1 — accessibility tokens
+   Toggled by <html data-font-size>, [data-reduced-motion],
+   [data-high-contrast]. See controller.set_setting + app.js
+   applySettingsToDOM. The defaults already match `medium` /
+   off / off so the absence of these attributes is the baseline.
+   ============================================================ */
+
+/* Font size — scale --base-font via a multiplier so the same
+   ruleset across the app inherits. Small ~ -1px equivalent,
+   large ~ +2px equivalent. */
+html[data-font-size="small"]{font-size:14px}
+html[data-font-size="medium"]{font-size:15px}
+html[data-font-size="large"]{font-size:17.5px}
+
+/* Reduced motion — collapse transitions and animations to a
+   short fade. Affects modal entry, screen swaps, and the
+   relationship-meter slider. The * is intentional: we want every
+   property animation to honour the preference. prefers-reduced-motion
+   from the OS is also honoured automatically by Qt WebEngine. */
+html[data-reduced-motion] *,
+html[data-reduced-motion] *::before,
+html[data-reduced-motion] *::after{
+  animation-duration:.01ms !important;
+  animation-iteration-count:1 !important;
+  transition-duration:.05s !important;
+  scroll-behavior:auto !important;
+}
+
+/* High contrast — push the ink ramp brighter and the accents harder.
+   The bg ramp stays so the visual hierarchy of layers (bg-0 → bg-3)
+   doesn't collapse. */
+html[data-high-contrast]{
+  --ink:#ffffff;
+  --ink-dim:#f0e6d0;
+  --ink-faint:#c8b890;
+  --gold:#ffdf78;
+  --c-good:#7dffaa;
+  --c-bad:#ff7878;
+  --c-warn:#ffe066;
+}

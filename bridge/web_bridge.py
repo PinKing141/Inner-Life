@@ -350,4 +350,14 @@ class WebBridge(QObject):
             return self._envelope(False, f"Delete slot {slot_id} failed: {e}")
         return self._envelope(ok, None if ok else f"Could not delete slot {slot_id}.")
 
+    # ---- Settings v1 ----
+
+    @Slot(str, str, result=str)
+    def setSetting(self, key: str, value: str) -> str:
+        """Set one setting field. Value is always passed as a string from
+        JS (Qt slot typing); the Settings dataclass parses bool fields
+        from "true"/"false" tokens. Refusal (unknown key, bad value) is
+        a silent no-op — the returned snapshot reflects unchanged state."""
+        return _dumps(self._controller.set_setting(key, value))
+
 
