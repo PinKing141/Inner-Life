@@ -91,9 +91,38 @@ def loneliness_tick(state: GameState) -> str | None:
     return None
 
 
-GIFT_COST = 50
-LAVISH_GIFT_COST = 500
-DINNER_COST = 80
+# Gift catalogue — picker shown when the player taps Give Gift. Mix of
+# tiered prices and rel boosts so the player makes a real choice, not
+# just "always pick the biggest". Free option included so even a broke
+# player can do something thoughtful.
+GIFTS: tuple[dict, ...] = (
+    {"id": "handmade_card",  "name": "Handmade card",  "price":     0, "rel_boost":  3,
+     "blurb": "Free. The thought is real."},
+    {"id": "flowers",        "name": "Flowers",        "price":    20, "rel_boost":  6,
+     "blurb": "Reliable. Don't get the supermarket bunch."},
+    {"id": "chocolates",     "name": "Box of chocolates", "price":  35, "rel_boost":  7,
+     "blurb": "Always welcome. Pick something a tier above petrol-station."},
+    {"id": "good_bottle",    "name": "Good bottle of wine", "price": 60, "rel_boost": 10,
+     "blurb": "Costs more than they'd buy themselves."},
+    {"id": "bracelet",       "name": "Bracelet",       "price":   180, "rel_boost": 15,
+     "blurb": "Quietly considered. Keeps for years."},
+    {"id": "watch",          "name": "Watch",          "price":   450, "rel_boost": 22,
+     "blurb": "A real present. They'll wear it."},
+    {"id": "designer_bag",   "name": "Designer bag",   "price":  1_800, "rel_boost": 32,
+     "blurb": "Logos do the talking. Felt heavy in the box."},
+    {"id": "luxury_jewellery","name": "Luxury jewellery","price": 6_000, "rel_boost": 45,
+     "blurb": "A gift that becomes a story."},
+)
+
+# Money-gift tiers — discrete amounts so the picker is short and the
+# player makes a values decision, not a slider one.
+MONEY_GIFTS: tuple[dict, ...] = (
+    {"id": "small",    "amount":     50, "rel_boost":  4, "blurb": "Token gesture."},
+    {"id": "medium",   "amount":    500, "rel_boost": 10, "blurb": "Real help, no fuss."},
+    {"id": "large",    "amount":  5_000, "rel_boost": 22, "blurb": "Life-easing money."},
+    {"id": "huge",     "amount": 20_000, "rel_boost": 35, "blurb": "Changes their year."},
+)
+
 # Borrow gates: NPC needs to be close enough AND have money to lend.
 BORROW_MIN_RELATIONSHIP = 50
 BORROW_NPC_MIN_MONEY = 1_000
@@ -101,9 +130,10 @@ BORROW_NPC_MIN_MONEY = 1_000
 ADVICE_MIN_RELATIONSHIP = 30
 
 INTERACTIONS = (
-    "talk", "compliment", "argue", "gift",
-    "apologize", "deep_talk", "ask_advice", "borrow_money",
-    "insult", "lavish_gift", "take_to_dinner",
+    "talk", "compliment", "argue", "apologize",
+    "conversation", "ask_advice", "hang_out",
+    "give_gift", "give_money", "borrow_money",
+    "insult",
 )
 
 
@@ -114,14 +144,32 @@ def _find_agent(state: GameState, npc_id: int):
     return None
 
 
-def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResult:
+def _find_gift(gift_id: str) -> dict | None:
+    return next((g for g in GIFTS if g["id"] == gift_id), None)
+
+
+def _find_money_gift(tier_id: str) -> dict | None:
+    return next((m for m in MONEY_GIFTS if m["id"] == tier_id), None)
+
+
+def interact(
+    state: GameState,
+    npc_id: int,
+    action: str,
+    *,
+    rng=None,
+    param: str | None = None,
+) -> ActionResult:
     """Player-initiated interaction with a known NPC. Returns (ok, message).
 
-    State is only mutated on success. Some verbs (``deep_talk``,
-    ``ask_advice``, ``borrow_money``) use the passed-in ``rng`` for
-    rng-driven outcomes; deterministic verbs ignore it. The controller
-    forks an rng off the current tick + feed length per call so repeated
-    interactions in one year still diverge.
+    ``param`` is used by the picker verbs:
+      * ``give_gift`` — ``param`` is a gift id from ``GIFTS``.
+      * ``give_money`` — ``param`` is a tier id from ``MONEY_GIFTS``.
+
+    Some verbs (``conversation``, ``ask_advice``, ``borrow_money``) use
+    the passed-in ``rng`` for rng-driven outcomes; deterministic verbs
+    ignore it. The controller forks an rng off the current tick + feed
+    length so repeated interactions in one year still diverge.
     """
     rel = next((r for r in state.relationships if r.npc_id == npc_id), None)
     if rel is None:
@@ -141,14 +189,6 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         rel.relationship = max(0, rel.relationship - 8)
         state.stats.happiness = max(0, state.stats.happiness - 3)
         return ActionResult(True, f"You got into an argument with {name}.")
-    if action == "gift":
-        if state.money < GIFT_COST:
-            return ActionResult(False, f"You can't afford a gift for {name}.")
-        state.money -= GIFT_COST
-        rel.relationship = min(100, rel.relationship + 10)
-        return ActionResult(True, f"You gave {name} a gift. It cost £{GIFT_COST}.")
-
-    # --- New verbs (Phase 6 — NPC verbs v1) -----------------------------
 
     if action == "apologize":
         # Big lift when the relationship is hurt (rel < 50), small
@@ -161,9 +201,10 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         rel.relationship = min(100, rel.relationship + 2)
         return ActionResult(True, f"You said sorry. {name} wasn't sure what for.")
 
-    if action == "deep_talk":
-        # Heart-to-heart. ~70% of the time it lands; the rest it surfaces
-        # something harder and costs a little emotional reserve.
+    if action == "conversation":
+        # The longer version of "talk" — a real conversation. ~70% of
+        # the time it lands; the rest it surfaces something harder and
+        # costs a little emotional reserve.
         good_roll = rng.fork(0xD1A).chance(0.70) if rng is not None else True
         if good_roll:
             rel.relationship = min(100, rel.relationship + 6)
@@ -178,12 +219,8 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         if rel.relationship < ADVICE_MIN_RELATIONSHIP:
             return ActionResult(False,
                 f"You don't know {name} well enough to ask for real advice.")
-        # Advice quality scales with the NPC's own smarts (read from
-        # the Agent record). Better counsel from sharper people. A
-        # bad roll surfaces unhelpful guidance.
         agent = _find_agent(state, npc_id)
         npc_smarts = agent.smarts if agent is not None else 50
-        # Chance scales with NPC smarts: 50 smarts = 60% useful, 100 = 95%.
         useful_chance = 0.40 + (npc_smarts / 100.0) * 0.55
         useful = rng.fork(0xADC).chance(useful_chance) if rng is not None else True
         if useful:
@@ -195,6 +232,50 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         return ActionResult(True,
             f"You asked {name} for advice. It wasn't what you needed.")
 
+    if action == "hang_out":
+        # Free verb with a generous lift — the everyday default the
+        # player can lean on. Cheaper than dinner, less effort than
+        # conversation, no rng surprise.
+        rel.relationship = min(100, rel.relationship + 5)
+        state.stats.happiness = min(100, state.stats.happiness + 3)
+        return ActionResult(True, f"You hung out with {name}. Easy, nice.")
+
+    if action == "give_gift":
+        gift = _find_gift(param) if param else None
+        if gift is None:
+            return ActionResult(False, "Pick a gift first.")
+        if state.money < gift["price"]:
+            return ActionResult(False,
+                f"You can't afford a {gift['name'].lower()} (£{gift['price']:,}).")
+        state.money -= gift["price"]
+        rel.relationship = min(100, rel.relationship + gift["rel_boost"])
+        # Free gifts still cost happiness gain less; expensive ones lift
+        # the player's mood too.
+        if gift["price"] >= 1_000:
+            state.stats.happiness = min(100, state.stats.happiness + 3)
+        if gift["price"] > 0:
+            return ActionResult(True,
+                f"You gave {name} a {gift['name'].lower()}. £{gift['price']:,}.")
+        return ActionResult(True,
+            f"You gave {name} a {gift['name'].lower()}. The thought was the point.")
+
+    if action == "give_money":
+        tier = _find_money_gift(param) if param else None
+        if tier is None:
+            return ActionResult(False, "Pick how much to give.")
+        amount = tier["amount"]
+        if state.money < amount:
+            return ActionResult(False,
+                f"You can't afford to give £{amount:,} right now.")
+        state.money -= amount
+        agent = _find_agent(state, npc_id)
+        if agent is not None:
+            agent.money += amount  # conservation: money moves to the NPC
+        rel.relationship = min(100, rel.relationship + tier["rel_boost"])
+        state.stats.happiness = min(100, state.stats.happiness + 2)
+        return ActionResult(True,
+            f"You gave {name} £{amount:,}. They were grateful.")
+
     if action == "borrow_money":
         if rel.relationship < BORROW_MIN_RELATIONSHIP:
             return ActionResult(False,
@@ -203,12 +284,9 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         npc_money = agent.money if agent is not None else 0
         if npc_money < BORROW_NPC_MIN_MONEY:
             return ActionResult(False, f"{name} doesn't have it to lend right now.")
-        # Lend chance scales with relationship strength. Even close ties
-        # sometimes say no — there's real social cost in the ask.
         lend_chance = 0.30 + (rel.relationship / 100.0) * 0.55
         will_lend = rng.fork(0xB07).chance(lend_chance) if rng is not None else True
         if will_lend:
-            # Amount scales with both: closer ties + richer lenders give more.
             base = min(npc_money, 2_000)
             amount = int(base * (0.5 + rel.relationship / 200.0))
             amount = max(100, min(amount, npc_money))
@@ -229,24 +307,5 @@ def interact(state: GameState, npc_id: int, action: str, rng=None) -> ActionResu
         state.stats.looks = max(0, state.stats.looks - 1)
         return ActionResult(True, f"You said something cruel to {name}. It stuck.")
 
-    if action == "lavish_gift":
-        if state.money < LAVISH_GIFT_COST:
-            return ActionResult(False,
-                f"You can't afford a serious gift for {name} (£{LAVISH_GIFT_COST}).")
-        state.money -= LAVISH_GIFT_COST
-        rel.relationship = min(100, rel.relationship + 20)
-        state.stats.happiness = min(100, state.stats.happiness + 3)
-        return ActionResult(True,
-            f"You gave {name} something genuinely thoughtful. £{LAVISH_GIFT_COST}.")
-
-    if action == "take_to_dinner":
-        if state.money < DINNER_COST:
-            return ActionResult(False,
-                f"You can't afford to take {name} out (£{DINNER_COST}).")
-        state.money -= DINNER_COST
-        rel.relationship = min(100, rel.relationship + 8)
-        state.stats.happiness = min(100, state.stats.happiness + 3)
-        return ActionResult(True,
-            f"You took {name} for a long dinner. Worth £{DINNER_COST}.")
-
+    return ActionResult(False, "You can't do that.")
     return ActionResult(False, "You can't do that.")

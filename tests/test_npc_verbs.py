@@ -1,9 +1,9 @@
-"""NPC verbs v1 — apologize, deep_talk, ask_advice, borrow_money,
-insult, lavish_gift, take_to_dinner.
+"""NPC verbs v1 — talk/compliment/argue/apologize/conversation/ask_advice
+/hang_out/give_gift/give_money/borrow_money/insult.
 
-Covers refusal modes (unknown npc, dead npc, gating thresholds, cost
-ceilings), deterministic verbs' fixed effects, and the rng-driven
-verbs' both branches via seed sweeping.
+Covers refusal modes, deterministic verbs, rng-driven verbs (both
+branches via seed sweep), and the picker verbs that take a ``param``
+selecting a gift or money tier.
 """
 from __future__ import annotations
 
@@ -67,9 +67,8 @@ def test_dead_npc_refuses_everything():
 def test_apologize_big_lift_when_relationship_hurt():
     s = _new()
     npc_id = _add_friend(s, rel=20)
-    ok, _ = relationships.interact(s, npc_id, "apologize")
+    relationships.interact(s, npc_id, "apologize")
     rel = next(r for r in s.relationships if r.npc_id == npc_id)
-    assert ok is True
     assert rel.relationship == 32  # +12 because rel < 50
 
 
@@ -81,19 +80,16 @@ def test_apologize_small_when_relationship_healthy():
     assert rel.relationship == 82  # only +2 when rel >= 50
 
 
-# --- deep_talk ----------------------------------------------------------
+# --- conversation (rng-driven) ------------------------------------------
 
 
-def test_deep_talk_has_both_outcomes_under_different_seeds():
-    """The verb is meant to be rng-driven; across enough seeds we
-    should see BOTH the 'lands' (+6 rel) and the 'gets heavy' (+2 rel)
-    branches fire."""
+def test_conversation_has_both_outcomes_under_different_seeds():
     good_count = 0
     heavy_count = 0
     for seed in range(50):
         s = _new()
         npc_id = _add_friend(s, rel=50)
-        relationships.interact(s, npc_id, "deep_talk", rng=Rng(seed).fork(7))
+        relationships.interact(s, npc_id, "conversation", rng=Rng(seed).fork(7))
         rel = next(r for r in s.relationships if r.npc_id == npc_id)
         if rel.relationship == 56:
             good_count += 1
@@ -108,14 +104,12 @@ def test_deep_talk_has_both_outcomes_under_different_seeds():
 
 def test_ask_advice_refuses_below_threshold():
     s = _new()
-    npc_id = _add_friend(s, rel=20)  # below ADVICE_MIN_RELATIONSHIP=30
+    npc_id = _add_friend(s, rel=20)
     ok, _ = relationships.interact(s, npc_id, "ask_advice", rng=Rng(1).fork(7))
     assert ok is False
 
 
 def test_ask_advice_smarter_npc_more_often_useful():
-    """High-smarts NPCs should land useful advice substantially more
-    often than low-smarts NPCs across a fixed seed sweep."""
     smart_useful = 0
     dull_useful = 0
     for seed in range(50):
@@ -131,7 +125,122 @@ def test_ask_advice_smarter_npc_more_often_useful():
             smart_useful += 1
         if s_low.stats.smarts > smarts_before_low:
             dull_useful += 1
-    assert smart_useful > dull_useful + 5  # meaningful gap, not just edge noise
+    assert smart_useful > dull_useful + 5
+
+
+# --- hang_out ----------------------------------------------------------
+
+
+def test_hang_out_is_free_and_lifts_relationship_and_happiness():
+    s = _new(money=0)
+    s.stats.happiness = 50
+    npc_id = _add_friend(s, rel=50)
+    ok, _ = relationships.interact(s, npc_id, "hang_out")
+    rel = next(r for r in s.relationships if r.npc_id == npc_id)
+    assert ok is True
+    assert s.money == 0  # free
+    assert rel.relationship == 55
+    assert s.stats.happiness == 53
+
+
+# --- give_gift (picker) ------------------------------------------------
+
+
+def test_give_gift_without_param_refuses():
+    s = _new()
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_gift", param=None)
+    assert ok is False
+
+
+def test_give_gift_unknown_id_refuses():
+    s = _new()
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_gift", param="rocket_ship")
+    assert ok is False
+
+
+def test_give_gift_free_option_works_when_broke():
+    """The free handmade card is the inclusivity option — no money path
+    should still produce a real relationship lift."""
+    s = _new(money=0)
+    npc_id = _add_friend(s, rel=50)
+    ok, _ = relationships.interact(s, npc_id, "give_gift", param="handmade_card")
+    rel = next(r for r in s.relationships if r.npc_id == npc_id)
+    assert ok is True
+    assert s.money == 0
+    assert rel.relationship == 53  # +3 boost from the catalogue
+
+
+def test_give_gift_paid_option_debits_money_and_lifts_relationship():
+    s = _new(money=10_000)
+    npc_id = _add_friend(s, rel=50)
+    relationships.interact(s, npc_id, "give_gift", param="watch")
+    rel = next(r for r in s.relationships if r.npc_id == npc_id)
+    watch = next(g for g in relationships.GIFTS if g["id"] == "watch")
+    assert s.money == 10_000 - watch["price"]
+    assert rel.relationship == 50 + watch["rel_boost"]
+
+
+def test_give_gift_refuses_when_broke():
+    s = _new(money=100)
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_gift", param="luxury_jewellery")
+    assert ok is False
+    assert s.money == 100  # untouched on refusal
+
+
+def test_gift_catalogue_priced_in_ladder_order():
+    """The catalogue is declared cheap → expensive so the UI can render
+    it in that order without sorting. Stays useful as future entries
+    are added."""
+    prices = [g["price"] for g in relationships.GIFTS]
+    assert prices == sorted(prices)
+
+
+# --- give_money (picker) ------------------------------------------------
+
+
+def test_give_money_without_param_refuses():
+    s = _new()
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_money", param=None)
+    assert ok is False
+
+
+def test_give_money_unknown_tier_refuses():
+    s = _new()
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_money", param="zillion")
+    assert ok is False
+
+
+def test_give_money_refuses_when_broke():
+    s = _new(money=10)
+    npc_id = _add_friend(s)
+    ok, _ = relationships.interact(s, npc_id, "give_money", param="small")
+    assert ok is False
+
+
+def test_give_money_transfers_to_npc_with_conservation():
+    """Player gives £500 → player.money -500, npc.money +500. Real
+    money conservation (modelled as an Agent.money mutation)."""
+    s = _new(money=10_000)
+    npc_id = _add_friend(s, rel=50, agent_money=1_000)
+    player_before = s.money
+    agent = next(a for a in s.agents if a.npc_id == npc_id)
+    agent_before = agent.money
+    relationships.interact(s, npc_id, "give_money", param="medium")
+    medium = next(t for t in relationships.MONEY_GIFTS if t["id"] == "medium")
+    assert s.money == player_before - medium["amount"]
+    assert agent.money == agent_before + medium["amount"]
+    rel = next(r for r in s.relationships if r.npc_id == npc_id)
+    assert rel.relationship == 50 + medium["rel_boost"]
+
+
+def test_money_gift_tiers_in_ascending_order():
+    amounts = [t["amount"] for t in relationships.MONEY_GIFTS]
+    assert amounts == sorted(amounts)
 
 
 # --- borrow_money -------------------------------------------------------
@@ -139,7 +248,7 @@ def test_ask_advice_smarter_npc_more_often_useful():
 
 def test_borrow_refuses_when_relationship_too_low():
     s = _new()
-    npc_id = _add_friend(s, rel=30)  # below BORROW_MIN_RELATIONSHIP=50
+    npc_id = _add_friend(s, rel=30)
     money_before = s.money
     ok, _ = relationships.interact(s, npc_id, "borrow_money", rng=Rng(1).fork(7))
     assert ok is False
@@ -148,7 +257,7 @@ def test_borrow_refuses_when_relationship_too_low():
 
 def test_borrow_refuses_when_npc_broke():
     s = _new()
-    npc_id = _add_friend(s, rel=90, agent_money=100)  # below BORROW_NPC_MIN_MONEY
+    npc_id = _add_friend(s, rel=90, agent_money=100)
     money_before = s.money
     ok, _ = relationships.interact(s, npc_id, "borrow_money", rng=Rng(1).fork(7))
     assert ok is False
@@ -156,8 +265,6 @@ def test_borrow_refuses_when_npc_broke():
 
 
 def test_borrow_success_credits_player_and_debits_npc():
-    """Find a seed where the lend roll succeeds and assert conservation:
-    money moves from agent to player exactly."""
     for seed in range(50):
         s = _new()
         npc_id = _add_friend(s, rel=90, agent_money=5_000)
@@ -174,7 +281,6 @@ def test_borrow_success_credits_player_and_debits_npc():
 
 
 def test_borrow_failure_costs_relationship_and_happiness():
-    """Find a seed where the lend roll fails."""
     for seed in range(50):
         s = _new()
         npc_id = _add_friend(s, rel=55, agent_money=5_000)
@@ -204,78 +310,57 @@ def test_insult_is_worse_than_argue():
     assert rel_insult.relationship < rel_argue.relationship
 
 
-# --- lavish_gift -------------------------------------------------------
+# --- Controller verb passes rng + param through ----------------------
 
 
-def test_lavish_gift_refuses_when_broke():
-    s = _new(money=400)  # below LAVISH_GIFT_COST=500
-    npc_id = _add_friend(s)
-    ok, _ = relationships.interact(s, npc_id, "lavish_gift")
-    assert ok is False
-    assert s.money == 400
-
-
-def test_lavish_gift_lifts_relationship_and_charges_money():
-    s = _new(money=10_000)
-    npc_id = _add_friend(s, rel=50)
-    relationships.interact(s, npc_id, "lavish_gift")
-    rel = next(r for r in s.relationships if r.npc_id == npc_id)
-    assert s.money == 10_000 - relationships.LAVISH_GIFT_COST
-    assert rel.relationship == 70  # +20
-
-
-# --- take_to_dinner ---------------------------------------------------
-
-
-def test_dinner_refuses_when_broke():
-    s = _new(money=50)
-    npc_id = _add_friend(s)
-    ok, _ = relationships.interact(s, npc_id, "take_to_dinner")
-    assert ok is False
-
-
-def test_dinner_lifts_relationship_and_happiness():
-    s = _new(money=1_000)
-    s.stats.happiness = 50
-    npc_id = _add_friend(s, rel=50)
-    relationships.interact(s, npc_id, "take_to_dinner")
-    rel = next(r for r in s.relationships if r.npc_id == npc_id)
-    assert s.money == 1_000 - relationships.DINNER_COST
-    assert rel.relationship == 58
-    assert s.stats.happiness == 53
-
-
-# --- Controller verb passes rng through ------------------------------
-
-
-def test_controller_relationship_action_routes_rng_for_probabilistic_verbs():
-    """End-to-end: controller.relationship_action must fork an rng and
-    pass it through. Without this, deep_talk would always take the
-    deterministic branch."""
+def test_controller_routes_rng_for_probabilistic_verbs():
     c = GameController()
     c.new_game(seed=1, name="", gender="Female", country="US", talent="Sports")
     c.state.character.age = 30
     npc_id = _add_friend(c.state, rel=50)
-    # Call several times — at least one outcome should differ (proving
-    # determinism shifts with tick/feed-length).
     outcomes = set()
     for _ in range(8):
-        c.relationship_action(npc_id, "deep_talk")
+        c.relationship_action(npc_id, "conversation")
         rel = next(r for r in c.state.relationships if r.npc_id == npc_id)
         outcomes.add(rel.relationship - 50)
-        # Reset for next call so the +6 doesn't accumulate.
-        rel.relationship = 50
-    assert len(outcomes) > 1, "deep_talk produced identical outcomes — rng not forked"
+        rel.relationship = 50  # reset between calls
+    assert len(outcomes) > 1, "conversation produced identical outcomes — rng not forked"
+
+
+def test_controller_routes_param_for_give_gift():
+    c = GameController()
+    c.new_game(seed=1, name="", gender="Female", country="US", talent="Sports")
+    c.state.character.age = 30
+    c.state.money = 10_000
+    npc_id = _add_friend(c.state, rel=50)
+    c.relationship_action(npc_id, "give_gift", param="watch")
+    rel = next(r for r in c.state.relationships if r.npc_id == npc_id)
+    watch = next(g for g in relationships.GIFTS if g["id"] == "watch")
+    assert c.state.money == 10_000 - watch["price"]
+    assert rel.relationship == 50 + watch["rel_boost"]
+
+
+def test_snapshot_exposes_catalogues_for_ui_pickers():
+    """The UI gift/money pickers read gift_catalogue and
+    money_gift_tiers off the snapshot. Don't strand the pickers."""
+    c = GameController()
+    c.new_game(seed=1, name="", gender="Female", country="US", talent="Sports")
+    snap = c.snapshot()
+    assert isinstance(snap.get("gift_catalogue"), list) and len(snap["gift_catalogue"]) >= 5
+    assert isinstance(snap.get("money_gift_tiers"), list) and len(snap["money_gift_tiers"]) >= 3
+    # Each row should have the fields the UI consumes.
+    for g in snap["gift_catalogue"]:
+        assert "id" in g and "name" in g and "price" in g and "blurb" in g
+    for t in snap["money_gift_tiers"]:
+        assert "id" in t and "amount" in t and "blurb" in t
 
 
 def test_interactions_tuple_lists_every_supported_verb():
-    """The UI consults INTERACTIONS to gate buttons; if a verb is
-    handled in interact() but missing here, the UI silently can't
-    expose it. This test keeps the two in sync."""
     s = _new(money=10_000)
     npc_id = _add_friend(s, rel=80)
     for action in relationships.INTERACTIONS:
-        # Each verb should return a result of some kind (not crash).
+        # Picker verbs need a param to succeed but should still RETURN
+        # an ActionResult (the refusal message), not raise.
         result = relationships.interact(s, npc_id, action, rng=Rng(1).fork(7))
         assert hasattr(result, "ok")
         assert hasattr(result, "message")
