@@ -30,16 +30,8 @@ Object.assign(window.App, {
   onSnapshot(snap) {
     const prevMode = this.state ? this.state.mode : null;
     this.state = snap;
-    // Settings v1: every snapshot carries the live settings. Apply the
-    // display flags to <html> so CSS can react before the next render
-    // pass paints. Works even during character creation.
     this.applySettingsToDOM(snap.settings);
-    if (snap.mode === "CREATION") {
-      if (prevMode !== "CREATION") this.startCreation();
-      return;
-    }
     if (prevMode !== "PLAYING" && prevMode !== "DEATH") {
-      // Transitioned into the game from creation (or from load).
       LifeUI.scene("game");
       LifeUI.clearLife();
       this.loggedFeedCount = 0;
