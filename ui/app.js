@@ -59,10 +59,8 @@ Object.assign(window.App, {
     });
     LifeUI.setStats(s.stats || {});
     this.renderActivities();
-    this.renderOccupation();
     this.renderRelations();
     this.renderAssets();
-    this.renderCrime();
     this.appendNewFeedEntries();
     this.syncModal();
   },

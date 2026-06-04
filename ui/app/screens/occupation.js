@@ -1,14 +1,12 @@
 /**
- * App.screens.occupation — render the Occupation tab + helpers shared
- * with the Education modal.
- *
- * Landing layout (BitLife-style category page):
- *   • Current Job + Career Actions (when employed)
- *   • Occupation: Jobs · Education (drill-down rows)
- *
- * Both drill-down rows open modals defined in ui/app/modals/education.js
- * (openJobsModal / openEducationModal). The grade helpers + job filter
- * live here because the landing's subtitle counts use them too.
+ * App.occupation helpers — shared by the Life screen entry-card +
+ * the Education/Jobs modals. The Occupation tab itself is gone; School
+ * and Special Careers are opened as overlay modals from the Life screen.
+ * What survives here:
+ *   - occupationLocked(state) → greys the School entry-card while the
+ *     player is too young for school
+ *   - _gradeForSmarts / _schoolName / _gradeBarHTML / _eligibleJobs /
+ *     _educationSummary — used by openJobsModal + openEducationModal
  */
 (function (App) {
   "use strict";
@@ -102,76 +100,4 @@
     return "School in session";
   };
 
-  App.renderOccupation = function () {
-    const s = this.state;
-
-    // Locked / too-young: panel is a single explanatory tile. The
-    // tab is still tappable (per design feedback) so the player can
-    // see why and watch the age requirement.
-    if (App.occupationLocked(s)) {
-      LifeUI.renderScreen("occupation", [{
-        items: [{
-          icon: "infant", accent: "var(--ink-faint)",
-          title: "Too young",
-          subtitle: "Nothing to do here yet. Age up to start school.",
-          locked: true,
-        }],
-      }]);
-      return;
-    }
-
-    const job = s.career;
-    const groups = [];
-
-    if (job) {
-      groups.push({
-        label: "Current Job",
-        items: [{
-          icon: "brief", accent: "var(--gold)",
-          title: job.title,
-          subtitle: `${job.employer || "Employer"} · £${(job.salary || 0).toLocaleString()}/yr · Perf ${job.performance}`,
-        }],
-      });
-      groups.push({
-        label: "Career Actions",
-        items: [
-          { icon: "spark", accent: "var(--c-happy)", title: "Work Harder",
-            subtitle: "Push for performance; costs a little happiness",
-            trailing: { kind: "chevron" }, action: "work-harder" },
-          { icon: "gem", accent: "var(--cat-money)", title: "Ask for a Raise",
-            subtitle: "Pitch a salary bump",
-            trailing: { kind: "chevron" }, action: "request-raise" },
-          { icon: "trophy", accent: "var(--gold)", title: "Ask for Promotion",
-            subtitle: "Aim for the next rung",
-            trailing: { kind: "chevron" }, action: "request-promotion" },
-          { icon: "x", accent: "var(--c-bad)", title: "Quit Job",
-            subtitle: "Walk away from this role",
-            trailing: { kind: "chevron" }, action: "quit-job" },
-        ],
-      });
-    }
-
-    const eligibleJobsCount = App._eligibleJobs(s).length;
-    groups.push({
-      label: "Occupation",
-      items: [
-        { icon: "brief", accent: "var(--cat-money)",
-          title: "Jobs",
-          subtitle: job
-            ? `Browse other listings · ${eligibleJobsCount} you qualify for`
-            : (eligibleJobsCount > 0
-                ? `${eligibleJobsCount} positions you qualify for`
-                : "No jobs you qualify for yet — study to unlock more"),
-          trailing: { kind: "chevron" },
-          action: "open-jobs-modal" },
-        { icon: "cap", accent: "var(--cat-education)",
-          title: "Education",
-          subtitle: App._educationSummary(s),
-          trailing: { kind: "chevron" },
-          action: "open-education-modal" },
-      ],
-    });
-
-    LifeUI.renderScreen("occupation", groups);
-  };
 })(window.App = window.App || {});
