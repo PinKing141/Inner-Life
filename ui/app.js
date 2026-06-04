@@ -2,14 +2,17 @@
  * App — the seam between the Qt bridge (Python core) and LifeUI.
  *
  * Snapshot in, LifeUI calls out. JS holds no game state and runs no rules.
- * Each stateChanged triggers render(), which delegates to the screen
- * renderers (app/screens.js), the feed appender (app/feed.js), and the
- * modal coordinator (app/modals.js). Save/load and bridge connection live
- * in app/bridge.js and app/dispatch.js.
+ * Each stateChanged triggers render(), which delegates to the per-tab
+ * screen renderers under app/screens/, the feed appender (app/feed.js),
+ * and the modal coordinator under app/modals/. Save/load and bridge
+ * connection live in app/bridge.js and app/dispatch.js.
  *
- * Load order (set in index.html): lib/icons.js → life-ui.js →
- *   mock_snapshot.js → app/screens.js → app/modals.js → app/creation.js →
- *   app/feed.js → app/bridge.js → app/dispatch.js → app.js
+ * Load order (set in index.html):
+ *   lib/icons.js → life-ui.js → mock_snapshot.js →
+ *   app/screens/*.js (per-tab renderers) →
+ *   app/modals/*.js (router + per-domain raise helpers) →
+ *   app/creation.js → app/feed.js → app/bridge.js →
+ *   app/dispatch.js → app.js
  */
 
 window.App = window.App || {};
