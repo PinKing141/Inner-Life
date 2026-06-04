@@ -7,7 +7,9 @@ Run with:  python main.py
 """
 from __future__ import annotations
 
+import re
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Slot
@@ -20,6 +22,27 @@ from bridge import WebBridge
 from controller import GameController
 
 UI_PATH = Path(__file__).parent / "ui" / "index.html"
+
+
+def _cache_busted_html() -> tuple[str, QUrl]:
+    """Read index.html and stamp every local <link rel="stylesheet"> and
+    <script src=> with a per-launch ?v= query string. Qt WebEngine's
+    file:// loader otherwise caches CSS/JS by exact URL across runs even
+    when the on-disk HTTP cache is memory-only, so edits to life-ui.css
+    can silently fail to show up. Reuses index.html as-is for source of
+    truth; the cache-bust is invisible to dev tooling."""
+    html = UI_PATH.read_text(encoding="utf-8")
+    stamp = str(int(time.time()))
+    # Only stamp same-origin (relative) URLs; leave fonts.googleapis.com etc. alone.
+    def repl(match: "re.Match[str]") -> str:
+        prefix, url = match.group(1), match.group(2)
+        if "://" in url or url.startswith("//"):
+            return match.group(0)
+        sep = "&" if "?" in url else "?"
+        return f'{prefix}"{url}{sep}v={stamp}"'
+    html = re.sub(r'(<link[^>]*\shref=)"([^"]+)"', repl, html)
+    html = re.sub(r'(<script[^>]*\ssrc=)"([^"]+)"', repl, html)
+    return html, QUrl.fromLocalFile(str(UI_PATH.parent.resolve()) + "/")
 
 
 class WindowControls(QObject):
@@ -79,7 +102,8 @@ class MainWindow(QMainWindow):
         self.channel.registerObject("windowControls", self.window_controls)
         self.view.page().setWebChannel(self.channel)
 
-        self.view.load(QUrl.fromLocalFile(str(UI_PATH.resolve())))
+        html, base = _cache_busted_html()
+        self.view.setHtml(html, base)
         self.setCentralWidget(self.view)
 
 
