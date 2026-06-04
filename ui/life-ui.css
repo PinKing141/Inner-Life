@@ -380,6 +380,7 @@ body{
 /* hero: flag + name + balance, then a location row beneath */
 .hero{
   padding:22px 22px 20px;
+  background:var(--bg-2);
   background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 8%,var(--bg-2)) 0%,transparent 100%);
   border-bottom:1px solid var(--line-soft);
 }
