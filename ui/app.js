@@ -87,14 +87,10 @@ App.applySettingsToDOM = function (settings) {
 // ===== Bootstrap =====
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Configure 5 screens BEFORE mount: first 4 appear in the nav (life /
-  // activities / career / relations), assets is the 5th and is reached
-  // via a "Property & Assets" list-item on the Career screen.
-  LifeUI.registerScreen("life",       { label: "Life",       icon: "infant" });
-  LifeUI.registerScreen("activities", { label: "Activities", icon: "dots"   });
-  LifeUI.registerScreen("career",     { label: "Career",     icon: "brief"  });
-  LifeUI.registerScreen("relations",  { label: "Relations",  icon: "heart"  });
-  LifeUI.registerScreen("assets",     { label: "Assets",     icon: "assets" });
+  // Screen registration lives in life-ui.js BUILTIN — Life / Assets /
+  // Relations / Activities. No pre-registration here, otherwise stale
+  // ids (like the old "career" tab) leak into S.screens and override
+  // BUILTIN's nav order.
   LifeUI.mount("#game");
   App.connect();
 });

@@ -310,6 +310,10 @@ body{
   font-family:var(--font-label);font-size:9px;font-weight:700;
   letter-spacing:.14em;text-transform:uppercase;color:var(--accent,var(--gold));
 }
+.ui-year .cat .yr{
+  margin-left:auto;color:var(--ink-faint);
+  letter-spacing:.1em;font-weight:700;
+}
 .ui-year .text{
   font-family:var(--font-body);font-size:15px;line-height:1.58;color:var(--ink);
 }
@@ -380,6 +384,7 @@ body{
 /* hero: flag + name + balance, then a location row beneath */
 .hero{
   padding:22px 22px 20px;
+  background:var(--bg-2);
   background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 8%,var(--bg-2)) 0%,transparent 100%);
   border-bottom:1px solid var(--line-soft);
 }
