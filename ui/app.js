@@ -7,12 +7,8 @@
  * and the modal coordinator under app/modals/. Save/load and bridge
  * connection live in app/bridge.js and app/dispatch.js.
  *
- * Load order (set in index.html):
- *   lib/icons.js → life-ui.js → mock_snapshot.js →
- *   app/screens/*.js (per-tab renderers) →
- *   app/modals/*.js (router + per-domain raise helpers) →
- *   app/creation.js → app/feed.js → app/bridge.js →
- *   app/dispatch.js → app.js
+ * Character creation is gone — the controller auto-spawns a random baby
+ * in a random country on boot. The snapshot lands straight in PLAYING.
  */
 
 window.App = window.App || {};
@@ -23,7 +19,6 @@ Object.assign(window.App, {
   loggedFeedCount: 0,
   currentModalKey: null,
   deathShown: false,
-  creation: { first_name: "", last_name: "", gender: "", country: "", city: "", talent: "" },
 
   // ===== Snapshot entry point =====
 
@@ -58,6 +53,7 @@ Object.assign(window.App, {
       stage: s.career ? s.career.title : this.stageFor(ch.age || 0, s.education),
       stageIcon: this.stageIconFor(ch.age || 0, s.education, !!s.career),
       occupationLocked: this.occupationLocked(s),
+      age: ch.age || 0,
       location: ch.city ? `${ch.city}, ${ch.country}` : (ch.country || "—"),
       balance: s.money || 0,
     });
@@ -89,32 +85,6 @@ App.applySettingsToDOM = function (settings) {
   html.toggleAttribute("data-reduced-motion", !!settings.reduced_motion);
   html.toggleAttribute("data-high-contrast", !!settings.high_contrast);
 };
-
-LifeUI.on("creation-submit", ({ stepId, values }) => {
-  Object.assign(App.creation, values);
-  if (stepId === "identity")     App.creationStep("origin");
-  else if (stepId === "origin")  App.creationStep("city");
-  else if (stepId === "city")    App.creationStep("talent");
-  else if (stepId === "talent") {
-    const c = App.creation;
-    LifeUI.scene("game");
-    LifeUI.clearLife();
-    App.loggedFeedCount = 0;
-    App.currentModalKey = null;
-    App.deathShown = false;
-    if (App.bridge.newGameFull) {
-      App.bridge.newGameFull(c.first_name, c.last_name, c.gender, c.country, c.city, c.talent);
-    } else {
-      App.bridge.newGame(`${c.first_name} ${c.last_name}`.trim(), c.gender, c.country, c.talent);
-    }
-  }
-});
-
-LifeUI.on("creation-back", ({ stepId }) => {
-  if (stepId === "origin")    App.creationStep("identity");
-  else if (stepId === "city")   App.creationStep("origin", App.creation.country);
-  else if (stepId === "talent") App.creationStep("city", App.creation.city);
-});
 
 // ===== Bootstrap =====
 

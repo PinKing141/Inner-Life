@@ -40,6 +40,8 @@
       case "view-assets":         LifeUI.showScreen("assets"); break;
       case "open-jobs-modal":     this.openJobsModal(); break;
       case "open-education-modal": this.openEducationModal(); break;
+      case "open-school":         this.openEducationModal(); break;
+      case "open-special-careers": this.openJobsModal(); break;
       case "view-listing":        this.openListingOptions(payload); break;
       case "buy-listing":         await b.buyHome(payload); break;
       case "mortgage-listing":    await b.buyHomeMortgage(payload); break;
