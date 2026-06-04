@@ -78,9 +78,11 @@ const LifeUI = (function () {
   }
   function entryHTML(e, fresh) {
     const cat = e.category || 'event';
+    const ageTag = e.age != null
+      ? `<span class="yr">Age ${esc(e.age)}</span>` : '';
     return `<div class="entry t-${cat}${cat === 'birth' ? ' is-birth' : ''}` +
            `${fresh ? ' fresh' : ''}" style="--accent:var(--cat-${cat},var(--gold))">` +
-           `<div class="cat"><i></i><span>${esc(e.label || cat)}</span></div>` +
+           `<div class="cat"><i></i><span>${esc(e.label || cat)}</span>${ageTag}</div>` +
            `<div class="text">${e.text == null ? '' : e.text}</div></div>`;
   }
   function yearHTML(e, latest) {
@@ -413,7 +415,14 @@ const LifeUI = (function () {
     const hero = S.root && S.root.querySelector('.screen[data-screen="life"] .hero');
     if (!hero) return;
     if (d.name != null)    hero.querySelector('.nm').textContent = d.name;
-    if (d.stage != null)   hero.querySelector('.stage .txt').textContent = d.stage;
+    if (d.stage != null) {
+      hero.querySelector('.stage .txt').textContent = d.stage;
+      // Mock pattern: the Life nav tab mirrors the player's current
+      // stage — TODDLER / CHILD / TEENAGER / ADULT / SENIOR — so the
+      // bottom bar carries the same beat as the hero label.
+      const lifeBtnLbl = S.root.querySelector('.app-nav button[data-screen="life"] span');
+      if (lifeBtnLbl) lifeBtnLbl.textContent = d.stage;
+    }
     if (d.age != null)     hero.querySelector('.stage .age em').textContent = d.age;
     if (d.stageIcon != null) {
       hero.querySelector('.stage .ico').innerHTML = ICONS[d.stageIcon] ? svg(d.stageIcon, 2) : '';
