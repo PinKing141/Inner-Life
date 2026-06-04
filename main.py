@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Slot
 from PySide6.QtWebChannel import QWebChannel
+from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QMainWindow
 
@@ -66,6 +67,11 @@ class MainWindow(QMainWindow):
         self.controller = GameController()
         self.bridge = WebBridge(self.controller, self)
         self.window_controls = WindowControls(self)
+
+        profile = QWebEngineProfile.defaultProfile()
+        profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.MemoryHttpCache)
+        profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies)
+        profile.clearHttpCache()
 
         self.view = QWebEngineView()
         self.channel = QWebChannel(self.view.page())
