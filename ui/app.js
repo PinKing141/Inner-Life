@@ -64,6 +64,7 @@ Object.assign(window.App, {
       name: ch.name || "—",
       flag,
       stage: s.career ? s.career.title : this.stageFor(ch.age || 0, s.education),
+      stageIcon: this.stageIconFor(ch.age || 0, s.education, !!s.career),
       occupationLocked: this.occupationLocked(s),
       location: ch.city ? `${ch.city}, ${ch.country}` : (ch.country || "—"),
       balance: s.money || 0,

@@ -44,4 +44,6 @@ window.LIFE_ICONS = {
   x:`<path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>`,
   box:`<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M9 14h6" stroke-linecap="round"/>`,
   warn:`<path d="M12 4l9 16H3zM12 10v5M12 17.5v.5" stroke-linecap="round" stroke-linejoin="round"/>`,
+  dummy:`<circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="14" r="6"/><circle cx="12" cy="14" r="2"/><path d="M6.7 11.5 4 10.5M17.3 11.5 20 10.5" stroke-linecap="round"/>`,
+  students:`<path d="M3 8l9-3.5L21 8l-9 3.5z" stroke-linejoin="round"/><path d="M7 10v3.5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V10" stroke-linecap="round"/><circle cx="12" cy="18.5" r="1.6"/><path d="M9 22c0-1.4 1.3-2.5 3-2.5s3 1.1 3 2.5" stroke-linecap="round"/>`,
 };
