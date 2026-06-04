@@ -96,6 +96,13 @@
             if (pushTo) pushTo(state);
             return JSON.stringify(state);
           },
+          async newRandomLife() {
+            // Browser mock: just replay the same canned snapshot. In Qt
+            // this hits the controller's _auto_spawn for a fresh life.
+            if (PLAYING) state = PLAYING;
+            if (pushTo) pushTo(state);
+            return JSON.stringify(state);
+          },
           // Save/load go through the envelope path; mock them so the
           // toast UX is exercisable in browser preview too.
           async save() {

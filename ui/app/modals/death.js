@@ -15,7 +15,7 @@
       title: `${ch.name || "You"} died at ${ch.age || 0}`,
       subtitle: heirs.length
         ? "Your line endures — choose an heir to carry on."
-        : "Your story is complete. Open the menu to start another life." }];
+        : "Your story is complete. Start another life as a random baby anywhere in the world." }];
 
     if (heirs.length) {
       blocks.push({ type: "list", items: heirs.map(h => ({
@@ -30,7 +30,10 @@
     LifeUI.modal({
       kind: "award", title: "End of Life", dismissable: true,
       blocks,
-      actions: [{ label: "Close", variant: "ghost", action: "__close" }],
+      actions: [
+        { label: "Start a new life", variant: "primary", action: "new-random-life" },
+        { label: "Close", variant: "ghost", action: "__close" },
+      ],
     });
   };
 })(window.App = window.App || {});

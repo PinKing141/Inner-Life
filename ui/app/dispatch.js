@@ -42,6 +42,12 @@
       case "open-education-modal": this.openEducationModal(); break;
       case "open-school":         this.openEducationModal(); break;
       case "open-special-careers": this.openSpecialCareersModal(); break;
+      case "new-random-life":
+        if (b.newRandomLife) {
+          this.deathShown = false;
+          await b.newRandomLife();
+        }
+        break;
       case "view-listing":        this.openListingOptions(payload); break;
       case "buy-listing":         await b.buyHome(payload); break;
       case "mortgage-listing":    await b.buyHomeMortgage(payload); break;
