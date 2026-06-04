@@ -418,6 +418,9 @@ const LifeUI = (function () {
       // The Occupation tab label is fixed; stage info lives here.
       $('.app-identity .stage .txt').textContent = d.stage;
     }
+    if (d.stageIcon != null) {
+      $('.app-identity .stage .ico').innerHTML = ICONS[d.stageIcon] ? svg(d.stageIcon, 2) : '';
+    }
     // Greyed Occupation tab when the player is too young for jobs or
     // school. CSS hooks data-stage-locked on the button. Kept as a
     // separate flag so tests/callers can opt out without rebuilding nav.
@@ -543,7 +546,7 @@ const LifeUI = (function () {
           <div class="flag"></div>
           <div class="who">
             <div class="nm">—</div>
-            <div class="stage"><span class="txt">—</span>
+            <div class="stage"><span class="ico"></span><span class="txt">—</span>
               <span class="sep"></span><span class="loc">—</span></div>
           </div>
           <div class="bal"><div class="k">Bank Balance</div><div class="v">£0</div></div>

@@ -26,4 +26,12 @@
     if (age < 70) return "Mature Adult";
     return "Senior";
   };
+
+  App.stageIconFor = function (age, edu, hasCareer) {
+    if (hasCareer) return "brief";
+    if (edu && edu.in_school) return "students";
+    if (age < 2) return "dummy";
+    if (age < 13) return "child";
+    return "adult";
+  };
 })(window.App = window.App || {});

@@ -135,6 +135,10 @@ body{
   letter-spacing:.12em;text-transform:uppercase;color:var(--gold);
   display:flex;align-items:center;gap:7px;
 }
+.app-identity .who .stage .ico{display:inline-flex;align-items:center;
+  color:var(--gold)}
+.app-identity .who .stage .ico svg{width:13px;height:13px}
+.app-identity .who .stage .ico:empty{display:none}
 .app-identity .who .stage .sep{width:3px;height:3px;border-radius:50%;
   background:var(--ink-faint)}
 .app-identity .who .stage .loc{color:var(--ink-faint);
