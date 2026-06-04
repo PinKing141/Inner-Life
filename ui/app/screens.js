@@ -47,25 +47,13 @@
     LifeUI.renderScreen("activities", [{ label: "Things To Do", items }]);
   };
 
-  // Life-tab presentation cascade. Returns the tab label + icon +
-  // locked flag and the panel "kind" the renderer should use.
-  //   kind = "infant"     — too young for school/work
-  //   kind = "school"     — in school (any level, including uni)
-  //   kind = "occupation" — out of school, working-age
-  App.lifeTabInfo = function (s) {
-    const ch = s.character || {};
+  // Whether the Occupation tab should be greyed (player too young for
+  // school OR work). Drives setIdentity({occupationLocked}) — the tab
+  // is still tappable, but the panel renders a "come back later" tile.
+  App.occupationLocked = function (s) {
     const edu = s.education || {};
-    const age = ch.age || 0;
-    if (edu.in_school) {
-      return { kind: "school", label: "School", icon: "cap", locked: false };
-    }
-    // School age in most countries is 5+. Anything under is the
-    // grey/locked infant phase. The threshold matches sim's nursery
-    // age window (nursery_bully fires from 4).
-    if (age < 5) {
-      return { kind: "infant", label: "Infant", icon: "infant", locked: true };
-    }
-    return { kind: "occupation", label: "Occupation", icon: "brief", locked: false };
+    if (edu.in_school) return false;
+    return ((s.character && s.character.age) || 0) < 5;
   };
 
   // Convert player smarts to a letter grade for the school panel.
@@ -128,65 +116,31 @@
     });
   };
 
-  // The Life-tab panel renderer. Lives ABOVE the timeline; chooses the
-  // content shape from lifeTabInfo's kind.
-  App.renderLifeStage = function () {
+  // Occupation tab landing — two drill-down rows (Jobs + Education).
+  // Current-job + career actions appear here when employed; the
+  // long lists live in modals (openJobsModal / openEducationModal)
+  // so this landing stays a short BitLife-style category page.
+  App.renderOccupation = function () {
     const s = this.state;
-    const info = App.lifeTabInfo(s);
     const edu = s.education || {};
     const ch = s.character || {};
     const age = ch.age || 0;
 
-    if (info.kind === "infant") {
-      LifeUI.renderStagePanel([{
-        label: "Too young",
+    // Locked / too-young: panel is a single explanatory tile. The
+    // tab is still tappable (per design feedback) so the player can
+    // see why and watch the age requirement.
+    if (App.occupationLocked(s)) {
+      LifeUI.renderScreen("occupation", [{
         items: [{
           icon: "infant", accent: "var(--ink-faint)",
-          title: "Nothing to do here yet",
-          subtitle: "Age up to start school and unlock this tab.",
+          title: "Too young",
+          subtitle: "Nothing to do here yet. Age up to start school.",
           locked: true,
         }],
       }]);
       return;
     }
 
-    if (info.kind === "school") {
-      const groups = [];
-      const inUni = edu.level === "University";
-      groups.push({
-        items: [{
-          icon: "cap", accent: "var(--cat-education)",
-          title: App._schoolName(edu),
-          subtitle: inUni
-            ? `${edu.university_major || "Undeclared"} · ${edu.study_years_left || 0}y left`
-            : `In session · grade ${App._gradeForSmarts(s.stats.smarts || 0)}`,
-        }],
-      });
-      groups.push({
-        label: "Activities",
-        items: [
-          { icon: "book", accent: "var(--c-smarts)", title: "Study Harder",
-            subtitle: "Push your grades up",
-            trailing: { kind: "chevron" },
-            action: "do-activity", payload: "study" },
-          { icon: "doctor", accent: "var(--c-health)", title: "Visit the Nurse",
-            subtitle: "Free clinic at school",
-            trailing: { kind: "chevron" },
-            action: "do-activity", payload: "school_nurse" },
-          { icon: "x", accent: "var(--c-bad)", title: "Drop Out",
-            subtitle: inUni
-              ? "Leave university without a degree"
-              : "Leave school early — affects your job options later",
-            trailing: { kind: "chevron" },
-            action: inUni ? "drop-out-university" : "drop-out-school" },
-        ],
-      });
-      LifeUI.renderStagePanel(groups, App._gradeBarHTML(s.stats.smarts || 0));
-      return;
-    }
-
-    // info.kind === "occupation" — current job + career actions when
-    // employed, eligible-jobs list, and education re-entry options.
     const job = s.career;
     const groups = [];
 
@@ -244,45 +198,12 @@
       ],
     });
 
-    groups.push({
-      label: "Wealth",
-      items: [{
-        icon: "house", accent: "var(--gold)",
-        title: "Property & Assets",
-        subtitle: `Net worth £${(s.net_worth || 0).toLocaleString()}`,
-        trailing: { kind: "chevron" },
-        action: "view-assets",
-      }],
-    });
-
-    LifeUI.renderScreen("career", groups);
+    LifeUI.renderScreen("occupation", groups);
   };
 
-  // --- Career sub-page helpers ----------------------------------------
+  // --- Occupation sub-page helpers ------------------------------------
+  // (_eligibleJobs is defined once, earlier in this file.)
 
-  // Shared: filter the snapshot's job catalogue by everything the engine
-  // would gate on (age, smarts, education level, required field). Same
-  // logic the old in-line list used; lifted out so the landing-row
-  // subtitle and the modal stay in sync.
-  App._eligibleJobs = function (s) {
-    const age = (s.character && s.character.age) || 0;
-    const smarts = (s.stats && s.stats.smarts) || 0;
-    const edu = s.education || {};
-    const order = ["None", "Primary School", "Secondary School",
-                   "Secondary Education", "University"];
-    const meets = (need) =>
-      order.indexOf(edu.level || "None") >= order.indexOf(need);
-    return (s.jobs || []).filter(j => {
-      if (age < j.min_age) return false;
-      if (smarts < j.min_smarts) return false;
-      if (!meets(j.min_education)) return false;
-      if (j.required_field &&
-          (!edu.degree_completed || edu.degree_field !== j.required_field)) {
-        return false;
-      }
-      return true;
-    });
-  };
 
   // One-line state summary for the Education row's subtitle.
   App._educationSummary = function (s) {
@@ -340,23 +261,44 @@
     const age = (s.character && s.character.age) || 0;
     const items = [];
 
-    // Currently studying — descriptive row + drop-out.
-    if (edu.in_school && edu.level === "University") {
+    // --- In school: show the current-school panel inline ---
+    // The grade bar lives in a `text-html` block at the top of the
+    // modal; the rows below are the school activities matching the
+    // BitLife flow (Study Harder / Visit the Nurse / Drop Out).
+    if (edu.in_school) {
+      const inUni = edu.level === "University";
       items.push({
         icon: "cap", accent: "var(--cat-education)",
-        title: `${edu.university_name || "University"} — ${edu.university_major || "Undeclared"}`,
-        subtitle: `${edu.study_years_left || 0} years remaining`,
+        title: App._schoolName(edu),
+        subtitle: inUni
+          ? `${edu.university_major || "Undeclared"} · ${edu.study_years_left || 0}y left`
+          : `In session · grade ${App._gradeForSmarts(s.stats.smarts || 0)}`,
+      });
+      items.push({
+        icon: "book", accent: "var(--c-smarts)",
+        title: "Study Harder", subtitle: "Push your grades up",
+        trailing: { kind: "chevron" },
+        action: "do-activity", payload: "study",
+      });
+      items.push({
+        icon: "doctor", accent: "var(--c-health)",
+        title: "Visit the Nurse", subtitle: "Free clinic at school",
+        trailing: { kind: "chevron" },
+        action: "do-activity", payload: "school_nurse",
       });
       items.push({
         icon: "x", accent: "var(--c-bad)",
         title: "Drop Out",
-        subtitle: "Leave university without a degree",
+        subtitle: inUni
+          ? "Leave university without a degree"
+          : "Leave school early — affects your job options later",
         trailing: { kind: "chevron" },
-        action: "drop-out-university",
+        action: inUni ? "drop-out-university" : "drop-out-school",
       });
     }
 
-    // Not in school yet, but eligible to apply.
+    // --- Not in school: re-entry options ---
+
     if (!edu.in_school && !edu.degree_completed && age >= 18) {
       items.push({
         icon: "cap", accent: "var(--cat-education)",
@@ -367,7 +309,6 @@
       });
     }
 
-    // Postgrad path — gated on degree level.
     if (!edu.in_school && edu.degree_completed && !edu.masters_completed) {
       items.push({
         icon: "cap", accent: "var(--cat-education)",
@@ -390,16 +331,21 @@
       items.push({
         icon: "book", accent: "var(--ink-faint)",
         title: "No education options right now",
-        subtitle: edu.in_school
-          ? "You're in school. Age up to progress."
-          : "Come back when you've aged up further.",
+        subtitle: "Come back when you've aged up further.",
         locked: true,
       });
     }
 
+    // When in school, prepend the grade-bar block above the list.
+    const blocks = [];
+    if (edu.in_school) {
+      blocks.push({ type: "html", html: App._gradeBarHTML(s.stats.smarts || 0) });
+    }
+    blocks.push({ type: "list", items });
+
     LifeUI.modal({
       kind: "picker", title: "Education", dismissable: true,
-      blocks: [{ type: "list", items }],
+      blocks,
       actions: [{ label: "Close", variant: "ghost", action: "__close" }],
     });
   };
