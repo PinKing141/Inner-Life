@@ -219,17 +219,15 @@ const LifeUI = (function () {
   }
 
   const BUILTIN = [
-    // 'life' is the record (timeline). Stays a registered screen so
-    // showScreen('life') works from the age button + dispatch, but
-    // has no nav slot — buildScreensAndNav filters out hidden:true.
-    { id: 'life',       label: '',           icon: '',       hidden: true },
-    // Nav slots, left-to-right around the center age button:
-    //   [Occupation] [Assets] [AGE] [Relations] [Activities]
-    { id: 'occupation', label: 'Occupation', icon: 'brief' },
+    // 4-tab bottom nav, left to right. Life is the home screen — the
+    // editorial mock: hero, stat cards, occupation entry, the record
+    // timeline, and the AGE UP CTA. Occupation (School + Special
+    // Careers, including crime) opens as an overlay sub-page launched
+    // from buttons on the Life screen, not as its own nav tab.
+    { id: 'life',       label: 'Life',       icon: 'child' },
     { id: 'assets',     label: 'Assets',     icon: 'assets' },
     { id: 'relations',  label: 'Relations',  icon: 'heart' },
     { id: 'activities', label: 'Activities', icon: 'dots' },
-    { id: 'crime',      label: 'Crime',      icon: 'sack' },
   ];
 
   function registerScreen(id, opts) {
@@ -412,25 +410,24 @@ const LifeUI = (function () {
 
   function setIdentity(d) {
     d = d || {};
-    if (d.name != null) $('.app-identity .nm').textContent = d.name;
-    if (d.stage != null) {
-      // Identity-area sub-label (Toddler / Teenager / Mature Adult).
-      // The Occupation tab label is fixed; stage info lives here.
-      $('.app-identity .stage .txt').textContent = d.stage;
-    }
+    const hero = S.root && S.root.querySelector('.screen[data-screen="life"] .hero');
+    if (!hero) return;
+    if (d.name != null)    hero.querySelector('.nm').textContent = d.name;
+    if (d.stage != null)   hero.querySelector('.stage .txt').textContent = d.stage;
+    if (d.age != null)     hero.querySelector('.stage .age em').textContent = d.age;
     if (d.stageIcon != null) {
-      $('.app-identity .stage .ico').innerHTML = ICONS[d.stageIcon] ? svg(d.stageIcon, 2) : '';
+      hero.querySelector('.stage .ico').innerHTML = ICONS[d.stageIcon] ? svg(d.stageIcon, 2) : '';
     }
-    // Greyed Occupation tab when the player is too young for jobs or
-    // school. CSS hooks data-stage-locked on the button. Kept as a
-    // separate flag so tests/callers can opt out without rebuilding nav.
+    if (d.location != null) hero.querySelector('.location .loc').textContent = d.location;
+    if (d.balance != null)  hero.querySelector('.balance .amt').textContent = money(d.balance);
+    if (d.flag != null)     hero.querySelector('.flag').innerHTML = d.flag;
+    // Occupation sub-page launchers live on the Life screen now;
+    // CSS hooks data-stage-locked on the school button when the
+    // player is too young / no longer in school.
     if (d.occupationLocked != null) {
-      const btn = S.root.querySelector('.app-nav button[data-screen="occupation"]');
-      if (btn) btn.toggleAttribute('data-stage-locked', !!d.occupationLocked);
+      const school = S.root.querySelector('[data-action="open-school"]');
+      if (school) school.toggleAttribute('data-stage-locked', !!d.occupationLocked);
     }
-    if (d.location != null) $('.app-identity .stage .loc').textContent = d.location;
-    if (d.balance != null) $('.app-identity .bal .v').textContent = money(d.balance);
-    if (d.flag != null) $('.app-identity .flag').innerHTML = d.flag;
   }
 
   const STAT_META = {
@@ -444,9 +441,7 @@ const LifeUI = (function () {
       const row = S.root.querySelector(`.ui-stat[data-stat="${key}"]`);
       if (!row) return;
       const v = Math.max(0, Math.min(100, Math.round(stats[key])));
-      row.querySelector('.num').textContent = v + "%";
-      // Fill the BitLife-style horizontal bar. Sits between .name and
-      // .num — CSS makes the row a grid so the bar can flex.
+      row.querySelector('.num').textContent = v;
       const fill = row.querySelector('.fill');
       if (fill) fill.style.width = v + "%";
     });
@@ -492,26 +487,82 @@ const LifeUI = (function () {
       div.className = 'screen';
       div.dataset.screen = s.id;
       if (s.id === 'life') {
-        // Life screen is purely the timeline (record). The age button
-        // returns here from anywhere; sub-pages (Occupation, Assets,
-        // etc.) live on their own screens.
-        div.innerHTML = '<div class="ui-timeline"></div>';
+        // Life is the editorial home: hero, stat cards, occupation
+        // entry, "the record" timeline. All on one scrolling page.
+        div.innerHTML = lifeScreenHTML();
       }
       s.el = div;
       screensEl.appendChild(div);
     });
-    // Nav only shows non-hidden screens, first four. Current order
-    // (set in BUILTIN): occupation, assets | age | relations, activities.
     const navScreens = S.screens.filter(s => !s.hidden).slice(0, 4);
-    const cells = [];
-    navScreens.slice(0, 2).forEach(s => cells.push(navBtn(s)));
-    cells.push('<div class="nav-spacer"></div>');
-    navScreens.slice(2, 4).forEach(s => cells.push(navBtn(s)));
-    navEl.innerHTML = cells.join('');
-    // Default landing is 'life' (the record). If something replaces or
-    // removes the life screen, fall back to the first registered.
+    navEl.innerHTML = navScreens.map(navBtn).join('');
     const landing = S.screens.find(s => s.id === 'life') || S.screens[0];
     if (landing) showScreen(landing.id);
+  }
+
+  function lifeScreenHTML() {
+    return `
+      <header class="hero">
+        <div class="hero-top">
+          <div class="flag"></div>
+          <div class="identity">
+            <h1 class="nm">—</h1>
+            <div class="stage">
+              <span class="ico"></span>
+              <span class="txt">—</span>
+              <span class="dot"></span>
+              <span class="age">Age <em>0</em></span>
+            </div>
+          </div>
+          <div class="balance">
+            <div class="lbl">Balance</div>
+            <div class="amt">£0</div>
+          </div>
+        </div>
+        <div class="location">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/>
+            <circle cx="12" cy="10" r="2.6"/>
+          </svg>
+          <span class="loc">—</span>
+        </div>
+      </header>
+
+      <section class="stats">
+        ${['happiness','health','smarts','looks'].map(k => {
+          const m = STAT_META[k];
+          return `<div class="stat ui-stat" data-stat="${k}" style="--c:${m.color}">
+            <div class="row">
+              <span class="ico">${svg(m.icon, 2)}</span>
+              <span class="key">${m.label}</span>
+              <span class="val"><span class="num">0</span><small>/100</small></span>
+            </div>
+            <div class="bar"><div class="fill"></div></div>
+          </div>`;
+        }).join('')}
+      </section>
+
+      <section class="occupation-entry">
+        <div class="section-head"><h2>Occupation</h2><div class="rule"></div></div>
+        <div class="entry-grid">
+          <button class="entry-card" data-action="open-school">
+            <span class="ico">${svg('students', 2)}</span>
+            <span class="t">School</span>
+            <span class="chev">${svg('chevron', 2)}</span>
+          </button>
+          <button class="entry-card" data-action="open-special-careers">
+            <span class="ico">${svg('brief', 2)}</span>
+            <span class="t">Special Careers</span>
+            <span class="chev">${svg('chevron', 2)}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="record">
+        <div class="section-head"><h2>The Record</h2><div class="rule"></div></div>
+        <div class="ui-timeline"></div>
+      </section>
+    `;
   }
   function navBtn(s) {
     return `<button data-screen="${s.id}"><svg viewBox="0 0 24 24" fill="none" ` +
@@ -542,37 +593,18 @@ const LifeUI = (function () {
             </button>
           </div>
         </div>
-        <div class="app-identity">
-          <div class="flag"></div>
-          <div class="who">
-            <div class="nm">—</div>
-            <div class="stage"><span class="ico"></span><span class="txt">—</span>
-              <span class="sep"></span><span class="loc">—</span></div>
-          </div>
-          <div class="bal"><div class="k">Bank Balance</div><div class="v">£0</div></div>
-        </div>
         <div class="app-screens"></div>
         <div class="ui-toast">${svg('check', 2.4)}<span>Done</span></div>
         <div class="ui-overlay"></div>
-        <div class="app-navwrap">
-          <div class="app-nav"></div>
-          <button class="age-btn" data-age>
-            <svg class="hourglass" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        <div class="cta-wrap">
+          <button class="age-up" data-age>
+            <svg class="hg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               ${ICONS.hourglass}</svg>
-            <span class="age-lbl">Age</span>
+            Age Up
           </button>
         </div>
-        <div class="app-statbar">
-          ${['happiness','health','smarts','looks'].map(k => {
-            const m = STAT_META[k];
-            return `<div class="ui-stat" data-stat="${k}" style="--accent:${m.color}">` +
-                   `<span class="ico">${svg(m.icon, 2)}</span>` +
-                   `<span class="name">${m.label}</span>` +
-                   `<span class="bar"><span class="fill"></span></span>` +
-                   `<span class="num">0%</span></div>`;
-          }).join('')}
-        </div>
+        <div class="app-nav"></div>
       </div>
       </div>`;
 
@@ -582,8 +614,8 @@ const LifeUI = (function () {
       const b = e.target.closest('button[data-screen]');
       if (b) showScreen(b.dataset.screen);
     });
-    $('.age-btn').addEventListener('click', () => {
-      $('.age-btn').classList.toggle('flip');
+    $('.age-up').addEventListener('click', () => {
+      $('.age-up').classList.toggle('flip');
       fire('ageup');
       // Always return to the record (life timeline) after ageing — the
       // age button is the "read your story" button as well as the
@@ -592,7 +624,7 @@ const LifeUI = (function () {
     });
     $('.app-menu').addEventListener('click', () => fire('menu'));
     $('.app-screens').addEventListener('click', e => {
-      const it = e.target.closest('.ui-item[data-action]');
+      const it = e.target.closest('.ui-item[data-action], .entry-card[data-action]');
       if (!it) return;
       const payload = JSON.parse(decodeURIComponent(it.dataset.payload || 'null'));
       fire('action', { action: it.dataset.action, payload });

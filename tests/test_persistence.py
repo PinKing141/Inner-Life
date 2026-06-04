@@ -51,10 +51,12 @@ def test_save_load_roundtrip_and_deterministic_continuation(tmp_path):
 
 
 def test_save_without_active_game_raises(tmp_path):
-    """Saving before new_game() must fail loudly — silently writing nothing
-    would let the UI think a save exists when it doesn't."""
+    """Saving with no GameState must fail loudly — silently writing nothing
+    would let the UI think a save exists when it doesn't. GameController now
+    auto-spawns, so we explicitly clear state to reach this codepath."""
     import pytest
     c = GameController()
+    c.state = None
     with pytest.raises(RuntimeError):
         c.save(tmp_path / "empty.json")
 

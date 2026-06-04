@@ -78,6 +78,15 @@ class WebBridge(QObject):
     def newGame(self, name: str, gender: str, country: str, talent: str) -> str:
         return _dumps(self._controller.new_game(name, gender, country, talent))
 
+    @Slot(result=str)
+    def newRandomLife(self) -> str:
+        """Spawn a fresh random baby in a random country. Used by the death
+        modal's "Start a new life" button now that character creation is
+        gone."""
+        self._controller._auto_spawn()
+        self._controller._broadcast()
+        return _dumps(self._controller.snapshot())
+
     @Slot(str, str, str, str, str, str, result=str)
     def newGameFull(
         self,

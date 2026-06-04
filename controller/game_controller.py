@@ -11,6 +11,7 @@ the filesystem (save/load), time, etc. Keep that limited to here.
 from __future__ import annotations
 
 import json
+import random as _random
 import time
 from pathlib import Path
 from typing import Callable
@@ -34,6 +35,21 @@ class GameController:
         # via controller.settings to mirror the save_slots IO pattern.
         from controller import settings as settings_io
         self.settings: Settings = settings_io.load()
+        # Auto-spawn: every fresh GameController boots straight into a
+        # life — random country, random gender, random talent, random
+        # name picked locally by sim.new_game's per-country fallbacks.
+        # The UI no longer has a creation wizard.
+        self._auto_spawn()
+
+    def _auto_spawn(self) -> None:
+        country = _random.choice(countries_mod.list_countries()).name
+        gender = _random.choice(("Male", "Female", "NonBinary"))
+        from core.content.names import TALENTS
+        talent = _random.choice(TALENTS)
+        seed = int(time.time() * 1000) & 0x7FFFFFFF
+        self.state = sim.new_game(
+            seed=seed, name="", gender=gender, country=country, talent=talent,
+        )
 
     # ---- Subscription ----
 

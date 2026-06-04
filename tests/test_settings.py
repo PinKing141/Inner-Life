@@ -180,17 +180,6 @@ def test_controller_set_setting_refuses_bad_font_size():
 # --- Snapshot --------------------------------------------------------
 
 
-def test_snapshot_in_creation_mode_includes_settings():
-    """The character creation screen needs font size + motion before
-    any GameState exists. The CREATION-mode short-circuit must still
-    expose settings."""
-    c = GameController()
-    snap = c.snapshot()
-    assert snap["mode"] == "CREATION"
-    assert "settings" in snap
-    assert snap["settings"]["font_size"] == "medium"
-
-
 def test_snapshot_in_playing_mode_includes_settings():
     c = GameController()
     c.new_game(seed=1, name="", gender="Female", country="US", talent="Sports")
