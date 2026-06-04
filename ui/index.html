@@ -26,12 +26,30 @@
 <body>
 <div id="game"></div>
 <!-- Load order matters: icons table -> UI toolkit -> mock data -> App
-     modules (each augments window.App) -> app.js bootstrap. -->
+     modules (each augments window.App in its own IIFE) -> app.js
+     bootstrap. Per-domain UI modules are grouped by folder:
+       app/screens/ -- render per-tab content
+       app/modals/  -- raise per-domain modals
+     Order within a folder doesn't matter because each file just
+     augments the App namespace at script-execution time. -->
 <script src="lib/icons.js"></script>
 <script src="life-ui.js"></script>
 <script src="mock_snapshot.js"></script>
-<script src="app/screens.js"></script>
-<script src="app/modals.js"></script>
+<script src="app/screens/_helpers.js"></script>
+<script src="app/screens/activities.js"></script>
+<script src="app/screens/occupation.js"></script>
+<script src="app/screens/relations.js"></script>
+<script src="app/screens/assets.js"></script>
+<script src="app/screens/crime.js"></script>
+<script src="app/modals/_core.js"></script>
+<script src="app/modals/event.js"></script>
+<script src="app/modals/career.js"></script>
+<script src="app/modals/education.js"></script>
+<script src="app/modals/birth.js"></script>
+<script src="app/modals/milestone.js"></script>
+<script src="app/modals/crime.js"></script>
+<script src="app/modals/death.js"></script>
+<script src="app/modals/relations.js"></script>
 <script src="app/creation.js"></script>
 <script src="app/feed.js"></script>
 <script src="app/bridge.js"></script>
